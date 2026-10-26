@@ -22,36 +22,44 @@ def merge_kols(left: list[KolProfile], right: list[KolProfile]) -> list[KolProfi
     return list(merged.values())
 
 
-def merge_ranked(left: list[RankedKol], right: list[RankedKol]) -> list[RankedKol]:
-    """Fan-in reducer: dedupe by handle, keeping the highest-scoring copy."""
-    merged: dict[str, RankedKol] = {}
-    for ranked in [*left, *right]:
-        key = ranked.kol.handle.lower()
-        current = merged.get(key)
-        if current is None or ranked.total_score > current.total_score:
-            merged[key] = ranked
-    return list(merged.values())
-
-
 class MatchState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     request: MatchRequest
+    # Pipeline stages, in graph order.
     stage: Literal[
         "received",
-        "enriching",
-        "profiling",
-        "searching",
-        "scoring",
+        "scraping",
+        "analyzing_brand",
+        "generating_queries",
+        "discovering_kols",
+        "filtering_thai",
+        "enriching_kols",
+        "embedding_prefilter",
+        "reranking",
+        "outputting",
         "done",
         "failed",
     ] = "received"
 
+    website_content: str | None = None
     facebook_page: FacebookPage | None = None
     brand_profile: BrandProfile | None = None
 
-    candidates: Annotated[list[KolProfile], merge_kols] = Field(default_factory=list)
-    ranked: Annotated[list[RankedKol], merge_ranked] = Field(default_factory=list)
+    search_queries: list[str] = Field(default_factory=list)
+    search_rounds: int = Field(default=0, ge=0)
+
+    # Raw output of discover_kols, accumulated across query rounds. The reducer
+    # dedupes by lowercase handle with priority apify > seed > cache.
+    discovered: Annotated[list[KolProfile], merge_kols] = Field(default_factory=list)
+    # filter_thai output. Plain overwrite (not reducer-backed) so the list can shrink.
+    candidates: list[KolProfile] = Field(default_factory=list)
+    # embed_and_prefilter output: the top 20-30 candidates sent to llm_rerank.
+    shortlisted: list[KolProfile] = Field(default_factory=list)
+
+    # Every candidate scored by llm_rerank, sorted by total_score.
+    ranked: list[RankedKol] = Field(default_factory=list)
+    # Top-k slice of ranked, returned to the caller.
     results: list[RankedKol] = Field(default_factory=list)
 
     errors: Annotated[list[str], operator.add] = Field(default_factory=list)

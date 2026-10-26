@@ -16,16 +16,21 @@ class ScoreBreakdown(DomainModel):
 
 
 class MatchWeights(DomainModel):
-    relevance: float = Field(default=0.4, ge=0, le=1)
-    engagement: float = Field(default=0.25, ge=0, le=1)
-    audience: float = Field(default=0.2, ge=0, le=1)
-    tier: float = Field(default=0.15, ge=0, le=1)
+    relevance: float = Field(default=0.4, ge=0)
+    engagement: float = Field(default=0.25, ge=0)
+    audience: float = Field(default=0.2, ge=0)
+    tier: float = Field(default=0.15, ge=0)
 
     @model_validator(mode="after")
-    def _weights_sum_to_one(self) -> "MatchWeights":
+    def _normalize(self) -> "MatchWeights":
         total = self.relevance + self.engagement + self.audience + self.tier
-        if abs(total - 1.0) > 1e-6:
-            raise ValueError(f"weights must sum to 1.0, got {total:.4f}")
+        if total <= 0:
+            raise ValueError("weights must not all be zero")
+
+        self.relevance /= total
+        self.engagement /= total
+        self.audience /= total
+        self.tier /= total
         return self
 
     def apply(self, scores: ScoreBreakdown) -> float:
@@ -58,22 +63,25 @@ class FacebookPage(DomainModel):
 
 
 class TargetAudience(DomainModel):
-    age_range: str
-    gender: Literal["male", "female", "any"] = "any"
-    interests: list[str] = Field(default_factory=list)
+    age_min: int | None
+    age_max: int | None
+    gender: Literal["male", "female", "any"]
+    interests: list[str]
     location: str
 
 
 class BrandProfile(DomainModel):
+    """OpenAI strict structured output: every field is required (no defaults)."""
+
     category: str
-    products: list[str] = Field(default_factory=list)
+    products: list[str]
     target_audience: TargetAudience
     tone: str
     content_style: str
-    keywords_th: list[str] = Field(default_factory=list)
-    keywords_en: list[str] = Field(default_factory=list)
-    hashtags: list[str] = Field(default_factory=list)
-    preferred_tiers: list[str] = Field(default_factory=list)
+    keywords_th: list[str]
+    keywords_en: list[str]
+    hashtags: list[str]
+    preferred_tiers: list[Literal["nano", "micro", "macro", "mega"]]
     reasoning: str
 
 
@@ -83,15 +91,16 @@ class KolProfile(DomainModel):
     nickname: str | None = None
     followers: int = Field(default=0, ge=0)
     bio: str | None = None
-    language: str
-    region: str
-    median_engagement_rate: float = Field(
+    language: str | None = None
+    region: str | None = None
+    median_engagement_rate: float | None = Field(
+        default=None,
         ge=0,
         le=1,
         description="Median engagement per post as a fraction (0.043 = 4.3%).",
     )
     posts_per_week: float = Field(default=0, ge=0)
-    content_summary: str
+    content_summary: str | None = None
     source: Literal["apify", "seed", "cache"]
 
 

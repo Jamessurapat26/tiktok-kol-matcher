@@ -31,6 +31,9 @@ ENV/
 data/cache/
 *.db
 *.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
 
 # Node
 node_modules/

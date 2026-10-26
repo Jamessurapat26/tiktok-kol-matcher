@@ -1,4 +1,5 @@
-from typing import Literal
+from collections.abc import Mapping
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
@@ -16,22 +17,61 @@ class ScoreBreakdown(DomainModel):
 
 
 class MatchWeights(DomainModel):
+    # Frozen so the sum==1 invariant cannot be broken by attribute assignment.
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     relevance: float = Field(default=0.4, ge=0)
     engagement: float = Field(default=0.25, ge=0)
     audience: float = Field(default=0.2, ge=0)
     tier: float = Field(default=0.15, ge=0)
 
-    @model_validator(mode="after")
-    def _normalize(self) -> "MatchWeights":
-        total = self.relevance + self.engagement + self.audience + self.tier
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize(cls, data: Any) -> Any:
+        """Fill defaults and normalize the raw input dict before validation.
+
+        Normalizing here (rather than in a mode="after" validator) keeps the
+        invariant at construction without mutating an already-built model. No
+        model is instantiated in this validator, so it cannot recurse.
+        """
+        if isinstance(data, cls):
+            data = data.model_dump()
+        if not isinstance(data, Mapping):
+            return data
+
+        try:
+            values = {
+                "relevance": float(data.get("relevance", 0.4)),
+                "engagement": float(data.get("engagement", 0.25)),
+                "audience": float(data.get("audience", 0.2)),
+                "tier": float(data.get("tier", 0.15)),
+            }
+        except (TypeError, ValueError):
+            # Let field validation coerce/report non-numeric input.
+            return data
+
+        if any(value < 0 for value in values.values()):
+            # Leave negatives to the fields' ge=0 constraint.
+            return data
+
+        total = sum(values.values())
         if total <= 0:
             raise ValueError("weights must not all be zero")
 
-        self.relevance /= total
-        self.engagement /= total
-        self.audience /= total
-        self.tier /= total
-        return self
+        normalized = {name: value / total for name, value in values.items()}
+        # Preserve unknown keys so extra="forbid" still rejects them.
+        return {**data, **normalized}
+
+    def model_copy(
+        self,
+        *,
+        update: Mapping[str, Any] | None = None,
+        deep: bool = False,
+    ) -> "MatchWeights":
+        """Validate ``update`` so ``model_copy(update=...)`` cannot break the sum."""
+        if not update:
+            return super().model_copy(deep=deep)
+        return type(self).model_validate({**self.model_dump(), **update})
 
     def apply(self, scores: ScoreBreakdown) -> float:
         return round(

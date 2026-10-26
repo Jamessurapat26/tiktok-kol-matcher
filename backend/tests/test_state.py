@@ -2,7 +2,7 @@ import pytest
 from langgraph.graph import END, START, StateGraph
 from pydantic import ValidationError
 
-from app.models import KolProfile, MatchRequest, MatchWeights
+from app.models import KolProfile, MatchRequest, MatchWeights, ScoreBreakdown
 from app.state import MatchState, merge_kols
 
 
@@ -36,6 +36,28 @@ def test_merge_kols_dedupes_by_lowercase_handle_and_prefers_apify():
     assert by_handle["creator"].followers == 300
 
 
+def test_merge_kols_coerces_dict_updates():
+    cache = {
+        "handle": "@Creator",
+        "url": "https://www.tiktok.com/@creator",
+        "source": "cache",
+        "followers": 100,
+    }
+    apify = {
+        "handle": " creator ",
+        "url": "https://www.tiktok.com/@creator",
+        "source": "apify",
+        "followers": 300,
+    }
+
+    merged = merge_kols([cache], [apify])
+
+    assert len(merged) == 1
+    assert isinstance(merged[0], KolProfile)
+    assert merged[0].source == "apify"
+    assert merged[0].followers == 300
+
+
 def test_merge_kols_prefers_seed_over_cache():
     cache = make_kol("creator", "cache")
     seed = make_kol("creator", "seed")
@@ -66,6 +88,63 @@ def test_match_weights_reject_negative(field):
 def test_match_weights_reject_all_zero():
     with pytest.raises(ValidationError, match="must not all be zero"):
         MatchWeights(relevance=0, engagement=0, audience=0, tier=0)
+
+
+def test_match_weights_defaults_fill_and_apply():
+    weights = MatchWeights()
+    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
+
+    request = make_request()
+    assert sum(request.weights.model_dump().values()) == pytest.approx(1.0)
+
+    scores = ScoreBreakdown(
+        relevance=1,
+        engagement=1,
+        audience_fit=1,
+        tier_fit=1,
+        audience_confidence="high",
+    )
+    assert request.weights.apply(scores) == pytest.approx(1.0)
+
+
+def test_match_weights_missing_fields_get_defaults_before_normalizing():
+    weights = MatchWeights(relevance=1)
+
+    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
+    assert weights.engagement == pytest.approx(0.25 / 1.6)
+    assert weights.audience == pytest.approx(0.2 / 1.6)
+    assert weights.tier == pytest.approx(0.15 / 1.6)
+
+
+def test_match_weights_assignment_raises():
+    weights = MatchWeights()
+
+    with pytest.raises(ValidationError):
+        weights.relevance = 1.0
+
+    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
+
+
+def test_match_weights_model_copy_revalidates_update():
+    weights = MatchWeights()
+
+    copied = weights.model_copy(update={"relevance": 9})
+
+    assert copied is not weights
+    assert sum(copied.model_dump().values()) == pytest.approx(1.0)
+    assert copied.relevance == pytest.approx(9 / 9.6)
+
+
+def test_match_weights_model_validate_normalizes():
+    weights = MatchWeights.model_validate(
+        {"relevance": 4, "engagement": 2, "audience": 2, "tier": 2}
+    )
+
+    assert weights.relevance == pytest.approx(0.4)
+    assert weights.engagement == pytest.approx(0.2)
+    assert weights.audience == pytest.approx(0.2)
+    assert weights.tier == pytest.approx(0.2)
+    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
 
 
 def test_graph_loop_accumulates_discovered_and_filter_can_shrink():
@@ -120,3 +199,59 @@ def test_graph_loop_accumulates_discovered_and_filter_can_shrink():
         "discover round 2",
         "filter_thai",
     ]
+
+
+def test_graph_node_returning_dicts_is_coerced_by_reducer():
+    def discover(state: MatchState) -> dict:
+        return {
+            "discovered": [
+                {
+                    "handle": "@Creator",
+                    "url": "https://www.tiktok.com/@creator",
+                    "source": "cache",
+                    "followers": 100,
+                },
+                {
+                    "handle": "creator",
+                    "url": "https://www.tiktok.com/@creator",
+                    "source": "apify",
+                    "followers": 300,
+                },
+            ]
+        }
+
+    graph = StateGraph(MatchState)
+    graph.add_node("discover", discover)
+    graph.add_edge(START, "discover")
+    graph.add_edge("discover", END)
+
+    result = graph.compile().invoke({"request": make_request()})
+
+    assert len(result["discovered"]) == 1
+    assert all(isinstance(kol, KolProfile) for kol in result["discovered"])
+    assert result["discovered"][0].source == "apify"
+    assert result["discovered"][0].followers == 300
+
+
+def test_graph_accumulates_search_queries_across_rounds():
+    def generate_queries(state: MatchState) -> dict:
+        round_no = state.search_rounds + 1
+        return {
+            "search_queries": [f"query {round_no}"],
+            "search_rounds": round_no,
+        }
+
+    def next_node(state: MatchState) -> str:
+        return "generate_queries" if state.search_rounds < 3 else END
+
+    graph = StateGraph(MatchState)
+    graph.add_node("generate_queries", generate_queries)
+    graph.add_edge(START, "generate_queries")
+    graph.add_conditional_edges(
+        "generate_queries", next_node, ["generate_queries", END]
+    )
+
+    result = graph.compile().invoke({"request": make_request()})
+
+    assert result["search_queries"] == ["query 1", "query 2", "query 3"]
+

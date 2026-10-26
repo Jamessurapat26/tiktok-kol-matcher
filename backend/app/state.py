@@ -9,10 +9,15 @@ _SOURCE_PRIORITY: dict[str, int] = {"apify": 3, "seed": 2, "cache": 1}
 
 
 def merge_kols(left: list[KolProfile], right: list[KolProfile]) -> list[KolProfile]:
-    """Fan-in reducer: dedupe by handle, keeping the highest-priority source."""
+    """Fan-in reducer: dedupe by handle, keeping the highest-priority source.
+
+    LangGraph passes node updates to reducers as raw values, so list items may be
+    dicts even though the state annotation says ``KolProfile``. Coerce them here.
+    """
     merged: dict[str, KolProfile] = {}
-    for kol in [*left, *right]:
-        key = kol.handle.lower()
+    for raw in [*left, *right]:
+        kol = raw if isinstance(raw, KolProfile) else KolProfile.model_validate(raw)
+        key = kol.handle.strip().lower().lstrip("@")
         current = merged.get(key)
         if (
             current is None
@@ -46,11 +51,14 @@ class MatchState(BaseModel):
     facebook_page: FacebookPage | None = None
     brand_profile: BrandProfile | None = None
 
-    search_queries: list[str] = Field(default_factory=list)
+    # Accumulates across rounds. generate_queries returns only the new queries for
+    # the current round; it can read the prior list on state to avoid repeats.
+    search_queries: Annotated[list[str], operator.add] = Field(default_factory=list)
     search_rounds: int = Field(default=0, ge=0)
 
     # Raw output of discover_kols, accumulated across query rounds. The reducer
-    # dedupes by lowercase handle with priority apify > seed > cache.
+    # dedupes by normalized handle (strip whitespace, lowercase, drop leading "@")
+    # with priority apify > seed > cache.
     discovered: Annotated[list[KolProfile], merge_kols] = Field(default_factory=list)
     # filter_thai output. Plain overwrite (not reducer-backed) so the list can shrink.
     candidates: list[KolProfile] = Field(default_factory=list)

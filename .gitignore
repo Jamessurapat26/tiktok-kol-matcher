@@ -27,6 +27,17 @@ ENV/
 !.env.example
 *.pem
 
+# Local data & databases
+data/cache/
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# Node
+node_modules/
+
 # Testing & tooling caches
 .pytest_cache/
 .mypy_cache/

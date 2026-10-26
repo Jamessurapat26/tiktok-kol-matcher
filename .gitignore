@@ -41,6 +41,10 @@ htmlcov/
 *.swp
 *~
 
+# Agent skills (installed per-machine via `npx skills add`)
+.agents/
+skills-lock.json
+
 # Logs
 *.log
 logs/

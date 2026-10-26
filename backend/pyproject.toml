@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "TikTok KOL matcher for Thai brands (LangGraph pipeline)"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

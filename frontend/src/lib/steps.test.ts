@@ -1,4 +1,4 @@
-import type { JobEvent } from '@/api/types'
+import type { JobEvent, NodeStatus } from '@/api/types'
 import demoEvents from '@/test/demo-events.json'
 import { applyEvent, initialProgress, NODE_ORDER, type Progress, stepDuration } from './steps'
 
@@ -56,7 +56,7 @@ describe('applyEvent', () => {
     expect(step(afterFirstRound, 'discover_kols')).toMatchObject({ status: 'finished', runs: 1 })
 
     const duringSecondRound = fold(events.slice(10, 13), afterFirstRound)
-    expect(step(duringSecondRound, 'discover_kols')).toMatchObject({ status: 'running', runs: 2 })
+    expect(step(duringSecondRound, 'discover_kols')).toMatchObject({ status: 'running', runs: 2, summary: '' })
     expect(step(duringSecondRound, 'generate_queries').runs).toBe(2)
 
     const afterSecondRound = fold(events.slice(13, 14), duringSecondRound)
@@ -119,5 +119,11 @@ describe('applyEvent', () => {
     const progress = fold([nodeEvent(1, 'new_node', 'started')])
     expect(progress.steps).toEqual(initialProgress().steps)
     expect(progress.lastSeq).toBe(1)
+  })
+
+  it('leaves the state untouched on a status it does not know', () => {
+    const before = fold(events.slice(0, 3))
+    const bogus = nodeEvent(4, 'scrape_facebook', 'paused' as NodeStatus)
+    expect(applyEvent(before, bogus)).toBe(before)
   })
 })

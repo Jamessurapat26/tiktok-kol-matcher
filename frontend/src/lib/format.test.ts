@@ -30,6 +30,13 @@ describe('number formatting', () => {
     expect(formatDuration(95_000)).toBe('1m 35s')
   })
 
+  it('rounds a duration before choosing its unit', () => {
+    expect(formatDuration(999.4)).toBe('999 ms')
+    expect(formatDuration(999.6)).toBe('1.0 s')
+    expect(formatDuration(59_940)).toBe('59.9 s')
+    expect(formatDuration(59_950)).toBe('1m 0s')
+  })
+
   it('builds avatar initials from a handle', () => {
     expect(initials('BankZaGaming')).toBe('BA')
     expect(initials('_x.y')).toBe('XY')

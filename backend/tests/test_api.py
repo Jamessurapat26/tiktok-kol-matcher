@@ -1,4 +1,5 @@
 import json
+import threading
 from dataclasses import replace
 
 import pytest
@@ -9,6 +10,7 @@ from app.api.settings import LiveFlags, Settings
 from app.api.store import JobStore
 from app.graph import _NODE_ORDER
 from app.integrations import mock_integrations
+from app.integrations.web_reader import MockWebReader
 from app.models import MatchRequest
 
 _ENV_VARS = (
@@ -227,3 +229,34 @@ def test_restart_fails_jobs_left_running(make_client, tmp_path):
     assert job["status"] == "failed"
     assert "interrupted by restart" in job["errors"]
     assert [e["type"] for e in events] == ["failed"]
+
+
+class GatedWebReader:
+    def __init__(self):
+        self.gate = threading.Event()
+
+    def read(self, url):
+        assert self.gate.wait(5), "test never opened the gate"
+        return MockWebReader().read(url)
+
+
+def test_events_stream_live_while_job_runs(tmp_path):
+    reader = GatedWebReader()
+    app = create_app(
+        Settings(jobs_db=tmp_path / "jobs.db"),
+        integrations_factory=lambda flags: replace(mock_integrations(), web_reader=reader),
+    )
+    types = []
+    with TestClient(app) as client:
+        job_id = client.post("/api/jobs", json=_BODY).json()["job_id"]
+        with client.stream("GET", f"/api/jobs/{job_id}/events") as response:
+            for line in response.iter_lines():
+                if line.startswith("event: "):
+                    types.append(line.removeprefix("event: "))
+                    if not reader.gate.is_set():
+                        job = client.get(f"/api/jobs/{job_id}").json()
+                        assert job["status"] == "running", "first event arrived mid-run"
+                        reader.gate.set()
+
+    assert types[0] == "node"
+    assert types[-1] == "done"

@@ -269,6 +269,32 @@ def test_discover_searches_only_the_latest_round_queries():
     assert final["search_queries"] == round_1 + round_2
 
 
+def test_enricher_exception_keeps_the_kol_and_continues():
+    class Boom:
+        def enrich(self, kol):
+            if kol.handle == "Boom":
+                raise RuntimeError("profile down")
+            return {"median_engagement_rate": 0.04, "posts_per_week": 1.0}
+
+    fixtures = [
+        make_fixture("Boom", 1),
+        make_fixture("Fine", 1),
+    ]
+    integrations = replace(mock_integrations(kol_fixtures=fixtures), enricher=Boom())
+    final = build_graph(integrations, min_candidates=1).invoke(
+        initial_state(make_request())
+    )
+
+    by_handle = {kol.handle: kol for kol in final["candidates"]}
+    assert final["stage"] == "done"
+    assert by_handle["Boom"].median_engagement_rate is None
+    assert by_handle["Fine"].median_engagement_rate == 0.04
+    assert any(
+        "enrich_kols: failed for Boom: profile down" in error
+        for error in final["errors"]
+    )
+
+
 def test_invalid_enrichment_keeps_the_original_kol():
     class SelectiveEnricher:
         def enrich(self, kol):
@@ -377,3 +403,35 @@ def test_enricher_prefers_higher_priority_fixture_and_keeps_ties():
     update = MockKolEnricher([earlier, later]).enrich(kol)
     assert update["median_engagement_rate"] == 0.03
     assert "earlier" in update["content_summary"]
+
+
+class _CountingEnricher:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def enrich(self, kol: KolProfile) -> dict:
+        self.calls.append(kol.handle)
+        return {}
+
+
+def test_enrich_limit_caps_enrichment_to_largest_accounts():
+    enricher = _CountingEnricher()
+    integrations = replace(mock_integrations(), enricher=enricher)
+    graph = build_graph(integrations, enrich_limit=3)
+
+    final = graph.invoke(initial_state(make_request()))
+
+    assert final["stage"] == "done"
+    assert len(enricher.calls) == 3
+    by_followers = sorted(final["candidates"], key=lambda k: -k.followers)
+    assert {h.lower() for h in enricher.calls} == {
+        k.handle.lower() for k in by_followers[:3]
+    }
+    assert len(final["candidates"]) > 3
+
+
+def test_enrich_limit_default_enriches_everyone():
+    enricher = _CountingEnricher()
+    integrations = replace(mock_integrations(), enricher=enricher)
+    final = build_graph(integrations).invoke(initial_state(make_request()))
+    assert len(enricher.calls) == len(final["candidates"])

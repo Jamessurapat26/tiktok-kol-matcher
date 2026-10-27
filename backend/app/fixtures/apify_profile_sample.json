@@ -1,0 +1,109 @@
+[
+  {
+    "id": "7353646097262202145",
+    "text": "Hi, we're Apify, and we make the web more programmable. #fyp #automation",
+    "createTime": 1712154160,
+    "createTimeISO": "2024-04-03T14:22:40.000Z",
+    "isAd": true,
+    "isPinned": true,
+    "authorMeta": {
+      "id": "7353570794285417504",
+      "name": "apifytech",
+      "profileUrl": "https://www.tiktok.com/@apifytech",
+      "nickName": "apifytech",
+      "verified": false,
+      "signature": "Hi, we're Apify, and we make the web more programmable. web scraping, AI",
+      "bioLink": null,
+      "privateAccount": false,
+      "region": "CZ",
+      "fans": 852,
+      "following": 1,
+      "heart": 2611,
+      "video": 18
+    },
+    "webVideoUrl": "https://www.tiktok.com/@apifytech/video/7353646097262202145",
+    "diggCount": 725,
+    "shareCount": 30,
+    "playCount": 83900,
+    "commentCount": 10,
+    "hashtags": [
+      {"name": "fyp"},
+      {"name": "automation"}
+    ],
+    "input": "apifytech"
+  },
+  {
+    "id": "7353646097262202201",
+    "text": "desk setup tour #gadgets",
+    "createTime": 1700000000,
+    "createTimeISO": "2023-11-14T22:13:20.000Z",
+    "isAd": false,
+    "isPinned": false,
+    "authorMeta": {
+      "id": "7353570794285417504",
+      "name": "apifytech",
+      "profileUrl": "https://www.tiktok.com/@apifytech",
+      "nickName": "apifytech",
+      "signature": "Hi, we're Apify, and we make the web more programmable. web scraping, AI",
+      "region": "CZ",
+      "fans": 852,
+      "privateAccount": false
+    },
+    "webVideoUrl": "https://www.tiktok.com/@apifytech/video/7353646097262202201",
+    "diggCount": 100,
+    "shareCount": 20,
+    "playCount": 1000,
+    "commentCount": 20,
+    "hashtags": [
+      {"name": "gadgets"}
+    ],
+    "input": "apifytech"
+  },
+  {
+    "id": "7353646097262202202",
+    "text": "blue light glasses for late night gaming #eyewear",
+    "createTime": 1700604800,
+    "createTimeISO": "2023-11-21T22:13:20.000Z",
+    "isAd": false,
+    "isPinned": false,
+    "authorMeta": {
+      "id": "7353570794285417504",
+      "name": "apifytech",
+      "nickName": "apifytech",
+      "region": "CZ",
+      "fans": 852
+    },
+    "webVideoUrl": "https://www.tiktok.com/@apifytech/video/7353646097262202202",
+    "diggCount": 100,
+    "shareCount": 0,
+    "playCount": 2000,
+    "commentCount": 0,
+    "hashtags": [
+      {"name": "eyewear"}
+    ],
+    "input": "apifytech"
+  },
+  {
+    "id": "7353646097262202203",
+    "text": "one more setup #gadgets",
+    "createTime": 1701209600,
+    "createTimeISO": "2023-11-28T22:13:20.000Z",
+    "isAd": false,
+    "isPinned": false,
+    "authorMeta": {
+      "id": "7353570794285417504",
+      "name": "apifytech",
+      "nickName": "apifytech",
+      "region": "CZ",
+      "fans": 852
+    },
+    "webVideoUrl": "https://www.tiktok.com/@apifytech/video/7353646097262202203",
+    "diggCount": 852,
+    "shareCount": 0,
+    "commentCount": 0,
+    "hashtags": [
+      {"name": "gadgets"}
+    ],
+    "input": "apifytech"
+  }
+]

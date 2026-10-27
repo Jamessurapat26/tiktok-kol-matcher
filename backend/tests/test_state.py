@@ -68,13 +68,111 @@ def test_merge_kols_prefers_seed_over_cache():
 
 def test_merge_kols_equal_priority_keeps_the_earlier_row():
     earlier = make_kol("creator", "seed", followers=1)
-    later = make_kol("CREATOR", "seed", followers=2)
+    later = make_kol("CREATOR", "seed", followers=2, bio="later bio")
 
     merged = merge_kols([earlier], [later])
 
     assert merged[0].source == "seed"
     assert merged[0].followers == 1
     assert merged[0].handle == "creator"
+    # Equal priority does not fill from the later row.
+    assert merged[0].bio is None
+
+
+def test_merge_kols_fills_missing_fields_from_lower_priority():
+    seed = make_kol(
+        "creator",
+        "seed",
+        followers=200,
+        bio="from seed",
+        language="th",
+        nickname="Nick",
+        region="TH",
+        content_summary="seed topics",
+        median_engagement_rate=0.05,
+    )
+    apify = make_kol("Creator", "apify", followers=300)
+
+    merged = merge_kols([seed], [apify])
+
+    assert len(merged) == 1
+    winner = merged[0]
+    assert winner.source == "apify"
+    assert winner.handle == "Creator"
+    assert winner.followers == 300
+    assert winner.bio == "from seed"
+    assert winner.language == "th"
+    assert winner.nickname == "Nick"
+    assert winner.region == "TH"
+    assert winner.content_summary == "seed topics"
+    assert winner.median_engagement_rate == 0.05
+
+
+def test_merge_kols_fills_when_the_lower_priority_row_arrives_later():
+    apify = make_kol("Creator", "apify", followers=300, bio="kept")
+    cache = make_kol(
+        "creator",
+        "cache",
+        followers=10,
+        bio="not used",
+        language="th",
+        content_summary="cached topics",
+    )
+
+    winner = merge_kols([apify], [cache])[0]
+
+    assert winner.source == "apify"
+    assert winner.followers == 300
+    assert winner.bio == "kept"
+    assert winner.language == "th"
+    assert winner.content_summary == "cached topics"
+
+
+def test_merge_kols_does_not_treat_zero_as_missing():
+    seed = make_kol("creator", "seed", followers=50, posts_per_week=4)
+    apify = make_kol("creator", "apify", followers=0, posts_per_week=0)
+
+    winner = merge_kols([seed], [apify])[0]
+
+    assert winner.source == "apify"
+    assert winner.followers == 0
+    assert winner.posts_per_week == 0
+
+
+def test_merge_kols_fills_none_fields_through_the_priority_chain():
+    cache = make_kol("creator", "cache", bio="cache bio")
+    seed = make_kol("creator", "seed", language="th")
+    apify = make_kol("CREATOR", "apify", followers=10)
+
+    winner = merge_kols([cache, seed], [apify])[0]
+
+    assert winner.source == "apify"
+    assert winner.handle == "CREATOR"
+    assert winner.followers == 10
+    assert winner.bio == "cache bio"
+    assert winner.language == "th"
+
+
+def test_merge_kols_fills_missing_fields_from_dict_rows():
+    low = {
+        "handle": "creator",
+        "url": "https://www.tiktok.com/@creator",
+        "source": "cache",
+        "bio": "hello",
+        "followers": 10,
+    }
+    high = {
+        "handle": "Creator",
+        "url": "https://www.tiktok.com/@Creator",
+        "source": "apify",
+        "followers": 20,
+    }
+
+    merged = merge_kols([low], [high])
+
+    assert merged[0].source == "apify"
+    assert merged[0].followers == 20
+    assert merged[0].bio == "hello"
 
 
 def test_handle_strips_at_sign_and_preserves_case():

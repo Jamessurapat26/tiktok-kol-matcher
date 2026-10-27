@@ -1,0 +1,103 @@
+[
+  {
+    "id": "7543693751290481942",
+    "text": "ootd \n\n#foruyou #outfit",
+    "textLanguage": "en",
+    "createTime": 1756403075,
+    "createTimeISO": "2025-08-28T17:44:35.000Z",
+    "isAd": false,
+    "authorMeta": {
+      "id": "6733984297591636998",
+      "name": "gretalynnhihi",
+      "profileUrl": "https://www.tiktok.com/@gretalynnhihi",
+      "nickName": "Greta Lynn",
+      "verified": false,
+      "signature": "hellouu\nfashion | beauty | lifestyle",
+      "bioLink": null,
+      "privateAccount": false,
+      "following": 269,
+      "fans": 51200,
+      "heart": 3000000,
+      "video": 259
+    },
+    "webVideoUrl": "https://www.tiktok.com/@gretalynnhihi/video/7543693751290481942",
+    "diggCount": 23400,
+    "shareCount": 145,
+    "playCount": 145900,
+    "commentCount": 46,
+    "hashtags": [
+      {"name": "foruyou"},
+      {"name": "outfit"}
+    ],
+    "searchQuery": "ootd"
+  },
+  {
+    "id": "7543693751290481999",
+    "text": "second look #outfit",
+    "textLanguage": "en",
+    "createTime": 1756400000,
+    "createTimeISO": "2025-08-28T16:53:20.000Z",
+    "locationCreated": "US",
+    "isAd": false,
+    "authorMeta": {
+      "id": "6733984297591636998",
+      "name": "gretalynnhihi",
+      "nickName": "Greta Lynn",
+      "signature": "",
+      "fans": 51200,
+      "privateAccount": false
+    },
+    "webVideoUrl": "https://www.tiktok.com/@gretalynnhihi/video/7543693751290481999",
+    "diggCount": 10,
+    "shareCount": 1,
+    "playCount": 100,
+    "commentCount": 1,
+    "hashtags": [
+      {"name": "outfit"}
+    ],
+    "searchQuery": "ootd"
+  },
+  {
+    "id": "7533731959172861206",
+    "text": "",
+    "textLanguage": "un",
+    "createTime": 1754083665,
+    "createTimeISO": "2025-08-01T21:27:45.000Z",
+    "locationCreated": "GB",
+    "isAd": false,
+    "authorMeta": {
+      "id": "7002169437214213125",
+      "name": "shaiie_foeva",
+      "profileUrl": "https://www.tiktok.com/@shaiie_foeva",
+      "nickName": "Shaiie_Foeva",
+      "verified": false,
+      "signature": "SHOP THE E-BOOK OUT NOW",
+      "privateAccount": false,
+      "fans": 2200000,
+      "following": 0,
+      "heart": 126000000,
+      "video": 1036
+    },
+    "webVideoUrl": "https://www.tiktok.com/@shaiie_foeva/video/7533731959172861206",
+    "diggCount": 25900,
+    "shareCount": 352,
+    "playCount": 573900,
+    "commentCount": 346,
+    "hashtags": [],
+    "submittedVideoUrl": "https://www.tiktok.com/@shaiie_foeva/video/7533731959172861206"
+  },
+  {
+    "id": "0",
+    "text": "orphan video with no author",
+    "diggCount": 1,
+    "shareCount": 0,
+    "playCount": 10,
+    "commentCount": 0
+  },
+  {
+    "url": "https://www.tiktok.com/@someuser",
+    "input": "someuser",
+    "error": "Profile is private",
+    "errorCode": "PROFILE_PRIVATE"
+  }
+]

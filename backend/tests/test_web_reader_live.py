@@ -165,7 +165,10 @@ def test_jina_failure_falls_back_to_trafilatura():
 
     def direct_handler(request: httpx.Request) -> httpx.Response:
         assert str(request.url) == _URL
-        assert "user-agent" in request.headers
+        assert "Mozilla" in request.headers["user-agent"]
+        assert "text/html" in request.headers["accept"]
+        assert "en-US" in request.headers["accept-language"]
+        assert "gzip" in request.headers["accept-encoding"]
         return httpx.Response(200, text=_article_html())
 
     reader = FallbackWebReader(_jina(jina_handler), _trafilatura(direct_handler))
@@ -402,6 +405,15 @@ def test_trafilatura_retries_rate_limit_then_succeeds():
     assert calls["n"] == 3
     assert page.source == "trafilatura"
     assert "blue-light glasses" in page.content
+
+
+def test_trafilatura_default_client_uses_http2():
+    reader = TrafilaturaWebReader()
+    try:
+        pool = reader._client._transport._pool
+        assert pool._http2 is True
+    finally:
+        reader._client.close()
 
 
 def test_trafilatura_does_not_retry_client_errors():

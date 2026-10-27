@@ -43,7 +43,15 @@ def _kol_from_fixture(raw: dict) -> KolProfile:
 
     Fixture-only fields (topics, query_group, engagement_rate) are deliberately
     dropped here; enrichment re-reads the fixture through its own integration.
+    Actor error items (``errorCode``) and mapper rejects (``error``) are raised
+    so the discover loop skips and records that row.
     """
+    error_code = raw.get("errorCode")
+    error_detail = raw.get("error")
+    if error_code or error_detail:
+        code = str(error_code or "error")
+        detail = str(error_detail or code)
+        raise ValueError(f"{code}: {detail}")
     return KolProfile(
         handle=str(raw["handle"]),
         url=str(raw["url"]),
@@ -83,6 +91,7 @@ def make_nodes(
     min_candidates: int,
     max_search_rounds: int,
     prefilter_n: int = 25,
+    enrich_limit: int | None = None,
 ) -> dict[str, Node]:
     """Build the graph nodes with integrations and tuning closed over."""
 
@@ -202,7 +211,19 @@ def make_nodes(
     def enrich_kols(state: MatchState) -> dict[str, Any]:
         enriched: list[KolProfile] = []
         errors: list[str] = []
+        # Live enrichment is one paid actor run per profile, so only the
+        # largest accounts (by followers, then handle) are enriched when capped.
+        to_enrich = {
+            normalize_handle(kol.handle)
+            for kol in sorted(
+                state.candidates,
+                key=lambda k: (-k.followers, normalize_handle(k.handle)),
+            )[:enrich_limit]
+        }
         for kol in state.candidates:
+            if normalize_handle(kol.handle) not in to_enrich:
+                enriched.append(kol)
+                continue
             try:
                 # model_validate re-checks enrichment. model_dump() leaves url
                 # as an HttpUrl; model_validate accepts that.
@@ -216,6 +237,9 @@ def make_nodes(
                 errors.append(
                     f"enrich_kols: rejected enrichment for {kol.handle}: {exc}"
                 )
+            except Exception as exc:  # noqa: BLE001 - one profile must not drop the rest
+                enriched.append(kol)
+                errors.append(f"enrich_kols: failed for {kol.handle}: {exc}")
         update: dict[str, Any] = {
             "candidates": enriched,
             "stage": "enriching_kols",

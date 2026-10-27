@@ -7,6 +7,9 @@ from langgraph.errors import GraphRecursionError
 from app.cli import main
 from app.graph import build_graph
 from app.integrations import mock_integrations
+from app.integrations.kol_enricher_live import ApifyKolEnricher
+from app.integrations.kol_search_live import ApifyKolSearch
+from app.integrations.web_reader import MockWebReader
 from app.integrations.web_reader_live import CachedWebReader
 
 _WEBSITE = "https://ophtus.com"
@@ -206,6 +209,7 @@ def test_live_web_flag_uses_cached_reader_without_running_it(monkeypatch, capsys
     def spy(integrations=None, **kwargs):
         captured["integrations"] = integrations
         captured["kwargs"] = kwargs
+        captured["kwargs"] = kwargs
 
         class _Graph:
             def stream(self, *args, **kwargs):
@@ -232,5 +236,148 @@ def test_live_web_flag_uses_cached_reader_without_running_it(monkeypatch, capsys
 
     assert exit_code == 0
     assert isinstance(captured["integrations"].web_reader, CachedWebReader)
+    assert isinstance(captured["integrations"].kol_search, type(mock_integrations().kol_search))
     assert captured["kwargs"]["min_candidates"]
     assert json.loads(capsys.readouterr().out)["stage"] == "done"
+
+
+def test_help_mentions_live_kols(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["match", "--help"])
+
+    assert exc.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "--live-kols" in help_text
+    assert "--max-results-per-query" in help_text
+    assert "APIFY_TOKEN" in help_text
+
+
+def test_live_kols_without_token_exits_2(monkeypatch, capsys):
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+
+    def fail_build(*args, **kwargs):
+        raise AssertionError("graph should not run")
+
+    monkeypatch.setattr("app.cli.build_graph", fail_build)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--live-kols",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "APIFY_TOKEN" in captured.err
+    assert "Traceback" not in captured.err
+    assert captured.out == ""
+
+    monkeypatch.setenv("APIFY_TOKEN", "   ")
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--live-kols",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "APIFY_TOKEN" in captured.err
+
+
+def test_live_kols_rejects_non_positive_max_results(monkeypatch, capsys):
+    monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
+
+    def fail_build(*args, **kwargs):
+        raise AssertionError("graph should not run")
+
+    monkeypatch.setattr("app.cli.build_graph", fail_build)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--live-kols",
+            "--max-results-per-query",
+            "0",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "--max-results-per-query" in captured.err
+    assert "cli-test-token" not in captured.err
+    assert "cli-test-token" not in captured.out
+
+
+def test_live_kols_flag_wires_apify_without_running_it(monkeypatch, capsys):
+    monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
+    captured: dict = {}
+
+    def spy(integrations=None, **kwargs):
+        captured["integrations"] = integrations
+        captured["kwargs"] = kwargs
+
+        class _Graph:
+            def stream(self, *args, **kwargs):
+                return iter(
+                    [("values", {"stage": "done", "results": [], "errors": []})]
+                )
+
+        return _Graph()
+
+    monkeypatch.setattr("app.cli.build_graph", spy)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--top-k",
+            "5",
+            "--json",
+            "--live-kols",
+            "--max-results-per-query",
+            "4",
+            "--max-enrich",
+            "3",
+        ]
+    )
+
+    captured_io = capsys.readouterr()
+    assert exit_code == 0
+    assert isinstance(captured["integrations"].web_reader, MockWebReader)
+    assert isinstance(captured["integrations"].kol_search, ApifyKolSearch)
+    assert isinstance(captured["integrations"].enricher, ApifyKolEnricher)
+    assert captured["integrations"].kol_search.max_results == 4
+    assert captured["integrations"].enricher.max_videos == 4
+    assert captured["kwargs"]["enrich_limit"] == 3
+    assert "cli-test-token" not in captured_io.out
+    assert "cli-test-token" not in captured_io.err
+    assert json.loads(captured_io.out)["stage"] == "done"
+
+
+def test_max_enrich_must_be_positive(capsys):
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--max-enrich",
+            "0",
+        ]
+    )
+    assert exit_code == 2
+    assert "--max-enrich" in capsys.readouterr().err

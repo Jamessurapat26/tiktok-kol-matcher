@@ -48,7 +48,7 @@ from typing import Any
 import httpx
 
 from ..models import KolProfile, normalize_handle
-from .apify import ApifyClient, ApifyError, as_count, dig
+from .apify import ApifyBudget, ApifyClient, ApifyError, as_count, dig
 
 PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -261,6 +261,7 @@ class ApifyKolEnricher:
         max_retries: int = 1,
         backoff: float = 1.0,
         max_charge_usd: float = 0.50,
+        budget: ApifyBudget | None = None,
         cache_dir: Path | None = None,
         ttl_seconds: float = CACHE_TTL_SECONDS,
         clock: Callable[[], float] = time.time,
@@ -278,6 +279,7 @@ class ApifyKolEnricher:
             "max_retries": max_retries,
             "backoff": backoff,
             "max_charge_usd": max_charge_usd,
+            "budget": budget,
         }
         if sleeper is not None:
             client_kwargs["sleeper"] = sleeper

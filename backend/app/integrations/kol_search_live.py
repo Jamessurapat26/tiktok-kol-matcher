@@ -23,7 +23,15 @@ from typing import Any
 import httpx
 
 from ..models import normalize_handle
-from .apify import ApifyAuthError, ApifyClient, ApifyError, as_count, dig
+from .apify import (
+    ApifyAuthError,
+    ApifyBudget,
+    ApifyBudgetExceeded,
+    ApifyClient,
+    ApifyError,
+    as_count,
+    dig,
+)
 
 SEARCH_ACTOR = "clockworks/tiktok-scraper"
 
@@ -207,6 +215,7 @@ class ApifyKolSearch:
         max_retries: int = 1,
         backoff: float = 1.0,
         max_charge_usd: float = 0.50,
+        budget: ApifyBudget | None = None,
         sleeper: Any = None,
     ) -> None:
         if max_results < 1:
@@ -218,6 +227,7 @@ class ApifyKolSearch:
             "max_retries": max_retries,
             "backoff": backoff,
             "max_charge_usd": max_charge_usd,
+            "budget": budget,
         }
         if sleeper is not None:
             client_kwargs["sleeper"] = sleeper
@@ -232,7 +242,7 @@ class ApifyKolSearch:
         del round
         raw_items: list[Any] = []
         errors: list[dict[str, Any]] = []
-        for query in queries:
+        for index, query in enumerate(queries):
             if not query or not str(query).strip():
                 continue
             try:
@@ -241,6 +251,20 @@ class ApifyKolSearch:
                     search_input(query, max_results=self.max_results),
                     max_items=self.max_results,
                 )
+            except ApifyBudgetExceeded as exc:
+                # Keep creators from earlier queries, but stop paying for more.
+                skipped = sum(
+                    1 for pending in queries[index:] if pending and str(pending).strip()
+                )
+                label = "query" if skipped == 1 else "queries"
+                errors.append(
+                    {
+                        "source": "apify",
+                        "error": f"{exc}; skipped {skipped} {label}",
+                        "errorCode": "APIFY_BUDGET_EXCEEDED",
+                    }
+                )
+                break
             except ApifyAuthError:
                 raise
             except ApifyError as exc:

@@ -6,9 +6,12 @@ only as an ``Authorization`` header and is stripped from every error message.
 
 from __future__ import annotations
 
+import math
 import os
+import threading
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, NoReturn
 from urllib.parse import quote
 
@@ -24,6 +27,17 @@ _RUN_SYNC_ITEMS = (
 # sync HTTP call gave up, but the paid run may still be executing.
 _RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
+# Conservative estimates. The sync endpoint returns dataset items only, not
+# the run usage or cost, so these numbers cannot be exact.
+_FIXED_RUN_USD = 0.01
+_DEFAULT_ITEM_USD = 0.01
+ESTIMATED_USD_PER_ITEM: dict[str, float] = {
+    "clockworks/tiktok-scraper": 0.005,
+    "clockworks/tiktok-profile-scraper": 0.005,
+    "apify/facebook-pages-scraper": 0.01,
+    "apify/facebook-posts-scraper": 0.005,
+}
+
 
 class ApifyError(RuntimeError):
     """An Apify run failed or returned a payload we cannot use."""
@@ -35,6 +49,136 @@ class ApifyAuthError(ApifyError):
 
 class ApifyConfigError(ApifyError):
     """Live Apify was requested without ``APIFY_TOKEN``."""
+
+
+class ApifyBudgetExceeded(ApifyError):
+    """A job-level Apify budget was reached before a run could start."""
+
+
+class ApifyBudget:
+    """Thread-safe estimated spend for one job's Apify calls.
+
+    The run-sync-get-dataset-items endpoint returns only dataset items, not the
+    run cost, so ``record`` receives an estimate. The budget is soft: ``check``
+    runs before each actor call, and the call that crosses the limit is allowed
+    to finish. Spend can therefore exceed the limit by at most that last run.
+    """
+
+    def __init__(self, limit_usd: float) -> None:
+        if not math.isfinite(limit_usd) or limit_usd <= 0:
+            raise ValueError("limit_usd must be positive")
+        self._limit = float(limit_usd)
+        self._spent = 0.0
+        self._skipped = 0
+        self._lock = threading.Lock()
+
+    @property
+    def spent(self) -> float:
+        with self._lock:
+            return self._spent
+
+    @property
+    def remaining(self) -> float:
+        with self._lock:
+            return max(0.0, self._limit - self._spent)
+
+    @property
+    def exhausted(self) -> bool:
+        with self._lock:
+            return self._spent >= self._limit
+
+    @property
+    def skipped(self) -> int:
+        with self._lock:
+            return self._skipped
+
+    def check(self, actor: str) -> None:
+        """Raise ``ApifyBudgetExceeded`` once the estimated spend is used up."""
+        with self._lock:
+            if self._spent >= self._limit:
+                self._skipped += 1
+                raise ApifyBudgetExceeded(
+                    f"Apify job budget of ${self._limit:.2f} reached "
+                    f"(estimated spend ${self._spent:.2f}); skipping {actor}"
+                )
+
+    def record(self, actor: str, usd: float) -> None:
+        """Add an estimated charge. ``actor`` labels the call for callers."""
+        del actor
+        with self._lock:
+            self._spent += float(usd)
+
+    def summary(self) -> str:
+        with self._lock:
+            return (
+                f"Apify budget: estimated ${self._spent:.2f} of "
+                f"${self._limit:.2f} spent, {self._skipped} calls skipped"
+            )
+
+
+def estimate_run_cost(
+    actor: str,
+    items_returned: int,
+    max_charge_usd: float,
+) -> float:
+    """Estimate one run's cost from its item count and per-run cap.
+
+    The sync endpoint does not return usage, so this is an estimate: a small
+    fixed per-run amount plus a conservative per-item rate. Unknown actors use
+    the default per-item rate. The result never exceeds the run's own cap.
+    """
+    per_item = ESTIMATED_USD_PER_ITEM.get(actor, _DEFAULT_ITEM_USD)
+    estimate = _FIXED_RUN_USD + per_item * max(items_returned, 1)
+    return min(max_charge_usd, estimate)
+
+
+def _positive_env(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a positive number") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a positive number")
+    return value
+
+
+@dataclass(frozen=True)
+class ApifyLimits:
+    """Per-run caps and the shared job budget for live Apify calls."""
+
+    job_budget_usd: float
+    tiktok_search_max_charge_usd: float
+    tiktok_profile_max_charge_usd: float
+    facebook_max_charge_usd: float
+
+    @classmethod
+    def from_env(cls) -> ApifyLimits:
+        job_budget = _positive_env("APIFY_JOB_BUDGET_USD", 1.00)
+        tiktok_search = _positive_env("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", 0.50)
+        tiktok_profile = _positive_env("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", 0.50)
+        facebook = _positive_env("APIFY_FACEBOOK_MAX_CHARGE_USD", 0.50)
+        for name, value in (
+            ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", tiktok_search),
+            ("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", tiktok_profile),
+        ):
+            if value < 0.50:
+                raise ValueError(
+                    f"{name} must be at least 0.50, the minimum the TikTok "
+                    "actors accept"
+                )
+        return cls(
+            job_budget_usd=job_budget,
+            tiktok_search_max_charge_usd=tiktok_search,
+            tiktok_profile_max_charge_usd=tiktok_profile,
+            facebook_max_charge_usd=facebook,
+        )
+
+    def budget(self) -> ApifyBudget:
+        """Return a new budget for one job or CLI run."""
+        return ApifyBudget(self.job_budget_usd)
 
 
 def actor_run_sync_url(actor: str) -> str:
@@ -91,6 +235,7 @@ class ApifyClient:
         max_retries: int = 1,
         backoff: float = 1.0,
         max_charge_usd: float = 0.50,
+        budget: ApifyBudget | None = None,
         sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
         resolved = token if token is not None else os.environ.get("APIFY_TOKEN")
@@ -111,6 +256,7 @@ class ApifyClient:
         self._max_retries = max_retries
         self._backoff = backoff
         self._max_charge_usd = max_charge_usd
+        self._budget = budget
         self._sleeper = sleeper
         # The sync endpoint can sit until ``timeout``. Give the socket a little
         # longer so httpx does not cancel the request first.
@@ -128,6 +274,8 @@ class ApifyClient:
         """Run ``actor`` and return the dataset items (a JSON list)."""
         if max_items < 1:
             raise ValueError("max_items must be at least 1")
+        if self._budget is not None:
+            self._budget.check(actor)
 
         url = actor_run_sync_url(actor)
         params = {
@@ -155,8 +303,11 @@ class ApifyClient:
                 )
             except httpx.TimeoutException as exc:
                 # A timed-out POST may already have started a paid run.
+                self._record_cap(actor)
                 self._fail(f"Apify request timed out calling {actor}", exc)
             except httpx.TransportError as exc:
+                # Connection errors may never have reached the server, so no
+                # charge is recorded until an attempt gets a response.
                 last_transport = type(exc).__name__
                 if attempt >= attempts - 1:
                     self._fail(
@@ -174,15 +325,38 @@ class ApifyClient:
                 )
 
             if response.status_code in (200, 201):
-                return self._parse_items(response)
+                try:
+                    items = self._parse_items(response)
+                except ApifyError:
+                    # The run happened; keep the estimate conservative.
+                    self._record_cap(actor)
+                    raise
+                self._record_estimate(actor, len(items))
+                return items
 
             if response.status_code in _RETRY_STATUS and attempt < attempts - 1:
                 self._sleep(attempt)
                 continue
 
+            if response.status_code == 408 or response.status_code >= 500:
+                # The POST may have started a paid run before this failure.
+                # Other 4xx (400, 402, 404, 422, 429) are refused before a run starts.
+                self._record_cap(actor)
             self._fail(f"Apify run for {actor} failed: {self._detail(response)}")
 
         self._fail(f"Apify request failed calling {actor}: {last_transport}")
+
+    def _record_estimate(self, actor: str, items_returned: int) -> None:
+        if self._budget is None:
+            return
+        self._budget.record(
+            actor,
+            estimate_run_cost(actor, items_returned, self._max_charge_usd),
+        )
+
+    def _record_cap(self, actor: str) -> None:
+        if self._budget is not None:
+            self._budget.record(actor, self._max_charge_usd)
 
     def _parse_items(self, response: httpx.Response) -> list[Any]:
         try:

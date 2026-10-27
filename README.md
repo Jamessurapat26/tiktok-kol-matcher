@@ -268,6 +268,10 @@ one-line description each. Blank values take the defaults. The main ones:
 | --- | --- | --- |
 | `DEMO_MODE` | API mode | unset: demo unless `APIFY_TOKEN` is set |
 | `APIFY_TOKEN` | live Facebook, TikTok search, enrichment | unset |
+| `APIFY_JOB_BUDGET_USD` | estimated Apify budget for one job or CLI run | `1.00` |
+| `APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD` | per-run cap for TikTok search | `0.50` (actor minimum) |
+| `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD` | per-run cap for TikTok enrichment | `0.50` (actor minimum) |
+| `APIFY_FACEBOOK_MAX_CHARGE_USD` | per-run cap for each Facebook run | `0.50` |
 | `JINA_API_KEY` | live web reader | unset (requests go without a key) |
 | `LLM_BASE_URL` | live LLM | `https://integrate.api.nvidia.com/v1` |
 | `LLM_MODEL` | live LLM | `nvidia/nemotron-3.5-lightning-30b-a3b` |
@@ -570,6 +574,14 @@ exits with code 2 before the pipeline starts.
   endpoint. Transport errors and HTTP 429/5xx are retried once. Timeouts and
   HTTP 408 are not retried, because the paid run may already be in progress.
   The store lists these actors from about $1–$2 per 1,000 results.
+- **Cost control.** Each run has its own cap (`APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD`,
+  `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD`, and `APIFY_FACEBOOK_MAX_CHARGE_USD`),
+  and one `APIFY_JOB_BUDGET_USD` budget covers the whole job across Facebook,
+  search, and enrichment. The sync endpoint returns dataset items but no usage,
+  so spend is estimated from the items returned plus a small per-run amount.
+  The budget is soft: the run that crosses it finishes, then later calls are
+  skipped and recorded as warnings instead of failing the job. Cache hits do
+  not call Apify and cost nothing.
 - **Cache.** Enrichment results are stored as JSON under `data/cache/apify` for
   7 days. Set `KOL_CACHE_DIR` to move the root (`$KOL_CACHE_DIR/apify`). A hit
   does not call Apify.

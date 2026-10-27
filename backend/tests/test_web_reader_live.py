@@ -35,8 +35,24 @@ _ARTICLE = (
 ) * 4
 
 
+_CAPTCHA = (
+    "Just a moment...\n\n"
+    "ophtus.com\n\n"
+    "Verifying you are human. This may take a few seconds.\n\n"
+    "ophtus.com needs to review the security of your connection before proceeding.\n\n"
+    "Ray ID: 8c1f2a3b4c5d6e7f\n\n"
+    "Performance & security by Cloudflare"
+)
+
+
 def _client(handler) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def _jina_reply(body: str, *warnings: str) -> str:
+    """Text reply shape from r.jina.ai (reader/snapshot-formatter.ts)."""
+    mixins = "".join(f"{warning}\n\n" for warning in warnings)
+    return f"Title: Ophtus\n\nURL Source: {_URL}\n\n{mixins}Markdown Content:\n{body}"
 
 
 def _article_html() -> str:
@@ -81,7 +97,7 @@ def test_jina_success_truncates_and_keeps_the_key_out_of_the_page():
         seen["url"] = str(request.url)
         seen["accept"] = request.headers["accept"]
         seen["authorization"] = request.headers["authorization"]
-        return httpx.Response(200, text=body)
+        return httpx.Response(200, text=_jina_reply(body))
 
     reader = _jina(handler, api_key=_API_KEY)
     page = reader.fetch(_URL)
@@ -192,6 +208,55 @@ def test_short_jina_page_uses_trafilatura_fallback():
     assert page.source == "trafilatura"
     assert page.content != "short"
     assert len(page.content) >= 200
+
+
+def test_jina_target_error_warning_falls_back_and_is_not_cached(tmp_path):
+    assert len(_CAPTCHA) >= 200, "the CAPTCHA page must beat min_chars on its own"
+
+    def jina_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text=_jina_reply(_CAPTCHA, "Warning: Target URL returned error 403: Forbidden"),
+        )
+
+    def direct_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=_article_html())
+
+    reader = CachedWebReader(
+        FallbackWebReader(_jina(jina_handler), _trafilatura(direct_handler)),
+        tmp_path,
+    )
+    page = reader.fetch(_URL)
+
+    assert page.source == "trafilatura"
+    assert "Verifying you are human" not in page.content
+    payload = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    assert payload["source"] == "trafilatura"
+    assert "Verifying you are human" not in payload["content"]
+
+    both_fail = FallbackWebReader(
+        _jina(jina_handler),
+        _Stub(error=WebReadError("extract failed")),
+    )
+    with pytest.raises(WebReadError) as exc_info:
+        both_fail.fetch(_URL)
+    assert "Target URL returned error 403" in str(exc_info.value)
+
+
+def test_jina_header_does_not_count_toward_min_chars():
+    body = "Ophtus blue-light glasses. " * 5
+    reply = _jina_reply(body)
+    assert len(body) < 200 < len(reply)
+
+    def jina_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=reply)
+
+    def direct_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=_article_html())
+
+    page = FallbackWebReader(_jina(jina_handler), _trafilatura(direct_handler)).fetch(_URL)
+
+    assert page.source == "trafilatura"
 
 
 def test_short_fallback_page_is_still_returned():

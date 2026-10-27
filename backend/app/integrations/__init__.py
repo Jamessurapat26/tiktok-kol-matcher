@@ -117,47 +117,6 @@ def _live_web_reader() -> WebReader:
     )
 
 
-def mock_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
-    """Build a fully mocked integration bundle."""
-    return build_integrations(kol_fixtures=kol_fixtures)
-
-
-def real_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
-    """Live web reader; every other service stays mocked."""
-    return build_integrations(live_web=True, kol_fixtures=kol_fixtures)
-
-
-def _live_kol_services(token: str, max_results: int) -> tuple[KolSearch, KolEnricher]:
-    from .kol_enricher_live import ApifyKolEnricher
-    from .kol_search_live import ApifyKolSearch
-
-    return (
-        ApifyKolSearch(token=token, max_results=max_results),
-        ApifyKolEnricher(token=token, max_videos=max_results),
-    )
-
-
-def _live_llm(api_key: str | None) -> BrandAnalyzer:
-    from .llm_live import LiveBrandAnalyzer
-
-    return LiveBrandAnalyzer(api_key=api_key)
-
-
-def _live_web_reader() -> WebReader:
-    from .web_reader_live import (
-        CachedWebReader,
-        FallbackWebReader,
-        JinaWebReader,
-        TrafilaturaWebReader,
-        default_cache_dir,
-    )
-
-    return CachedWebReader(
-        FallbackWebReader(JinaWebReader(), TrafilaturaWebReader()),
-        default_cache_dir(),
-    )
-
-
 __all__ = [
     "ApifyConfigError",
     "BrandAnalyzer",

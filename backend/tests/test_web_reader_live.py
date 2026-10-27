@@ -26,10 +26,10 @@ from app.models import MatchRequest
 from app.nodes import make_nodes
 from app.state import MatchState
 
-_URL = "https://ophtus.com/glasses"
+_URL = "https://example-brand.co.th/glasses"
 _API_KEY = "test-jina-key-not-a-secret-value"
 _ARTICLE = (
-    "Ophtus makes blue-light glasses in Bangkok for gamers and students who "
+    "ExampleBrand makes blue-light glasses in Bangkok for gamers and students who "
     "spend long hours on screens. The frames are lightweight and the lenses "
     "keep colours natural. "
 ) * 4
@@ -57,8 +57,8 @@ def _jina_reply(body: str, *warnings: str) -> str:
 
 def _article_html() -> str:
     return (
-        "<html><head><title>Ophtus</title></head>"
-        "<body><article><h1>Ophtus</h1><p>"
+        "<html><head><title>ExampleBrand</title></head>"
+        "<body><article><h1>ExampleBrand</h1><p>"
         f"{_ARTICLE}"
         "</p></article></body></html>"
     )
@@ -90,7 +90,7 @@ class _Stub:
 
 
 def test_jina_success_truncates_and_keeps_the_key_out_of_the_page():
-    body = "  Ophtus blue-light glasses for Thai gamers.  "
+    body = "  ExampleBrand blue-light glasses for Thai gamers.  "
     seen: dict[str, str] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -122,13 +122,13 @@ def test_jina_success_truncates_and_keeps_the_key_out_of_the_page():
 
 def test_jina_strips_image_links_and_empty_bullets():
     body = (
-        "# Ophtus\n\n"
-        "* [![logo](https://x.test/a.png)](https://ophtus.com)\n"
+        "# ExampleBrand\n\n"
+        "* [![logo](https://x.test/a.png)](https://example-brand.co.th)\n"
         "*\n"
         "- \n"
         "![](https://x.test/b.jpg)\n"
         "[](https://x.test/c)\n\n\n\n"
-        "* [Shop](https://ophtus.com/shop)\n"
+        "* [Shop](https://example-brand.co.th/shop)\n"
         "Blue-light glasses for Thai gamers."
     )
 
@@ -140,7 +140,7 @@ def test_jina_strips_image_links_and_empty_bullets():
     assert "![" not in content
     assert "a.png" not in content
     assert "b.jpg" not in content
-    assert "[Shop](https://ophtus.com/shop)" in content
+    assert "[Shop](https://example-brand.co.th/shop)" in content
     assert "Blue-light glasses for Thai gamers." in content
     assert "\n\n\n" not in content
     assert not any(line.strip() in {"*", "-", "+"} for line in content.splitlines())
@@ -153,7 +153,7 @@ def test_jina_retries_server_error_then_succeeds():
         calls["n"] += 1
         if calls["n"] == 1:
             return httpx.Response(503, text="unavailable")
-        return httpx.Response(200, text="Ophtus page recovered from Jina. " * 10)
+        return httpx.Response(200, text="ExampleBrand page recovered from Jina. " * 10)
 
     page = _jina(handler).fetch(_URL)
 
@@ -164,7 +164,7 @@ def test_jina_retries_server_error_then_succeeds():
 
 def test_long_jina_page_does_not_call_fallback():
     def jina_handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="Ophtus blue-light glasses. " * 20)
+        return httpx.Response(200, text="ExampleBrand blue-light glasses. " * 20)
 
     def direct_handler(request: httpx.Request) -> httpx.Response:
         raise AssertionError("fallback should not fetch when Jina returns enough text")
@@ -316,7 +316,7 @@ def test_cache_hit_skips_the_network(tmp_path):
 
     def handler(request: httpx.Request) -> httpx.Response:
         calls["n"] += 1
-        return httpx.Response(200, text="Ophtus แว่นกันแสงสีฟ้า " + ("glasses " * 40))
+        return httpx.Response(200, text="ExampleBrand แว่นกันแสงสีฟ้า " + ("glasses " * 40))
 
     reader = CachedWebReader(_jina(handler), tmp_path, clock=lambda: 1_000.0)
     first = reader.fetch("https://Example.com/path/")
@@ -387,7 +387,7 @@ def test_failed_fetch_is_not_cached(tmp_path):
         calls["n"] += 1
         if calls["n"] == 1:
             return httpx.Response(404, text="missing")
-        return httpx.Response(200, text="Ophtus recovered. " * 20)
+        return httpx.Response(200, text="ExampleBrand recovered. " * 20)
 
     reader = CachedWebReader(_jina(handler, max_retries=0), tmp_path)
     with pytest.raises(WebReadError):
@@ -421,8 +421,8 @@ def test_website_content_is_truncated_before_state():
     update = nodes["scrape_website"](
         MatchState(
             request=MatchRequest(
-                website_url="https://ophtus.com",
-                facebook_url="https://www.facebook.com/ophtus",
+                website_url="https://example-brand.co.th",
+                facebook_url="https://www.facebook.com/examplebrand",
             )
         )
     )

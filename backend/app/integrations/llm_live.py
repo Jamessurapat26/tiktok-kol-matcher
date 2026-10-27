@@ -352,20 +352,26 @@ class LiveBrandAnalyzer:
         self,
         brand: BrandProfile,
         kols: list[KolProfile],
+        *,
+        similarities: list[float] | None = None,
     ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
+        if similarities is not None and len(similarities) != len(kols):
+            raise ValueError("similarities must have one score per creator")
         if not kols:
             return []
         scored: list[tuple[KolProfile, ScoreBreakdown, str]] = []
         size = self._settings.rerank_batch_size
         for start in range(0, len(kols), size):
             batch = kols[start : start + size]
-            scored.extend(self._rerank_batch(brand, batch))
+            batch_scores = None if similarities is None else similarities[start : start + size]
+            scored.extend(self._rerank_batch(brand, batch, batch_scores))
         return scored
 
     def _rerank_batch(
         self,
         brand: BrandProfile,
         kols: list[KolProfile],
+        similarities: list[float] | None = None,
     ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
         def accept(batch: RelevanceBatch) -> None:
             seen = {normalize_handle(item.handle) for item in batch.scores}
@@ -373,7 +379,11 @@ class LiveBrandAnalyzer:
             if missing:
                 raise ValueError(f"missing scores for: {', '.join(missing)}")
 
-        batch = self._structured(rerank_messages(brand, kols), RelevanceBatch, accept)
+        batch = self._structured(
+            rerank_messages(brand, kols, similarities),
+            RelevanceBatch,
+            accept,
+        )
         by_score = {normalize_handle(item.handle): item for item in batch.scores}
         results: list[tuple[KolProfile, ScoreBreakdown, str]] = []
         for kol in kols:

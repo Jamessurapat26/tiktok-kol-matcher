@@ -20,6 +20,6 @@ class MockFacebookScraper:
         self._fixture_path = fixture_path
 
     def fetch_page(self, url: str) -> FacebookPage:
-        # The mock ignores the URL and always returns the Ophtus-like fixture.
+        # The mock ignores the URL and always returns the example-brand-like fixture.
         raw = json.loads(self._fixture_path.read_text(encoding="utf-8"))
         return FacebookPage.model_validate(raw)

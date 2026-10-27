@@ -1,6 +1,6 @@
-# Ophtus
+# ExampleBrand
 
-Ophtus is a Bangkok-based eyewear brand making blue-light glasses and
+ExampleBrand is a Bangkok-based eyewear brand making blue-light glasses and
 screen-friendly frames for gamers, students and desk workers.
 
 ## What we make
@@ -15,7 +15,7 @@ screen-friendly frames for gamers, students and desk workers.
 Our audience is mostly 16–34 year olds in Thailand who game, stream, study or
 work on screens every day. We also ship to gamers across Southeast Asia.
 
-## Why Ophtus
+## Why ExampleBrand
 
 - Lightweight frames designed for long gaming sessions.
 - Blue-light filtering lenses that keep colours natural on screen.

@@ -36,5 +36,5 @@ class MockWebReader:
         self._fixture_path = fixture_path
 
     def read(self, url: str) -> str:
-        # The mock ignores the URL and always returns the Ophtus-like fixture.
+        # The mock ignores the URL and always returns the example-brand-like fixture.
         return self._fixture_path.read_text(encoding="utf-8")

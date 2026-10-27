@@ -95,8 +95,11 @@ class MatchState(BaseModel):
     discovered: Annotated[list[KolProfile], merge_kols] = Field(default_factory=list)
     # filter_thai output. Plain overwrite (not reducer-backed) so the list can shrink.
     candidates: list[KolProfile] = Field(default_factory=list)
-    # embed_and_prefilter output: the top 20-30 candidates sent to llm_rerank.
+    # embed_and_prefilter output: candidates sent to llm_rerank.
+    # The list is at least the prefilter width and at least top_k.
     shortlisted: list[KolProfile] = Field(default_factory=list)
+    # Cosine similarities in the same order as ``shortlisted``.
+    prefilter_scores: list[float] = Field(default_factory=list)
 
     # Every candidate scored by llm_rerank, sorted by total_score.
     ranked: list[RankedKol] = Field(default_factory=list)

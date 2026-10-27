@@ -54,8 +54,15 @@ class BrandAnalyzer(Protocol):
         self,
         brand: BrandProfile,
         kols: list[KolProfile],
+        *,
+        similarities: list[float] | None = None,
     ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
-        """Score each KOL and return a short reason for the match."""
+        """Score each KOL and return a short reason for the match.
+
+        ``similarities`` are cosine scores from the embedder, aligned with
+        ``kols``. The mock uses them as relevance. A live model still scores
+        relevance itself and can read the same scores in its prompt.
+        """
         ...
 
 
@@ -74,12 +81,16 @@ class ChatClient(Protocol):
 def heuristic_score(
     brand: BrandProfile,
     kol: KolProfile,
+    *,
+    relevance: float | None = None,
 ) -> tuple[ScoreBreakdown, str]:
-    """Score one KOL with the offline token, engagement, audience, and tier rules.
+    """Score one KOL with the offline engagement, audience, and tier rules.
 
-    The live reranker replaces ``relevance`` and the reason. Engagement,
-    audience fit, and tier fit stay on this breakdown so the 0.4/0.25/0.2/0.15
-    weights still apply the same way.
+    When ``relevance`` is omitted, relevance is the offline topic overlap.
+    When the embedder passes a cosine score, that score is the relevance so
+    the prefilter and the mock reranker agree. The live reranker still
+    replaces relevance and the reason. Engagement, audience fit, and tier fit
+    stay on this breakdown so the 0.4/0.25/0.2/0.15 weights still apply.
     """
     brand_tokens = _tokens(
         " ".join(
@@ -93,7 +104,12 @@ def heuristic_score(
         )
     )
     matched = sorted(_kol_topics(kol) & brand_tokens)
-    relevance = min(1.0, 0.2 + 0.2 * len(matched)) if matched else 0.05
+    relevance_from_embedding = relevance is not None
+    if relevance is None:
+        relevance = min(1.0, 0.2 + 0.2 * len(matched)) if matched else 0.05
+    else:
+        relevance = min(1.0, max(0.0, float(relevance)))
+        matched = []
 
     engagement_rate = kol.median_engagement_rate or 0.02
     engagement = min(1.0, engagement_rate / ENGAGEMENT_CEILING)
@@ -129,7 +145,12 @@ def heuristic_score(
         tier_fit=round(tier_fit, 4),
         audience_confidence=confidence,
     )
-    if matched:
+    if relevance_from_embedding:
+        reason = (
+            f"Embedding similarity {relevance:.2f}. "
+            f"Tier: {tier}; audience fit: {confidence}."
+        )
+    elif matched:
         reason = (
             f"Matched topics: {', '.join(matched[:4])}. "
             f"Tier: {tier}; audience fit: {confidence}."
@@ -200,7 +221,7 @@ class MockBrandAnalyzer:
                 "lifestyle",
             ],
             hashtags=[
-                "#Ophtus",
+                "#ExampleBrand",
                 "#BlueLightGlasses",
                 "#GamingGlasses",
                 "#แว่นกันแสงสีฟ้า",
@@ -250,9 +271,14 @@ class MockBrandAnalyzer:
         self,
         brand: BrandProfile,
         kols: list[KolProfile],
+        *,
+        similarities: list[float] | None = None,
     ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
+        if similarities is not None and len(similarities) != len(kols):
+            raise ValueError("similarities must have one score per creator")
         results: list[tuple[KolProfile, ScoreBreakdown, str]] = []
-        for kol in kols:
-            scores, reason = heuristic_score(brand, kol)
+        for index, kol in enumerate(kols):
+            override = None if similarities is None else similarities[index]
+            scores, reason = heuristic_score(brand, kol, relevance=override)
             results.append((kol, scores, reason))
         return results

@@ -6,8 +6,15 @@ from langgraph.graph import END
 from pydantic import ValidationError
 
 from .integrations import Integrations
+from .integrations.embeddings import (
+    MockEmbedder,
+    brand_query_text,
+    kol_document_text,
+    kol_title,
+)
+from .integrations.llm import MockBrandAnalyzer
 from .integrations.web_reader import truncate
-from .models import BrandProfile, KolProfile, RankedKol, normalize_handle
+from .models import KolProfile, RankedKol, normalize_handle
 from .state import MatchState
 
 Node = Callable[[MatchState], dict[str, Any]]
@@ -64,27 +71,6 @@ def _kol_from_fixture(raw: dict) -> KolProfile:
     )
 
 
-def _brand_text(brand: BrandProfile) -> str:
-    return " ".join(
-        [
-            brand.category,
-            brand.tone,
-            brand.content_style,
-            *brand.products,
-            *brand.keywords_th,
-            *brand.keywords_en,
-            *brand.hashtags,
-            *brand.target_audience.interests,
-        ]
-    )
-
-
-def _kol_text(kol: KolProfile) -> str:
-    return " ".join(
-        part for part in (kol.content_summary, kol.bio, kol.nickname) if part
-    )
-
-
 def make_nodes(
     integrations: Integrations,
     *,
@@ -94,6 +80,13 @@ def make_nodes(
     enrich_limit: int | None = None,
 ) -> dict[str, Node]:
     """Build the graph nodes with integrations and tuning closed over."""
+
+    def _similarities(brand, kols: list[KolProfile]) -> list[float]:
+        return integrations.embedder.similarity(
+            brand_query_text(brand),
+            [kol_document_text(kol) for kol in kols],
+            titles=[kol_title(kol) for kol in kols],
+        )
 
     @_guarded("scrape_website", stage_on_error=False)
     def scrape_website(state: MatchState) -> dict[str, Any]:
@@ -252,21 +245,41 @@ def make_nodes(
     def embed_and_prefilter(state: MatchState) -> dict[str, Any]:
         if state.brand_profile is None:
             raise ValueError("brand_profile is required before prefiltering")
-        scores = integrations.embedder.similarity(
-            _brand_text(state.brand_profile),
-            [_kol_text(kol) for kol in state.candidates],
-        )
+        if prefilter_n < 1:
+            raise ValueError("prefilter_n must be at least 1")
+        scores = _similarities(state.brand_profile, state.candidates)
         ranked_pairs = sorted(
             zip(state.candidates, scores, strict=True),
             key=lambda pair: (-pair[1], normalize_handle(pair[0].handle)),
         )
-        shortlisted = [kol for kol, _ in ranked_pairs[:prefilter_n]]
-        return {"shortlisted": shortlisted, "stage": "embedding_prefilter"}
+        # A top_k above the configured width used to return only the width.
+        limit = max(prefilter_n, state.request.top_k)
+        kept = ranked_pairs[:limit]
+        return {
+            "shortlisted": [kol for kol, _score in kept],
+            "prefilter_scores": [score for _kol, score in kept],
+            "stage": "embedding_prefilter",
+        }
 
     @_guarded("llm_rerank")
     def llm_rerank(state: MatchState) -> dict[str, Any]:
         if state.brand_profile is None:
             raise ValueError("brand_profile is required before reranking")
+        if state.prefilter_scores and len(state.prefilter_scores) != len(state.shortlisted):
+            raise ValueError("prefilter_scores must have one score per shortlisted creator")
+        # MockEmbedder scores are hashed bag-of-words noise. The mock reranker
+        # needs them as its deterministic relevance; a live model must not be
+        # told they are evidence.
+        mock_scores_for_live_model = isinstance(
+            integrations.embedder, MockEmbedder
+        ) and not isinstance(integrations.llm, MockBrandAnalyzer)
+        similarities: list[float] | None
+        if mock_scores_for_live_model:
+            similarities = None
+        elif len(state.prefilter_scores) == len(state.shortlisted):
+            similarities = list(state.prefilter_scores)
+        else:
+            similarities = _similarities(state.brand_profile, state.shortlisted)
         ranked = [
             RankedKol(
                 kol=kol,
@@ -277,6 +290,7 @@ def make_nodes(
             for kol, scores, reason in integrations.llm.rerank(
                 state.brand_profile,
                 state.shortlisted,
+                similarities=similarities,
             )
         ]
         ranked.sort(

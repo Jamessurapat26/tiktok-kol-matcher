@@ -50,6 +50,8 @@ def build_graph(
     enrich_limit: int | None = None,
 ):
     """Build and compile the mock KOL-matching graph."""
+    if prefilter_n < 1:
+        raise ValueError("prefilter_n must be at least 1")
     integrations = integrations or mock_integrations()
     nodes = make_nodes(
         integrations,

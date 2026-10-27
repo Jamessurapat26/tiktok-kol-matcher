@@ -27,6 +27,7 @@ def build_integrations(
     live_web: bool = False,
     live_kols: bool = False,
     live_llm: bool = False,
+    live_embed: bool = False,
     kol_fixtures: list[dict] | None = None,
     max_results_per_query: int = 10,
     apify_token: str | None = None,
@@ -38,8 +39,11 @@ def build_integrations(
     enrichment are live only when ``live_kols`` is true (requires
     ``APIFY_TOKEN``). Brand analysis, query generation, and reranking are
     live only when ``live_llm`` is true (requires ``LLM_API_KEY``,
-    ``NVIDIA_API_KEY``, or ``OPENAI_API_KEY``). Facebook and embeddings stay
-    mocked. The default never touches the network.
+    ``NVIDIA_API_KEY``, or ``OPENAI_API_KEY``). Embeddings are live only when
+    ``live_embed`` is true. That loads ``google/embeddinggemma-2`` through
+    sentence-transformers on the first embed call (install the ``embed`` extra).
+    Facebook stays mocked. The default never touches the network and does not
+    download a model.
     """
     if max_results_per_query < 1:
         raise ValueError("max_results_per_query must be at least 1")
@@ -62,7 +66,54 @@ def build_integrations(
         llm=_live_llm(llm_api_key) if live_llm else MockBrandAnalyzer(),
         kol_search=kol_search,
         enricher=enricher,
-        embedder=MockEmbedder(),
+        embedder=_live_embedder() if live_embed else MockEmbedder(),
+    )
+
+
+def mock_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
+    """Build a fully mocked integration bundle."""
+    return build_integrations(kol_fixtures=kol_fixtures)
+
+
+def real_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
+    """Live web reader; every other service stays mocked."""
+    return build_integrations(live_web=True, kol_fixtures=kol_fixtures)
+
+
+def _live_kol_services(token: str, max_results: int) -> tuple[KolSearch, KolEnricher]:
+    from .kol_enricher_live import ApifyKolEnricher
+    from .kol_search_live import ApifyKolSearch
+
+    return (
+        ApifyKolSearch(token=token, max_results=max_results),
+        ApifyKolEnricher(token=token, max_videos=max_results),
+    )
+
+
+def _live_embedder() -> Embedder:
+    from .embeddings_live import SentenceTransformerEmbedder
+
+    return SentenceTransformerEmbedder.from_env()
+
+
+def _live_llm(api_key: str | None) -> BrandAnalyzer:
+    from .llm_live import LiveBrandAnalyzer
+
+    return LiveBrandAnalyzer(api_key=api_key)
+
+
+def _live_web_reader() -> WebReader:
+    from .web_reader_live import (
+        CachedWebReader,
+        FallbackWebReader,
+        JinaWebReader,
+        TrafilaturaWebReader,
+        default_cache_dir,
+    )
+
+    return CachedWebReader(
+        FallbackWebReader(JinaWebReader(), TrafilaturaWebReader()),
+        default_cache_dir(),
     )
 
 

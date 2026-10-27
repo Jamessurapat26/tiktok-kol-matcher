@@ -18,7 +18,7 @@ _USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
-# Shopify (ophtus.com) answers 200 to curl and 429 to a bare httpx client.
+# Some Shopify storefronts answer 200 to curl and 429 to a bare httpx client.
 # curl negotiates HTTP/2 and sends a browser Accept set; httpx defaults to
 # HTTP/1.1 with ``accept: */*``. These headers plus ``http2=True`` close that gap.
 _BROWSER_HEADERS = {

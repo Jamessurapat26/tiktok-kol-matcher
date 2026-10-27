@@ -45,5 +45,7 @@ export const api = {
   job: (id: string) => request<Job>(`/api/jobs/${encodeURIComponent(id)}`),
   createJob: (body: JobCreate) =>
     request<JobCreated>('/api/jobs', { method: 'POST', body: JSON.stringify(body) }),
-  eventsUrl: (id: string) => `/api/jobs/${encodeURIComponent(id)}/events`,
+  /** `after` resumes past that seq; 0 streams from the start. */
+  eventsUrl: (id: string, after = 0) =>
+    `/api/jobs/${encodeURIComponent(id)}/events${after > 0 ? `?after=${after}` : ''}`,
 }

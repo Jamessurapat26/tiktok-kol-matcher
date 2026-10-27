@@ -41,6 +41,7 @@ export function useJobProgress(jobId: string | null): { progress: Progress; conn
         if (event.type !== 'node') void client.invalidateQueries({ queryKey: queryKeys.jobs, exact: true })
       },
       onConnectionChange: (connected) => setState((s) => ({ ...forJob(s), connected })),
+      onReopen: () => void client.invalidateQueries({ queryKey: queryKeys.job(jobId) }),
     })
   }, [jobId, client])
 

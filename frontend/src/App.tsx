@@ -30,7 +30,10 @@ export default function App() {
 
   // Edits belong to the job they were typed under. A job loaded from ?job= or
   // History shows its own request until the user types again.
-  const [edits, setEdits] = useState<{ jobId: string | null; draft: BrandDraft }>({ jobId: null, draft: EMPTY_DRAFT })
+  const [edits, setEdits] = useState<{ jobId: string | null; draft: BrandDraft }>({
+    jobId: null,
+    draft: EMPTY_DRAFT,
+  })
   const request = job.data?.request
   const draft = edits.jobId === jobId || !request ? edits.draft : toDraft(request)
   const setDraft = (next: BrandDraft) => setEdits({ jobId, draft: next })

@@ -70,10 +70,13 @@ export function followJobEvents(jobId: string, handlers: EventStreamHandlers): (
     source.onerror = () => {
       handlers.onConnectionChange(false)
       if (stopped || source.readyState !== EventSource.CLOSED) return
-      retry = setTimeout(() => {
-        open()
-        handlers.onReopen()
-      }, Math.min(MAX_RETRY_MS, 1000 * 2 ** attempt++))
+      retry = setTimeout(
+        () => {
+          open()
+          handlers.onReopen()
+        },
+        Math.min(MAX_RETRY_MS, 1000 * 2 ** attempt++),
+      )
     }
   }
 

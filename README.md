@@ -1,7 +1,7 @@
 # TikTok KOL Matcher
 
 A LangGraph pipeline that turns a brand's website and Facebook page into a ranked
-shortlist of Thai TikTok creators.
+shortlist of Thai TikTok creators. It runs as a CLI or as an HTTP service.
 
 Given a brand website and Facebook page, it scrapes the sources, builds a
 structured brand profile, generates TikTok search queries, discovers creators,
@@ -17,7 +17,11 @@ keeps Thai creators, enriches their profiles, and scores the shortlist on:
 Each result includes the component scores, a total score, and a short reason for
 the match.
 
-## Pipeline
+## Architecture
+
+### Pipeline
+
+The graph in `backend/app/graph.py` runs these nodes:
 
 ```mermaid
 flowchart TD
@@ -36,43 +40,74 @@ flowchart TD
     O --> OUT([Top-k ranked shortlist])
 ```
 
-The website and Facebook scrapers run in parallel. Discovery loops back to query
-generation until it has at least 30 KOLs or reaches the 2-round cap. The 30-KOL
-target counts discovered (deduped) KOLs before the Thai filter. `filter_thai`
-runs after that target is met and can shrink the list.
+The website and Facebook scrapers run in parallel, and `analyze_brand` waits
+for both. Discovery loops back to query generation until it has at least 30
+KOLs or reaches the 2-round cap. The 30-KOL target counts discovered (deduped)
+KOLs before the Thai filter, so `filter_thai` runs after the target is met and
+can shrink the list. A fatal node failure sets `stage` to `failed` and ends the
+graph. A scraper failure is only a warning.
+
+### HTTP service
+
+```mermaid
+flowchart LR
+    C[Client] -->|"POST /api/jobs"| API[FastAPI app]
+    API -->|"insert job (queued)"| DB[("SQLite data/jobs.db: jobs, events")]
+    API -->|"start"| RUN[Runner thread]
+    RUN -->|"graph.stream"| G[LangGraph pipeline]
+    RUN -->|"status, stage, node events, results"| DB
+    C -->|"GET /api/jobs/{id}/events"| API
+    API -->|"poll events after cursor"| DB
+    API -->|"SSE"| C
+```
+
+`POST /api/jobs` stores the job as `queued`, starts a daemon thread, and
+returns the job id. The thread moves the job to `running`, streams the graph,
+and writes a `started` and a `finished` or `failed` event for every node. It
+ends the job as `succeeded` or `failed` and writes a final `done` or `failed`
+event. The SSE endpoint polls SQLite for events after the client's cursor, so a
+replay and a live stream use the same code. On startup, jobs that a previous
+process left `queued` or `running` are marked `failed` with
+"interrupted by restart".
 
 ## Current status
 
-This is a working skeleton with deterministic mocks. Every external service in
-`backend/app/integrations/` has a `Protocol` and a `Mock` implementation, so the
-whole pipeline runs offline and produces stable output. Five pieces can run live:
+Every external service in `backend/app/integrations/` has a `Protocol` and a
+`Mock` implementation, so the whole pipeline runs offline and produces stable
+output. Five pieces can run live:
 
-- Web page reading, with `--live-web` (see below).
-- Facebook page reading, with `--live-fb` (see below). It calls Apify and needs
-  `APIFY_TOKEN`. The default stays on the offline fixture.
-- TikTok creator search and enrichment, with `--live-kols` (see below). It calls
-  Apify and needs `APIFY_TOKEN`. The default stays on the offline fixtures.
-- Brand analysis, query generation, and relevance reranking, with `--live-llm`
-  (see below). The default stays on the offline mock.
-- Embeddings and the cosine prefilter, with `--live-embed` (see below). The
-  default stays on the offline mock and does not download a model.
+| CLI flag | API flag | What runs live | Needs |
+| --- | --- | --- | --- |
+| `--live-web` | `live_web` | Brand website reading | nothing (`JINA_API_KEY` optional) |
+| `--live-fb` | `live_fb` | Facebook page and recent posts | `APIFY_TOKEN` |
+| `--live-kols` | `live_kols` | TikTok creator search and enrichment | `APIFY_TOKEN` |
+| `--live-llm` | `live_llm` | Brand analysis, query generation, rerank | `LLM_API_KEY`, `NVIDIA_API_KEY`, or `OPENAI_API_KEY` |
+| `--live-embed` | `live_embed` | Embeddings and the cosine prefilter | the `embed` extra (`uv sync --extra embed`) |
+
+[Live integrations](#live-integrations) describes each one.
 
 ## Tech stack
 
 - Python 3.13
 - [uv](https://docs.astral.sh/uv/) for dependency management
 - [LangGraph](https://langchain-ai.github.io/langgraph/) for orchestration
-- Pydantic for domain models and structured outputs
-- FastAPI for the HTTP API, with SQLite job storage
+- Pydantic for domain models and structured outputs, pydantic-settings for
+  service configuration
+- FastAPI for the HTTP API, with SQLite job storage and server-sent events
 
 ## How to run
+
+Install the dependencies first:
 
 ```bash
 cd backend
 uv sync
 ```
 
-Run the CLI:
+### CLI
+
+The CLI runs one match in the foreground. With no `--live-*` flag every service
+is mocked and nothing touches the network:
 
 ```bash
 uv run python -m app.cli match \
@@ -81,20 +116,300 @@ uv run python -m app.cli match \
   --top-k 10
 ```
 
-Progress is printed to stderr; the ranked table goes to stdout. `--json` returns
-the same run as a single JSON object on stdout:
+Progress goes to stderr and the ranked table goes to stdout:
+
+```text
+[ 1] scrape_facebook    facebook=ExampleBrand
+[ 2] scrape_website     website=1330 chars
+[ 3] analyze_brand      brand=profile
+[ 4] generate_queries   queries+8
+[ 5] discover_kols      round=1 discovered=22 (+22 new)
+...
+rank  handle                     followers    ER % relevance engagement audience tier    total  reason
+------------------------------------------------------------------------------------------------------------------------------------
+   1  BankZaGaming               1,250,000   9.10%      0.21       0.61     1.00 mega    0.588  Embedding similarity 0.21. Tier: mega; audience...
+```
+
+`--json` prints the same run as one JSON object on stdout. Tune discovery with
+`--min-candidates N` and `--max-rounds N`.
+
+Add any `--live-*` flag from the table in [Current status](#current-status) to
+run that service live. The flags combine. For example, this run reads the
+website, the Facebook page, and TikTok live, and keeps the LLM and embeddings
+on the mocks:
 
 ```bash
+export APIFY_TOKEN=...
 uv run python -m app.cli match \
   --website https://example-brand.co.th \
   --facebook https://www.facebook.com/example-brand \
-  --top-k 10 \
-  --json
+  --top-k 5 \
+  --live-web --live-fb --live-kols --max-enrich 5
 ```
 
-Tune discovery with `--min-candidates N` and `--max-rounds N`.
+If `--live-fb` or `--live-kols` is set without `APIFY_TOKEN`, the CLI exits
+with code 2 before the pipeline starts.
 
-## Web reading
+### HTTP API on your machine
+
+```bash
+cd backend
+uv run uvicorn app.api.main:app --port 8000
+```
+
+The service reads its configuration from the environment when it starts. It
+does not read `.env` itself, so export the variables or use Docker Compose.
+Jobs go to `data/jobs.db` relative to the working directory, so run it from
+`backend/` or set `JOBS_DB`. [HTTP API](#http-api) lists the endpoints.
+
+### Docker Compose
+
+From the repository root:
+
+```bash
+cp .env.example .env   # optional: fill in keys for live mode
+docker compose up --build
+```
+
+The `backend` service listens on port 8000. Compose loads `.env` when it exists
+and runs in demo mode without it. The caches and `jobs.db` live in the
+`backend-data` volume, mounted at `/app/data`. The container runs as a non-root
+user, and a health check calls `/api/health`. A commented-out `frontend` service
+in `docker-compose.yml` is a placeholder for a Vite dev server on port 5173.
+
+The image installs the default dependencies only. To bake in the local
+embedder, build with the `embed` extra (this downloads the CPU build of torch):
+
+```bash
+docker build --build-arg INSTALL_EMBED=true -t tkm-backend backend
+```
+
+### Tests
+
+```bash
+cd backend
+uv run pytest
+```
+
+The tests make no network calls.
+
+## Configuration
+
+### Demo and live mode
+
+The HTTP service runs in one of two modes. `GET /api/health` reports the mode.
+
+- **Demo mode** forces every flag off, so jobs run from the mocks and fixtures
+  with no keys. A request that asks for a live flag still runs mocked. The
+  service is in demo mode when `DEMO_MODE` is true, or when `DEMO_MODE` is
+  unset and `APIFY_TOKEN` is missing.
+- **Live mode** applies when `DEMO_MODE` is false, or when `DEMO_MODE` is unset
+  and `APIFY_TOKEN` is set. A flag the request omits turns on when it can run:
+  web always, Facebook and KOLs with `APIFY_TOKEN`, the LLM with an LLM key,
+  and embeddings when the `embed` extra is installed. A flag set to `true` that
+  cannot run returns 400 and names the missing variable, for example
+  `live_kols is unavailable: APIFY_TOKEN is not set`. A flag set to `false`
+  stays off.
+
+The job records the flags it ran with in `flags`. The CLI has no mode. It runs
+live only the services you name with `--live-*` flags.
+
+### Environment variables
+
+[`.env.example`](.env.example) lists every variable the code reads, with a
+one-line description each. Blank values take the defaults. The main ones:
+
+| Variable | Used by | Default |
+| --- | --- | --- |
+| `DEMO_MODE` | API mode | unset: demo unless `APIFY_TOKEN` is set |
+| `APIFY_TOKEN` | live Facebook, TikTok search, enrichment | unset |
+| `JINA_API_KEY` | live web reader | unset (requests go without a key) |
+| `LLM_BASE_URL` | live LLM | `https://integrate.api.nvidia.com/v1` |
+| `LLM_MODEL` | live LLM | `nvidia/nemotron-3.5-lightning-30b-a3b` |
+| `LLM_API_KEY`, `NVIDIA_API_KEY`, `OPENAI_API_KEY` | live LLM, first non-empty wins | unset |
+| `EMBED_MODEL` | live embedder | `google/embeddinggemma-2` |
+| `KOL_CACHE_DIR` | every live cache | `data/cache` at the repo root |
+| `JOBS_DB` | API job store | `data/jobs.db` |
+| `CORS_ORIGINS` | API, comma-separated | `http://localhost:5173` |
+
+[LLM](#llm) and [Embeddings](#embeddings) list the tuning variables for those
+integrations. Keys and tokens are never logged. `/api/health` reports each one
+only as set or missing.
+
+## HTTP API
+
+| Method and path | Result |
+| --- | --- |
+| `POST /api/jobs` | 202 `{"job_id": "..."}`. 400 when a requested live flag cannot run. 422 on an invalid body |
+| `GET /api/jobs/{id}` | Status, stage, request, effective flags, errors, and ranked results. 404 when unknown |
+| `GET /api/jobs/{id}/events` | Server-sent events, ending with a `done` or `failed` event. 404 when unknown |
+| `GET /api/jobs?limit=20` | Recent jobs, newest first. `limit` is 1 to 100 |
+| `GET /api/health` | Mode, default flags, the configured models, and which credentials are set |
+
+The examples below come from a local run in demo mode, trimmed.
+
+### Create a job
+
+`top_k` is 1 to 200 and defaults to 10. The live flags are optional. An omitted
+flag takes the mode's default.
+
+```bash
+curl -X POST localhost:8000/api/jobs -H 'content-type: application/json' -d '{
+  "website_url": "https://example-brand.co.th",
+  "facebook_url": "https://www.facebook.com/example-brand",
+  "top_k": 3
+}'
+```
+
+```json
+{"job_id":"14aa56a39f8845cab15a866b34308480"}
+```
+
+### Read a job
+
+A job moves from `queued` to `running` to `succeeded` or `failed`.
+
+```bash
+curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
+```
+
+```json
+{
+  "id": "14aa56a39f8845cab15a866b34308480",
+  "status": "succeeded",
+  "stage": "done",
+  "request": {
+    "website_url": "https://example-brand.co.th/",
+    "facebook_url": "https://www.facebook.com/example-brand",
+    "top_k": 3,
+    "weights": {"relevance": 0.4, "engagement": 0.25, "audience": 0.2, "tier": 0.15}
+  },
+  "flags": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false},
+  "errors": [],
+  "results": [
+    {
+      "kol": {
+        "handle": "BankZaGaming",
+        "url": "https://www.tiktok.com/@BankZaGaming",
+        "followers": 1250000,
+        "language": "th",
+        "region": "TH",
+        "median_engagement_rate": 0.091,
+        "posts_per_week": 1.1,
+        "content_summary": "Topics: gaming, esports",
+        "source": "apify"
+      },
+      "scores": {
+        "relevance": 0.2145,
+        "engagement": 0.6067,
+        "audience_fit": 1.0,
+        "tier_fit": 1.0,
+        "audience_confidence": "high"
+      },
+      "total_score": 0.5875,
+      "reason": "Embedding similarity 0.21. Tier: mega; audience fit: high."
+    }
+  ],
+  "created_at": "2026-10-27T06:17:33.008856+00:00",
+  "updated_at": "2026-10-27T06:17:33.057882+00:00"
+}
+```
+
+### Stream progress
+
+```bash
+curl -N localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480/events
+```
+
+Each event carries its sequence number as the SSE `id`. Node events have type
+`node`, and the last event is `done` or `failed`, after which the server closes
+the stream. A `finished` event carries a short summary such as `discovered+22`.
+
+```text
+event: node
+data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":1,"type":"node","node":"scrape_facebook","status":"started","summary":"","timestamp":"2026-10-27T06:17:33.020539+00:00"}
+id: 1
+
+event: node
+data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":3,"type":"node","node":"scrape_facebook","status":"finished","summary":"facebook=ExampleBrand","timestamp":"2026-10-27T06:17:33.024247+00:00"}
+id: 3
+
+event: node
+data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":10,"type":"node","node":"discover_kols","status":"finished","summary":"round=1 discovered+22","timestamp":"2026-10-27T06:17:33.034594+00:00"}
+id: 10
+
+event: done
+data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":25,"type":"done","node":null,"status":null,"summary":"ranked 3 KOLs","timestamp":"2026-10-27T06:17:33.057947+00:00"}
+id: 25
+```
+
+To resume after a dropped connection, send the last `id` you received as
+`Last-Event-ID` (an `EventSource` does this on its own) or pass `?after=N`. The
+stream then starts after that event:
+
+```bash
+curl -N -H 'Last-Event-ID: 22' localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480/events
+```
+
+```text
+event: node
+data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":23,"type":"node","node":"rank_and_output","status":"started","summary":"","timestamp":"2026-10-27T06:17:33.055289+00:00"}
+id: 23
+
+event: node
+data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":24,"type":"node","node":"rank_and_output","status":"finished","summary":"results=3","timestamp":"2026-10-27T06:17:33.056399+00:00"}
+id: 24
+
+event: done
+data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":25,"type":"done","node":null,"status":null,"summary":"ranked 3 KOLs","timestamp":"2026-10-27T06:17:33.057947+00:00"}
+id: 25
+```
+
+### List jobs
+
+```bash
+curl 'localhost:8000/api/jobs?limit=5'
+```
+
+The response is a JSON array of jobs in the same shape as `GET /api/jobs/{id}`,
+newest first.
+
+### Check health
+
+```bash
+curl localhost:8000/api/health
+```
+
+```json
+{
+  "status": "ok",
+  "mode": "demo",
+  "defaults": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false},
+  "credentials": {
+    "APIFY_TOKEN": false,
+    "LLM_API_KEY": false,
+    "NVIDIA_API_KEY": false,
+    "OPENAI_API_KEY": false,
+    "JINA_API_KEY": false
+  },
+  "models": {
+    "llm_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "llm_host": "integrate.api.nvidia.com",
+    "embed_model": "google/embeddinggemma-2"
+  }
+}
+```
+
+`defaults` are the flags an omitted request field takes. `models` shows what
+the live LLM and embedder would use. `llm_host` is the host of `LLM_BASE_URL`
+only, never the full URL.
+
+## Live integrations
+
+Each section below covers one `--live-*` flag. The API flag of the same name
+runs the same code.
+
+### Web reading
 
 The default run uses the offline website fixture and does not touch the network.
 `--live-web` fetches the brand site for real and leaves Facebook, TikTok search,
@@ -121,7 +436,7 @@ uv run python -m app.cli match \
   --live-web
 ```
 
-## Facebook page (Apify)
+### Facebook page (Apify)
 
 The default run uses the offline Facebook fixture and does not call Apify.
 `--live-fb` reads the page through Apify. It needs `APIFY_TOKEN`, handled the
@@ -161,7 +476,7 @@ uv run python -m app.cli match \
   --live-fb
 ```
 
-## TikTok KOL search (Apify)
+### TikTok KOL search (Apify)
 
 The default run uses the offline KOL fixtures and does not call Apify.
 `--live-kols` searches TikTok and enriches Thai creators through Apify (at most
@@ -217,7 +532,7 @@ run once a token is available:
 uv run python scripts/apify_smoke.py "รีวิวแว่นตา"
 ```
 
-## LLM
+### LLM
 
 The default run uses the offline brand analyzer and does not call a model.
 `--live-llm` sends brand analysis, TikTok query generation, and relevance
@@ -280,8 +595,8 @@ The API key is not written to logs. It is stripped from error text.
 ```bash
 export LLM_API_KEY=...
 uv run python -m app.cli match \
-  --website https://example.com \
-  --facebook https://www.facebook.com/example \
+  --website https://example-brand.co.th \
+  --facebook https://www.facebook.com/example-brand \
   --top-k 5 \
   --live-llm
 ```
@@ -293,7 +608,7 @@ with a message and code 2 when no key is set:
 uv run python scripts/llm_smoke.py
 ```
 
-## Embeddings
+### Embeddings
 
 The default run uses an offline embedder. It does not download a model and it
 does not touch the network. `--live-embed` loads `google/embeddinggemma-2`
@@ -358,64 +673,6 @@ are atomic. A cache hit does not call the model.
 uv run python scripts/embed_smoke.py
 ```
 
-Run the tests:
-
-```bash
-uv run pytest
-```
-
-## HTTP API
-
-```bash
-cd backend
-uv run uvicorn app.api.main:app --port 8000
-```
-
-The service runs each job in a background thread and stores jobs and their
-progress events in SQLite (`data/jobs.db`, or `JOBS_DB`). On startup, jobs that
-a previous process left queued or running are marked failed with
-"interrupted by restart". CORS allows `http://localhost:5173` by default. Set
-`CORS_ORIGINS` to a comma-separated list to change it.
-
-| Method and path | Result |
-| --- | --- |
-| `POST /api/jobs` | 202 `{"job_id": "..."}`. 400 when a requested live flag cannot run |
-| `GET /api/jobs/{id}` | Status, stage, effective flags, errors, and the ranked results. 404 when unknown |
-| `GET /api/jobs/{id}/events` | Server-sent events, then a final `done` or `failed` event |
-| `GET /api/jobs?limit=20` | Recent jobs, newest first |
-| `GET /api/health` | Mode, default flags, and which credentials are set |
-
-```bash
-curl -X POST localhost:8000/api/jobs -H 'content-type: application/json' -d '{
-  "website_url": "https://example-brand.co.th",
-  "facebook_url": "https://www.facebook.com/example-brand",
-  "top_k": 10
-}'
-curl -N localhost:8000/api/jobs/<job_id>/events
-```
-
-A job moves from `queued` to `running` to `succeeded` or `failed`. Each graph
-node emits a `started` event and then a `finished` or `failed` event with a
-short summary such as `discovered+22`. The SSE `id` is the event's sequence
-number. A client that reconnects with `Last-Event-ID` (or `?after=N`) gets only
-the later events.
-
-### Demo and live mode
-
-The request can set `live_web`, `live_fb`, `live_kols`, `live_llm`, and
-`live_embed`. The job records the flags it actually ran with.
-
-- **Demo mode** forces every flag off, so the service runs from the mocks and
-  fixtures with no keys. It is on when `DEMO_MODE` is true, or when `DEMO_MODE`
-  is unset and `APIFY_TOKEN` is missing.
-- **Live mode** turns an omitted flag on when it can run: web always,
-  Facebook and KOLs with `APIFY_TOKEN`, the LLM with `LLM_API_KEY`,
-  `NVIDIA_API_KEY`, or `OPENAI_API_KEY`, and embeddings when the `embed` extra
-  is installed. A flag set to `true` that cannot run returns 400 and names the
-  missing variable.
-
-`/api/health` reports each credential only as set or missing.
-
 ## Repo layout
 
 ```text
@@ -432,6 +689,9 @@ backend/
     fixtures/        # mock website, Facebook page, KOL records, Apify samples
   scripts/           # apify_smoke.py, llm_smoke.py, and embed_smoke.py
   tests/
+  Dockerfile
   pyproject.toml
+docker-compose.yml
+.env.example
 README.md
 ```

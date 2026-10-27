@@ -88,6 +88,42 @@ def test_job_runs_to_succeeded_with_top_k_results(make_client):
     assert job["results"][0]["kol"]["handle"]
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        {**_BODY, "facebook_url": "https://example-brand.co.th/examplebrand"},
+        {**_BODY, "facebook_url": "https://facebook.com.example-brand.co.th/x"},
+        {**_BODY, "website_url": "http://localhost:8000"},
+        {**_BODY, "website_url": "http://127.0.0.1:9"},
+        {**_BODY, "website_url": "http://[::1]:9/"},
+        {**_BODY, "website_url": "http://10.0.0.1"},
+    ],
+)
+def test_private_or_non_facebook_hosts_are_422(make_client, body):
+    with make_client() as client:
+        response = client.post("/api/jobs", json=body)
+        listed = client.get("/api/jobs").json()
+
+    assert response.status_code == 422
+    assert listed == []
+
+
+@pytest.mark.parametrize(
+    "facebook_url",
+    [
+        "https://www.facebook.com/examplebrand",
+        "https://m.facebook.com/examplebrand",
+        "https://facebook.com/examplebrand",
+        "https://fb.com/examplebrand",
+    ],
+)
+def test_facebook_hosts_are_accepted(make_client, facebook_url):
+    with make_client() as client:
+        response = client.post("/api/jobs", json={**_BODY, "facebook_url": facebook_url})
+
+    assert response.status_code == 202
+
+
 def test_unknown_job_is_404(make_client):
     with make_client() as client:
         assert client.get("/api/jobs/nope").status_code == 404

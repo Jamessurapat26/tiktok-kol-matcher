@@ -1,7 +1,14 @@
 from collections.abc import Mapping
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
 
 
 class DomainModel(BaseModel):
@@ -125,6 +132,24 @@ class BrandProfile(DomainModel):
     reasoning: str
 
 
+def normalize_handle(handle: str) -> str:
+    """Comparable handle key: strip, lowercase, and drop leading '@'s."""
+    return handle.strip().lower().lstrip("@")
+
+
+# Higher wins when the same creator is seen from more than one source.
+# Unknown sources stay at 0 so they never replace a known row.
+SOURCE_PRIORITY: dict[str, int] = {"apify": 3, "seed": 2, "cache": 1}
+
+
+def outranks(new_source: str, current_source: str) -> bool:
+    """Return True when ``new_source`` has strictly higher priority.
+
+    Equal priority keeps the earlier record. Unknown sources have priority 0.
+    """
+    return SOURCE_PRIORITY.get(new_source, 0) > SOURCE_PRIORITY.get(current_source, 0)
+
+
 class KolProfile(DomainModel):
     handle: str
     url: HttpUrl
@@ -142,6 +167,15 @@ class KolProfile(DomainModel):
     posts_per_week: float = Field(default=0, ge=0)
     content_summary: str | None = None
     source: Literal["apify", "seed", "cache"]
+
+    @field_validator("handle")
+    @classmethod
+    def _clean_handle(cls, value: str) -> str:
+        # Preserve case. Strip again after removing '@' so "  @Bar " -> "Bar".
+        cleaned = value.strip().lstrip("@").strip()
+        if not cleaned:
+            raise ValueError("handle must not be empty")
+        return cleaned
 
 
 class RankedKol(DomainModel):

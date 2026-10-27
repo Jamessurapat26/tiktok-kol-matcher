@@ -3,9 +3,15 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import BrandProfile, FacebookPage, KolProfile, MatchRequest, RankedKol
-
-_SOURCE_PRIORITY: dict[str, int] = {"apify": 3, "seed": 2, "cache": 1}
+from .models import (
+    BrandProfile,
+    FacebookPage,
+    KolProfile,
+    MatchRequest,
+    RankedKol,
+    normalize_handle,
+    outranks,
+)
 
 
 def merge_kols(left: list[KolProfile], right: list[KolProfile]) -> list[KolProfile]:
@@ -17,12 +23,9 @@ def merge_kols(left: list[KolProfile], right: list[KolProfile]) -> list[KolProfi
     merged: dict[str, KolProfile] = {}
     for raw in [*left, *right]:
         kol = raw if isinstance(raw, KolProfile) else KolProfile.model_validate(raw)
-        key = kol.handle.strip().lower().lstrip("@")
+        key = normalize_handle(kol.handle)
         current = merged.get(key)
-        if (
-            current is None
-            or _SOURCE_PRIORITY[kol.source] > _SOURCE_PRIORITY[current.source]
-        ):
+        if current is None or outranks(kol.source, current.source):
             merged[key] = kol
     return list(merged.values())
 
@@ -54,6 +57,9 @@ class MatchState(BaseModel):
     # Accumulates across rounds. generate_queries returns only the new queries for
     # the current round; it can read the prior list on state to avoid repeats.
     search_queries: Annotated[list[str], operator.add] = Field(default_factory=list)
+    # Queries from the latest round only. Overwritten each round so discover_kols
+    # searches this list instead of the accumulated search_queries history.
+    last_queries: list[str] = Field(default_factory=list)
     search_rounds: int = Field(default=0, ge=0)
 
     # Raw output of discover_kols, accumulated across query rounds. The reducer

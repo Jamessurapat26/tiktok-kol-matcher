@@ -25,6 +25,8 @@ _ENV_VARS = (
     "LLM_BASE_URL",
     "LLM_MODEL",
     "EMBED_MODEL",
+    "JOB_WORKERS",
+    "MAX_QUEUED_JOBS",
 )
 _BODY = {
     "website_url": "https://example-brand.co.th",
@@ -41,11 +43,11 @@ def clean_env(monkeypatch):
 
 @pytest.fixture
 def make_client(tmp_path):
-    def make(integrations=None, **settings):
+    def make(integrations=None, submit=lambda work: work(), **settings):
         app = create_app(
             Settings(jobs_db=tmp_path / "jobs.db", **settings),
             integrations_factory=lambda flags: integrations or mock_integrations(),
-            submit=lambda work: work(),
+            submit=submit,
         )
         return TestClient(app)
 
@@ -122,6 +124,31 @@ def test_facebook_hosts_are_accepted(make_client, facebook_url):
         response = client.post("/api/jobs", json={**_BODY, "facebook_url": facebook_url})
 
     assert response.status_code == 202
+
+
+def test_full_queue_is_429_until_a_job_finishes(make_client):
+    pending = []
+    with make_client(submit=pending.append, max_queued_jobs=1) as client:
+        first = client.post("/api/jobs", json=_BODY)
+        second = client.post("/api/jobs", json=_BODY)
+        listed = client.get("/api/jobs").json()
+        pending.pop()()
+        third = client.post("/api/jobs", json=_BODY)
+
+    assert first.status_code == 202
+    assert second.status_code == 429
+    assert "MAX_QUEUED_JOBS" in second.json()["detail"]
+    assert [job["id"] for job in listed] == [first.json()["job_id"]]
+    assert third.status_code == 202
+
+
+def test_job_limits_come_from_the_environment(monkeypatch):
+    assert (Settings().job_workers, Settings().max_queued_jobs) == (2, 20)
+
+    monkeypatch.setenv("JOB_WORKERS", "3")
+    monkeypatch.setenv("MAX_QUEUED_JOBS", "5")
+
+    assert (Settings().job_workers, Settings().max_queued_jobs) == (3, 5)
 
 
 def test_unknown_job_is_404(make_client):

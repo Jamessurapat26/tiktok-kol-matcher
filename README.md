@@ -63,7 +63,7 @@ Swap in a real implementation later for Facebook page scraping.
 - [uv](https://docs.astral.sh/uv/) for dependency management
 - [LangGraph](https://langchain-ai.github.io/langgraph/) for orchestration
 - Pydantic for domain models and structured outputs
-- FastAPI (planned) for an HTTP API
+- FastAPI for the HTTP API, with SQLite job storage
 
 ## How to run
 
@@ -324,6 +324,58 @@ Run the tests:
 uv run pytest
 ```
 
+## HTTP API
+
+```bash
+cd backend
+uv run uvicorn app.api.main:app --port 8000
+```
+
+The service runs each job in a background thread and stores jobs and their
+progress events in SQLite (`data/jobs.db`, or `JOBS_DB`). On startup, jobs that
+a previous process left queued or running are marked failed with
+"interrupted by restart". CORS allows `http://localhost:5173` by default. Set
+`CORS_ORIGINS` to a comma-separated list to change it.
+
+| Method and path | Result |
+| --- | --- |
+| `POST /api/jobs` | 202 `{"job_id": "..."}`. 400 when a requested live flag cannot run |
+| `GET /api/jobs/{id}` | Status, stage, effective flags, errors, and the ranked results. 404 when unknown |
+| `GET /api/jobs/{id}/events` | Server-sent events, then a final `done` or `failed` event |
+| `GET /api/jobs?limit=20` | Recent jobs, newest first |
+| `GET /api/health` | Mode, default flags, and which credentials are set |
+
+```bash
+curl -X POST localhost:8000/api/jobs -H 'content-type: application/json' -d '{
+  "website_url": "https://example-brand.co.th",
+  "facebook_url": "https://www.facebook.com/example-brand",
+  "top_k": 10
+}'
+curl -N localhost:8000/api/jobs/<job_id>/events
+```
+
+A job moves from `queued` to `running` to `succeeded` or `failed`. Each graph
+node emits a `started` event and then a `finished` or `failed` event with a
+short summary such as `discovered+22`. The SSE `id` is the event's sequence
+number. A client that reconnects with `Last-Event-ID` (or `?after=N`) gets only
+the later events.
+
+### Demo and live mode
+
+The request can set `live_web`, `live_fb`, `live_kols`, `live_llm`, and
+`live_embed`. The job records the flags it actually ran with.
+
+- **Demo mode** forces every flag off, so the service runs from the mocks and
+  fixtures with no keys. It is on when `DEMO_MODE` is true, or when `DEMO_MODE`
+  is unset and `APIFY_TOKEN` is missing.
+- **Live mode** turns an omitted flag on when it can run: web always,
+  Facebook and KOLs with `APIFY_TOKEN`, the LLM with `LLM_API_KEY`,
+  `NVIDIA_API_KEY`, or `OPENAI_API_KEY`, and embeddings when the `embed` extra
+  is installed. A flag set to `true` that cannot run returns 400 and names the
+  missing variable.
+
+`/api/health` reports each credential only as set or missing.
+
 ## Repo layout
 
 ```text
@@ -334,6 +386,7 @@ backend/
     models.py        # MatchRequest, BrandProfile, KolProfile, RankedKol, ...
     state.py         # MatchState and list reducers
     cli.py           # argparse CLI (table or JSON)
+    api/             # FastAPI app: settings, SQLite job store, graph runner, routes
     prompts.py       # LLM prompt text for brand analysis, queries, and rerank
     integrations/    # Protocol + Mock per service; live web, Apify, LLM, and embedder
     fixtures/        # mock website, Facebook page, KOL records, Apify samples

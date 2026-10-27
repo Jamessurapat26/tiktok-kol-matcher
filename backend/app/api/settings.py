@@ -1,9 +1,13 @@
 import importlib.util
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from ..integrations.embeddings_live import DEFAULT_EMBED_MODEL
+from ..integrations.llm_live import DEFAULT_BASE_URL, DEFAULT_MODEL
 
 Mode = Literal["demo", "live"]
 
@@ -34,9 +38,8 @@ def _is_set(secret: SecretStr | None) -> bool:
 class Settings(BaseSettings):
     """Service configuration from the environment.
 
-    The integrations still read their own tuning variables (LLM_BASE_URL,
-    LLM_MODEL, EMBED_MODEL, ...). These settings decide the mode and which
-    live flags can run.
+    The integrations read their own variables when they are built. The model
+    fields here read the same names only to report them in /api/health.
     """
 
     model_config = SettingsConfigDict(extra="ignore")
@@ -47,13 +50,18 @@ class Settings(BaseSettings):
     nvidia_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
     jina_api_key: SecretStr | None = None
+    llm_base_url: str | None = None
+    llm_model: str | None = None
+    embed_model: str | None = None
     jobs_db: Path = Path("data/jobs.db")
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
-    @field_validator("demo_mode", mode="before")
+    @field_validator("demo_mode", "llm_base_url", "llm_model", "embed_model", mode="before")
     @classmethod
     def _blank_is_unset(cls, value: Any) -> Any:
-        return None if isinstance(value, str) and not value.strip() else value
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -81,6 +89,14 @@ class Settings(BaseSettings):
             "NVIDIA_API_KEY": _is_set(self.nvidia_api_key),
             "OPENAI_API_KEY": _is_set(self.openai_api_key),
             "JINA_API_KEY": _is_set(self.jina_api_key),
+        }
+
+    def models(self) -> dict[str, str | None]:
+        """What the live LLM and embedder would use. Host only, never the full URL."""
+        return {
+            "llm_model": self.llm_model or DEFAULT_MODEL,
+            "llm_host": urlsplit(self.llm_base_url or DEFAULT_BASE_URL).hostname,
+            "embed_model": self.embed_model or DEFAULT_EMBED_MODEL,
         }
 
     def unavailable(self) -> dict[str, str | None]:

@@ -22,6 +22,9 @@ _ENV_VARS = (
     "JINA_API_KEY",
     "JOBS_DB",
     "CORS_ORIGINS",
+    "LLM_BASE_URL",
+    "LLM_MODEL",
+    "EMBED_MODEL",
 )
 _BODY = {
     "website_url": "https://example-brand.co.th",
@@ -108,6 +111,33 @@ def test_health_without_env_is_demo(make_client):
     assert health["mode"] == "demo"
     assert not any(health["defaults"].values())
     assert not any(health["credentials"].values())
+
+
+def test_health_reports_integration_default_models(make_client, monkeypatch):
+    monkeypatch.setenv("LLM_MODEL", "  ")
+    with make_client() as client:
+        models = client.get("/api/health").json()["models"]
+
+    assert models == {
+        "llm_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "llm_host": "integrate.api.nvidia.com",
+        "embed_model": "google/embeddinggemma-2",
+    }
+
+
+def test_health_reports_configured_models_and_only_the_llm_host(make_client, monkeypatch):
+    monkeypatch.setenv("LLM_BASE_URL", "https://user:test-secret@llm.example-brand.co.th/v1?key=k")
+    monkeypatch.setenv("LLM_MODEL", "example/model-7b")
+    monkeypatch.setenv("EMBED_MODEL", "example/embedder")
+    with make_client() as client:
+        response = client.get("/api/health")
+
+    assert response.json()["models"] == {
+        "llm_model": "example/model-7b",
+        "llm_host": "llm.example-brand.co.th",
+        "embed_model": "example/embedder",
+    }
+    assert "test-secret" not in response.text
 
 
 def test_health_demo_mode_wins_over_token(make_client, monkeypatch):

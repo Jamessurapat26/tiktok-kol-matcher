@@ -50,6 +50,7 @@ class Health(BaseModel):
     mode: Mode
     defaults: LiveFlags
     credentials: dict[str, bool]
+    models: dict[str, str | None]
 
 
 def _live_integrations(settings: Settings, flags: LiveFlags) -> Integrations:
@@ -110,6 +111,7 @@ def create_app(
             mode=settings.mode,
             defaults=settings.default_flags(),
             credentials=settings.credentials(),
+            models=settings.models(),
         )
 
     @app.post("/api/jobs", status_code=202)

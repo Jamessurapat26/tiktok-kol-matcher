@@ -97,6 +97,10 @@ class MatchRequest(DomainModel):
     weights: MatchWeights = Field(default_factory=MatchWeights)
 
 
+MAX_RECENT_POSTS = 20
+MAX_POST_CHARS = 1_000
+
+
 class FacebookPage(DomainModel):
     page_name: str
     title: str
@@ -107,6 +111,14 @@ class FacebookPage(DomainModel):
     price_range: str | None = None
     website: HttpUrl | None = None
     ad_running: bool = False
+    recent_posts: list[str] = Field(default_factory=list)
+
+    @field_validator("recent_posts")
+    @classmethod
+    def _cap_posts(cls, posts: list[str]) -> list[str]:
+        """Collapse whitespace, drop blank posts, clip each, keep the newest few."""
+        compact = (" ".join(post.split())[:MAX_POST_CHARS].rstrip() for post in posts)
+        return [post for post in compact if post][:MAX_RECENT_POSTS]
 
 
 class TargetAudience(DomainModel):

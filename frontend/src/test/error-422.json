@@ -11,7 +11,7 @@
       "type": "value_error",
       "loc": ["body", "facebook_url"],
       "msg": "Value error, facebook_url must be a facebook.com or fb.com page",
-      "input": "https://example.com/x",
+      "input": "https://example-brand.co.th/x",
       "ctx": { "error": {} }
     },
     {

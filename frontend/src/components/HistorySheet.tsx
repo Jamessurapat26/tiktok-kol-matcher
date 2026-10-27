@@ -56,7 +56,7 @@ export function HistorySheet({ open, onOpenChange, selectedId, onSelect }: Props
                     }}
                     className={cn(
                       'flex w-full flex-col gap-1 rounded-xl border p-4 text-left outline-none hover:bg-surface focus-visible:ring-3 focus-visible:ring-ring',
-                      job.id === selectedId && 'border-primary',
+                      job.id === selectedId && 'border-ink',
                     )}
                   >
                     <span className="flex items-center justify-between gap-2">

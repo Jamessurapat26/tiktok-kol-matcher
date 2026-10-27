@@ -1,5 +1,7 @@
+import importlib.machinery
 import json
 import sys
+import types
 from dataclasses import replace
 
 import pytest
@@ -15,6 +17,12 @@ from app.integrations.web_reader_live import CachedWebReader
 
 _WEBSITE = "https://example-brand.co.th"
 _FACEBOOK = "https://www.facebook.com/examplebrand"
+
+
+def _pretend_embed_extra_installed(monkeypatch):
+    module = types.ModuleType("sentence_transformers")
+    module.__spec__ = importlib.machinery.ModuleSpec("sentence_transformers", None)
+    monkeypatch.setitem(sys.modules, "sentence_transformers", module)
 
 
 def test_json_output(capsys):
@@ -479,6 +487,7 @@ def test_live_embed_flag_does_not_load_the_model(monkeypatch, capsys):
     from app.integrations.embeddings_live import SentenceTransformerEmbedder
     from app.integrations.llm import MockBrandAnalyzer
 
+    _pretend_embed_extra_installed(monkeypatch)
     for name in ("EMBED_MODEL", "EMBED_DEVICE", "EMBED_DIM", "EMBED_DTYPE"):
         monkeypatch.delenv(name, raising=False)
     captured: dict = {}
@@ -548,6 +557,7 @@ def test_live_embed_without_the_extra_exits_2_before_any_integration(monkeypatch
 
 
 def test_bad_embed_dim_exits_2(monkeypatch, capsys):
+    _pretend_embed_extra_installed(monkeypatch)
     monkeypatch.setenv("EMBED_DIM", "300")
 
     def fail_build(*args, **kwargs):

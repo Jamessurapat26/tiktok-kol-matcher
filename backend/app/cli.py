@@ -1,4 +1,5 @@
 import argparse
+import importlib.util
 import json
 import os
 import sys
@@ -353,6 +354,14 @@ def _cmd_match(args: argparse.Namespace) -> int:
         print(
             "error: --live-llm requires LLM_API_KEY, NVIDIA_API_KEY, or "
             "OPENAI_API_KEY in the environment",
+            file=sys.stderr,
+        )
+        return 2
+    # find_spec only, so the model is neither imported nor loaded here.
+    if args.live_embed and importlib.util.find_spec("sentence_transformers") is None:
+        print(
+            "error: --live-embed requires sentence-transformers. "
+            "From the backend directory run `uv sync --extra embed`",
             file=sys.stderr,
         )
         return 2

@@ -92,6 +92,7 @@ def test_job_runs_to_succeeded_with_top_k_results(make_client):
     assert len(job["results"]) == 5
     assert job["request"]["top_k"] == 5
     assert job["results"][0]["kol"]["handle"]
+    assert job["brand_profile"]["category"]
 
 
 @pytest.mark.parametrize(
@@ -318,6 +319,7 @@ def test_fatal_node_failure_fails_job(make_client):
 
     assert job["status"] == "failed"
     assert job["results"] == []
+    assert job["brand_profile"] is None
     assert any("model unavailable" in error for error in job["errors"])
     analyze = [e for e in events if e["node"] == "analyze_brand"]
     assert [e["status"] for e in analyze] == ["started", "failed"]

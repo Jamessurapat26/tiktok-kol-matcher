@@ -43,7 +43,12 @@ def run_job(
         ):
             if mode == "values":
                 final = payload
-                store.progress(job_id, stage=payload["stage"], errors=payload["errors"])
+                store.progress(
+                    job_id,
+                    stage=payload["stage"],
+                    errors=payload["errors"],
+                    brand_profile=payload.get("brand_profile"),
+                )
             elif "input" in payload:
                 store.add_event(job_id, node=payload["name"], status="started")
             else:

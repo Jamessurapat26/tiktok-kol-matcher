@@ -514,8 +514,9 @@ before the pipeline starts.
   `website` domain), and `ad_status` are mapped onto the Facebook page.
 - **Recent posts** use [apify/facebook-posts-scraper](https://apify.com/apify/facebook-posts-scraper)
   with `resultsLimit` 20. Up to 20 post texts are kept, each with its
-  whitespace collapsed and cut to 1,000 characters. Brand analysis sees each
-  post cut to 300 characters.
+  whitespace collapsed and cut to 1,000 characters. Brand analysis sees only
+  the newest 3 posts, each cut to 200 characters, and treats them as weak
+  signals for tone and current campaigns rather than as product evidence.
 - **Cost controls.** Each page is two runs, and each run sets `maxItems`,
   `limit`, and `maxTotalChargeUsd` ($0.50). The store lists the page scraper
   from about $5–$12 per 1,000 pages and the posts scraper from about $2–$5 per

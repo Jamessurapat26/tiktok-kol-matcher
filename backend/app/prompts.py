@@ -12,30 +12,48 @@ from .models import BrandProfile, FacebookPage, KolProfile
 _SOURCE_CHARS = 12_000
 _BIO_CHARS = 300
 _SUMMARY_CHARS = 400
-_POST_CHARS = 300
+MAX_PROMPT_POSTS = 3
+MAX_PROMPT_POST_CHARS = 200
 
 BRAND_ANALYSIS_SYSTEM = """\
-You extract a structured brand profile from a brand's website text and, when
-present, its Facebook page. Reply with one JSON object and nothing else.
-Do not wrap the JSON in markdown. Put the JSON in the visible reply itself,
-not only in a reasoning trace.
+You extract a structured brand profile for a brand. Reply with one JSON object
+and nothing else. Do not wrap the JSON in markdown. Put the JSON in the visible
+reply itself, not only in a reasoning trace.
+
+Use the sources in this order of trust:
+1. The website text and the Facebook page name, categories, intro, and website
+   are the primary sources. Use them for products, category, and audience.
+2. Recent Facebook posts are a weak signal for tone and current campaigns only.
+   Never make a post the sole source of a product. Posts often mention items
+   that are not the brand's own products, such as giveaways, collaborations,
+   partner products, and memes. Leave those items out.
 
 The object must contain exactly these keys:
 - category: short product category
-- products: list of product names
+- products: the brand's own core product lines or categories, at most 8 items.
+  Each item is a short noun phrase of at most 4 words.
+  Prefer the primary sources over posts.
 - target_audience: object with age_min (integer or null), age_max (integer or
-  null), gender ("male", "female", or "any"), interests (list of strings),
-  and location
+  null), gender ("male", "female", or "any"), interests (at most 8 short
+  phrases of at most 3 words each), and location
 - tone: how the brand speaks
 - content_style: the kind of social content that fits the brand
-- keywords_th: Thai search keywords written in Thai script
-- keywords_en: English search keywords
-- hashtags: hashtags, each starting with #
+- keywords_th: Thai search phrases in Thai script, at most 12 items.
+  Each is a short search phrase of at most 3 words, written
+  without sentence structure, without verbs with clauses, and without
+  punctuation.
+- keywords_en: English search phrases, at most 12 items. Each is a
+  short search phrase of at most 3 words, without sentence
+  structure or punctuation.
+- hashtags: at most 10 hashtags. Each starts with # and has no
+  spaces.
 - preferred_tiers: list using only "nano", "micro", "macro", and "mega"
 - reasoning: one or two sentences on how you read the sources
 
-Use null for an age bound you cannot tell. Prefer the sources over guesses.
-If Facebook text is missing, say so in reasoning and still return the profile.
+Give a best-estimate age_min and age_max from the brand type and audience cues.
+Use null for an age bound only when there is truly no signal. Prefer the
+primary sources over guesses. If Facebook text is missing, say so in reasoning
+and still return the profile.
 """
 
 # Each query becomes one paid Apify actor run, so the live analyzer enforces
@@ -91,9 +109,9 @@ def brand_messages(
 ) -> list[dict[str, str]]:
     website = _clip(website_content, _SOURCE_CHARS) or "(no website text)"
     user = (
-        "Website text:\n"
+        "Primary source: Website text\n"
         f"{website}\n\n"
-        "Facebook page:\n"
+        "Primary source: Facebook page (name, categories, intro, and website)\n"
         f"{_facebook_text(facebook_page)}"
     )
     return [
@@ -175,16 +193,24 @@ def _facebook_text(page: FacebookPage | None) -> str:
     categories = ", ".join(page.categories)
     lines = [
         f"name: {page.page_name}",
-        f"title: {page.title}",
         f"categories: {categories}",
         f"intro: {_clip(page.intro, _SOURCE_CHARS)}",
+        f"website: {page.website or ''}",
+        f"title: {page.title}",
         f"followers: {page.followers}",
         f"price_range: {page.price_range or ''}",
-        f"website: {page.website or ''}",
     ]
-    if page.recent_posts:
-        lines.append("recent_posts:")
-        lines.extend(f"- {_clip(post, _POST_CHARS)}" for post in page.recent_posts)
+    # recent_posts is newest first. Posts are a weak signal, so only the newest
+    # few are sent, and each is clipped hard to keep them from dominating.
+    posts = page.recent_posts[:MAX_PROMPT_POSTS]
+    if posts:
+        lines.append(
+            "weak_signals_recent_posts (weak signal only: use for tone and"
+            " current campaigns; never as the sole source of a product):"
+        )
+        lines.extend(
+            f"- {_clip(post, MAX_PROMPT_POST_CHARS)}" for post in posts
+        )
     return "\n".join(lines)
 
 

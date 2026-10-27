@@ -877,3 +877,45 @@ def test_brand_list_fields_given_as_strings_are_split():
     assert profile.preferred_tiers == ["micro"]
     assert profile.target_audience.interests == ["gaming", "study"]
     assert len(queue.requests) == 1
+
+
+def test_analyze_brand_tidies_a_polluted_profile():
+    polluted = {
+        **_BRAND_JSON,
+        "products": [
+            "blue-light glasses",
+            "free cotton towel from the latest giveaway post",
+            "towel",
+        ],
+        "keywords_th": [
+            "แว่นตา",
+            (
+                "แว่นตากันแสงสีฟ้าสำหรับเกมเมอร์ที่ต้องนั่งหน้าจอคอมพิวเตอร์"
+                "เป็นเวลานานทุกวันโดยไม่พักสายตา"
+            ),
+        ],
+        "keywords_en": [
+            "blue light glasses",
+            "what to look for when buying blue light glasses",
+        ],
+        "hashtags": ["#Blue Light", "##Glasses", "x" * 40],
+        "target_audience": {
+            **_BRAND_JSON["target_audience"],
+            "age_min": 75,
+            "age_max": 18,
+            "interests": ["gaming", "too many words in one interest"],
+        },
+    }
+    chat = _ScriptedChat([json.dumps(polluted)])
+    analyzer = LiveBrandAnalyzer(settings=LlmSettings(api_key=_KEY), chat=chat)
+
+    profile = analyzer.analyze_brand("A shop sells blue-light glasses.", _page())
+
+    assert profile.products == ["blue-light glasses", "towel"]
+    assert profile.keywords_th == ["แว่นตา"]
+    assert profile.keywords_en == ["blue light glasses"]
+    assert profile.hashtags == ["#BlueLight", "#Glasses"]
+    assert profile.target_audience.age_min == 18
+    assert profile.target_audience.age_max == 75
+    assert profile.target_audience.interests == ["gaming"]
+    assert len(chat.messages) == 1

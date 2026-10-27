@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from ..integrations.embeddings_live import DEFAULT_EMBED_MODEL
@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     embed_model: str | None = None
     jobs_db: Path = Path("data/jobs.db")
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
+    job_workers: int = Field(default=2, ge=1)
+    max_queued_jobs: int = Field(default=20, ge=1)
 
     @field_validator("demo_mode", "llm_base_url", "llm_model", "embed_model", mode="before")
     @classmethod

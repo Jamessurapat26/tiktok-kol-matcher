@@ -236,6 +236,8 @@ one-line description each. Blank values take the defaults. The main ones:
 | `KOL_CACHE_DIR` | every live cache | `data/cache` at the repo root |
 | `JOBS_DB` | API job store | `data/jobs.db` |
 | `CORS_ORIGINS` | API, comma-separated | `http://localhost:5173` |
+| `JOB_WORKERS` | API, jobs that run at once | `2` |
+| `MAX_QUEUED_JOBS` | API, jobs queued or running before `POST /api/jobs` returns 429 | `20` |
 
 [LLM](#llm) and [Embeddings](#embeddings) list the tuning variables for those
 integrations. Keys and tokens are never logged. `/api/health` reports each one
@@ -245,7 +247,7 @@ only as set or missing.
 
 | Method and path | Result |
 | --- | --- |
-| `POST /api/jobs` | 202 `{"job_id": "..."}`. 400 when a requested live flag cannot run. 422 on an invalid body |
+| `POST /api/jobs` | 202 `{"job_id": "..."}`. 400 when a requested live flag cannot run. 422 on an invalid body, a `facebook_url` outside facebook.com or fb.com, or a `website_url` on a local or private address. 429 when `MAX_QUEUED_JOBS` jobs are queued or running |
 | `GET /api/jobs/{id}` | Status, stage, request, effective flags, errors, and ranked results. 404 when unknown |
 | `GET /api/jobs/{id}/events` | Server-sent events, ending with a `done` or `failed` event. 404 when unknown |
 | `GET /api/jobs?limit=20` | Recent jobs, newest first. `limit` is 1 to 100 |

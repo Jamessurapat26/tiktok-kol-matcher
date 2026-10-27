@@ -2,6 +2,7 @@ import asyncio
 import ipaddress
 import threading
 from collections.abc import AsyncIterator, Callable
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
@@ -26,7 +27,7 @@ _MAX_ENRICH = 10
 _POLL_SECONDS = 0.25
 
 IntegrationsFactory = Callable[[LiveFlags], Integrations]
-Submit = Callable[[Callable[[], None]], None]
+Submit = Callable[[Callable[[], None]], object]
 
 
 class JobCreate(BaseModel):
@@ -90,27 +91,29 @@ def _live_integrations(settings: Settings, flags: LiveFlags) -> Integrations:
     )
 
 
-def _start_thread(work: Callable[[], None]) -> None:
-    threading.Thread(target=work, daemon=True).start()
-
-
 def create_app(
     settings: Settings | None = None,
     *,
     integrations_factory: IntegrationsFactory | None = None,
-    submit: Submit = _start_thread,
+    submit: Submit | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
 
     make_integrations = integrations_factory or (
         lambda flags: _live_integrations(settings, flags)
     )
+    executor = ThreadPoolExecutor(settings.job_workers, thread_name_prefix="job")
+    submit = submit or executor.submit
+    # One permit per job from POST until run_job returns, so queued and running count together.
+    slots = threading.Semaphore(settings.max_queued_jobs)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.store = JobStore(settings.jobs_db)
         app.state.store.fail_interrupted()
         yield
+        # Queued jobs stay "queued" in the store; the next start fails them as interrupted.
+        executor.shutdown(wait=False, cancel_futures=True)
 
     app = FastAPI(title="TikTok KOL Matcher", lifespan=lifespan)
     app.add_middleware(
@@ -153,9 +156,26 @@ def create_app(
             integrations = make_integrations(flags)
         except (FlagUnavailable, ApifyConfigError, LlmConfigError, EmbedConfigError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from None
-        job = store.create(request, flags)
+        if not slots.acquire(blocking=False):
+            raise HTTPException(
+                status_code=429,
+                detail=f"{settings.max_queued_jobs} jobs are already queued or running "
+                "(MAX_QUEUED_JOBS); retry when one finishes",
+            )
+        try:
+            job = store.create(request, flags)
+        except BaseException:
+            slots.release()
+            raise
         enrich_limit = _MAX_ENRICH if flags.live_kols else None
-        submit(lambda: run_job(store, job.id, integrations, enrich_limit=enrich_limit))
+
+        def work() -> None:
+            try:
+                run_job(store, job.id, integrations, enrich_limit=enrich_limit)
+            finally:
+                slots.release()
+
+        submit(work)
         return JobCreated(job_id=job.id)
 
     @app.get("/api/jobs")

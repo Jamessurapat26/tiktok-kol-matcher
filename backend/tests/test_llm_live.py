@@ -589,6 +589,48 @@ def test_rerank_batches_and_keeps_heuristic_scores_in_the_total():
     assert item.total_score == state.request.weights.apply(item.scores)
 
 
+class _FakeEmbedder:
+    """Stand-in for a real embedder: not MockEmbedder, so its scores are evidence."""
+
+    def similarity(self, query, documents, *, titles=None):
+        return [0.9] * len(documents)
+
+
+def _live_rerank_prompt(embedder) -> str:
+    kols = [_kol("Alpha")]
+    reply = json.dumps(
+        {"scores": [{"handle": kol.handle, "relevance": 0.5, "reason": "ok"} for kol in kols]}
+    )
+    chat = _ScriptedChat([reply])
+    analyzer = LiveBrandAnalyzer(settings=LlmSettings(api_key=_KEY), chat=chat)
+    state = MatchState(
+        request=_request(),
+        brand_profile=_brand(),
+        shortlisted=kols,
+        prefilter_scores=[0.2899],
+        stage="embedding_prefilter",
+    )
+    update = make_nodes(
+        replace(mock_integrations(), llm=analyzer, embedder=embedder),
+        min_candidates=1,
+        max_search_rounds=1,
+    )["llm_rerank"](state)
+    assert update["stage"] == "reranking", update
+    return "\n".join(message["content"] for message in chat.messages[0])
+
+
+def test_live_rerank_hides_mock_embedder_scores():
+    prompt = _live_rerank_prompt(MockEmbedder())
+    assert "embedding_similarity" not in prompt
+    assert "cosine similarity" not in prompt
+
+
+def test_live_rerank_sends_real_embedder_scores():
+    prompt = _live_rerank_prompt(_FakeEmbedder())
+    assert "embedding_similarity: 0.2899" in prompt
+    assert "cosine similarity" in prompt
+
+
 def test_generate_queries_node_keeps_per_round_queries():
     class _Recording(MockBrandAnalyzer):
         def __init__(self) -> None:

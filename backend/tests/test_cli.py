@@ -1,4 +1,5 @@
 import json
+import sys
 from dataclasses import replace
 
 import pytest
@@ -519,6 +520,31 @@ def test_live_embed_flag_does_not_load_the_model(monkeypatch, capsys):
     assert captured["kwargs"]["prefilter_n"] == 25
     assert "OLLAMA" not in captured_io.out
     assert "OLLAMA" not in captured_io.err
+
+
+def test_live_embed_without_the_extra_exits_2_before_any_integration(monkeypatch, capsys):
+    monkeypatch.setitem(sys.modules, "sentence_transformers", None)
+
+    def fail(*args, **kwargs):
+        raise AssertionError("integrations and graph should not be built")
+
+    monkeypatch.setattr("app.cli.build_integrations", fail)
+    monkeypatch.setattr("app.cli.build_graph", fail)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--live-embed",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "uv sync --extra embed" in captured.err
+    assert "Traceback" not in captured.err
+    assert captured.out == ""
 
 
 def test_bad_embed_dim_exits_2(monkeypatch, capsys):

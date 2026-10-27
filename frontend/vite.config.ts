@@ -7,5 +7,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   server: { proxy: { '/api': 'http://localhost:8000' } },
-  test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test/setup.ts'] },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+    // Vitest blanks CSS imports by default; lib/utils reads the token file as text.
+    css: { include: [/tokens\.css/] },
+  },
 })

@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -8,12 +9,13 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.sse import EventSourceResponse, ServerSentEvent
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from ..integrations import Integrations, build_integrations
 from ..integrations.apify import ApifyConfigError
 from ..integrations.embeddings import EmbedConfigError
 from ..integrations.llm_live import LlmConfigError
+from ..integrations.web_reader_live import is_public_address
 from ..models import MatchRequest
 from .runner import run_job
 from .settings import FlagUnavailable, LiveFlags, Mode, Settings
@@ -39,6 +41,31 @@ class JobCreate(BaseModel):
     live_kols: bool | None = None
     live_llm: bool | None = None
     live_embed: bool | None = None
+
+    @field_validator("website_url")
+    @classmethod
+    def _public_website(cls, url: HttpUrl) -> HttpUrl:
+        # Literal addresses only; names are resolved and checked by the web reader.
+        host = (url.host or "").strip("[]")
+        if host == "localhost" or (_is_ip_literal(host) and not is_public_address(host)):
+            raise ValueError("website_url must not point at a private or local address")
+        return url
+
+    @field_validator("facebook_url")
+    @classmethod
+    def _facebook_host(cls, url: HttpUrl) -> HttpUrl:
+        host = url.host or ""
+        if host not in {"facebook.com", "fb.com"} and not host.endswith(".facebook.com"):
+            raise ValueError("facebook_url must be a facebook.com or fb.com page")
+        return url
+
+
+def _is_ip_literal(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
 
 
 class JobCreated(BaseModel):

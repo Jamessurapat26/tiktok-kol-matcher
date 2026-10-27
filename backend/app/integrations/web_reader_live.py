@@ -1,7 +1,9 @@
 import hashlib
+import ipaddress
 import json
 import os
 import re
+import socket
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -105,6 +107,36 @@ class JinaWebReader:
         return self.fetch(url).content
 
 
+Resolver = Callable[[str], list[str]]
+
+_MAX_REDIRECTS = 10
+
+
+def resolve_host(host: str) -> list[str]:
+    return [info[4][0] for info in socket.getaddrinfo(host, None)]
+
+
+def is_public_address(address: str) -> bool:
+    # is_global alone still says yes to multicast ranges.
+    ip = ipaddress.ip_address(address)
+    return ip.is_global and not ip.is_multicast
+
+
+def _assert_public(host: str, resolve: Resolver) -> None:
+    """Refuse hosts that resolve to loopback, private, link-local, or other non-public addresses.
+
+    The job URL comes from the API caller, so a direct fetch of it must not reach
+    this machine or its network. The check resolves separately from the connect,
+    so a host whose DNS answer flips between the two (rebinding) is not covered.
+    """
+    try:
+        addresses = resolve(host)
+    except OSError as exc:
+        raise WebReadError(f"Could not resolve {host}") from exc
+    if not addresses or not all(is_public_address(address) for address in addresses):
+        raise WebReadError(f"Refused to fetch {host}: not a public address")
+
+
 class TrafilaturaWebReader:
     def __init__(
         self,
@@ -112,24 +144,29 @@ class TrafilaturaWebReader:
         timeout: float = 20.0,
         max_retries: int = 2,
         backoff: float = 1.0,
+        resolve: Resolver = resolve_host,
     ) -> None:
-        self._client = client or httpx.Client(
-            timeout=timeout,
-            http2=True,
-            follow_redirects=True,
-        )
+        self._client = client or httpx.Client(timeout=timeout, http2=True)
         self._max_retries = max_retries
         self._backoff = backoff
+        self._resolve = resolve
+
+    def _send(self, url: str) -> httpx.Response:
+        """One GET, following redirects by hand so every hop's host is checked."""
+        request = self._client.build_request("GET", url, headers=_BROWSER_HEADERS)
+        for _ in range(_MAX_REDIRECTS + 1):
+            _assert_public(request.url.host, self._resolve)
+            resp = self._client.send(request, follow_redirects=False)
+            if resp.next_request is None:
+                return resp
+            request = resp.next_request
+        raise WebReadError(f"Failed to fetch {url}: too many redirects")
 
     def _get(self, url: str) -> httpx.Response:
         attempts = self._max_retries + 1
         for attempt in range(attempts):
             try:
-                resp = self._client.get(
-                    url,
-                    headers=_BROWSER_HEADERS,
-                    follow_redirects=True,
-                )
+                resp = self._send(url)
                 if resp.status_code != 429 and resp.status_code < 500:
                     resp.raise_for_status()
                     return resp

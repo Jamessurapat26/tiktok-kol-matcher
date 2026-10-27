@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDateTime, formatDuration } from '@/lib/format'
 import { type Progress, type Step, type StepStatus, stepDuration } from '@/lib/steps'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 
 const LABELS: Record<Step['node'], string> = {
   scrape_website: 'Read website',

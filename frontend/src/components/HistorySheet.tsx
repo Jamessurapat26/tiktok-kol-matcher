@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime } from '@/lib/format'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 
 const STATUS_BADGE: Record<JobStatus, 'success' | 'warning' | 'error' | 'info'> = {
   queued: 'warning',

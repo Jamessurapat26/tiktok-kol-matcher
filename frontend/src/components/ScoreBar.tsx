@@ -1,4 +1,4 @@
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 
 /** A 0..1 value as a horizontal bar. */
 export function ScoreBar({ value, label, className }: { value: number; label: string; className?: string }) {

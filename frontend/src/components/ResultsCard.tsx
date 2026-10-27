@@ -6,7 +6,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Skeleton } from '@/components/ui/skeleton'
 import { downloadCsv, toCsv } from '@/lib/csv'
 import { formatCompact, formatPercent, formatScore, initials } from '@/lib/format'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 import { ScoreBar } from './ScoreBar'
 
 const CONFIDENCE: Record<AudienceConfidence, number> = { low: 1 / 3, medium: 2 / 3, high: 1 }

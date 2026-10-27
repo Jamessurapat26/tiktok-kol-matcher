@@ -1,0 +1,189 @@
+"""Prompt text for the live brand analyzer.
+
+The model must put one JSON object in the visible reply. Reasoning models can
+spend the completion budget on a hidden trace and return an empty reply, so
+the instructions say the JSON belongs in the answer itself.
+"""
+
+from __future__ import annotations
+
+from .models import BrandProfile, FacebookPage, KolProfile
+
+_SOURCE_CHARS = 12_000
+_BIO_CHARS = 300
+_SUMMARY_CHARS = 400
+
+BRAND_ANALYSIS_SYSTEM = """\
+You extract a structured brand profile from a brand's website text and, when
+present, its Facebook page. Reply with one JSON object and nothing else.
+Do not wrap the JSON in markdown. Put the JSON in the visible reply itself,
+not only in a reasoning trace.
+
+The object must contain exactly these keys:
+- category: short product category
+- products: list of product names
+- target_audience: object with age_min (integer or null), age_max (integer or
+  null), gender ("male", "female", or "any"), interests (list of strings),
+  and location
+- tone: how the brand speaks
+- content_style: the kind of social content that fits the brand
+- keywords_th: Thai search keywords written in Thai script
+- keywords_en: English search keywords
+- hashtags: hashtags, each starting with #
+- preferred_tiers: list using only "nano", "micro", "macro", and "mega"
+- reasoning: one or two sentences on how you read the sources
+
+Use null for an age bound you cannot tell. Prefer the sources over guesses.
+If Facebook text is missing, say so in reasoning and still return the profile.
+"""
+
+QUERY_SYSTEM = """\
+You write TikTok search queries that find creators for a brand. Reply with one
+JSON object and nothing else, in the visible reply, not only in a reasoning
+trace. Do not wrap it in markdown.
+
+Shape: {"queries": ["...", "..."]}
+
+Each query is a short TikTok search string. Mix Thai (Thai script) and
+English. Do not repeat any query from the previous list, even with different
+casing or extra spaces. Round 1 is broad product and audience searches. Later
+rounds expand into hashtags, adjacent topics, and creator-style searches that
+were not used yet. Return between 6 and 10 queries.
+"""
+
+RERANK_SYSTEM = """\
+You score how relevant each TikTok creator is to a brand. Reply with one JSON
+object and nothing else, in the visible reply, not only in a reasoning trace.
+Do not wrap it in markdown.
+
+Shape: {"scores": [{"handle": "...", "relevance": 0.0, "reason": "..."}]}
+
+relevance is a number from 0 to 1. 1 means the creator clearly covers the
+brand's products or audience. 0 means unrelated. The goal is to find creators
+who could promote the brand, so score the brand's own account, other shops, and
+competing brands low, however closely their products match. reason is one
+short sentence in Thai or English. Include every handle from the input exactly
+once. Copy each handle unchanged.
+"""
+
+JSON_RETRY_USER = (
+    "That response failed validation:\n"
+    "{error}\n\n"
+    "Reply again with only one JSON object that matches the schema. "
+    "No markdown, and put the JSON in the visible reply."
+)
+
+
+def brand_messages(
+    website_content: str | None,
+    facebook_page: FacebookPage | None,
+) -> list[dict[str, str]]:
+    website = _clip(website_content, _SOURCE_CHARS) or "(no website text)"
+    user = (
+        "Website text:\n"
+        f"{website}\n\n"
+        "Facebook page:\n"
+        f"{_facebook_text(facebook_page)}"
+    )
+    return [
+        {"role": "system", "content": BRAND_ANALYSIS_SYSTEM},
+        {"role": "user", "content": user},
+    ]
+
+
+def query_messages(
+    brand: BrandProfile,
+    previous_queries: list[str],
+    round: int,
+) -> list[dict[str, str]]:
+    previous = "\n".join(f"- {query}" for query in previous_queries) or "(none)"
+    user = (
+        f"Round: {round}\n\n"
+        "Brand:\n"
+        f"{_brand_summary(brand)}\n\n"
+        "Queries already used (do not repeat these):\n"
+        f"{previous}"
+    )
+    return [
+        {"role": "system", "content": QUERY_SYSTEM},
+        {"role": "user", "content": user},
+    ]
+
+
+def rerank_messages(brand: BrandProfile, kols: list[KolProfile]) -> list[dict[str, str]]:
+    cards = "\n\n".join(_kol_card(kol) for kol in kols)
+    user = (
+        "Brand:\n"
+        f"{_brand_summary(brand)}\n\n"
+        "Creators:\n"
+        f"{cards}"
+    )
+    return [
+        {"role": "system", "content": RERANK_SYSTEM},
+        {"role": "user", "content": user},
+    ]
+
+
+def _brand_summary(brand: BrandProfile) -> str:
+    audience = brand.target_audience
+    return "\n".join(
+        [
+            f"category: {brand.category}",
+            f"products: {', '.join(brand.products)}",
+            f"tone: {brand.tone}",
+            f"content_style: {brand.content_style}",
+            (
+                f"audience: {audience.gender}, ages {audience.age_min}-{audience.age_max}, "
+                f"{audience.location}"
+            ),
+            f"interests: {', '.join(audience.interests)}",
+            f"keywords_th: {', '.join(brand.keywords_th)}",
+            f"keywords_en: {', '.join(brand.keywords_en)}",
+            f"hashtags: {' '.join(brand.hashtags)}",
+            f"preferred_tiers: {', '.join(brand.preferred_tiers)}",
+        ]
+    )
+
+
+def _facebook_text(page: FacebookPage | None) -> str:
+    if page is None:
+        return "(no Facebook page was scraped)"
+    categories = ", ".join(page.categories)
+    return "\n".join(
+        [
+            f"name: {page.page_name}",
+            f"title: {page.title}",
+            f"categories: {categories}",
+            f"intro: {_clip(page.intro, _SOURCE_CHARS)}",
+            f"followers: {page.followers}",
+            f"price_range: {page.price_range or ''}",
+        ]
+    )
+
+
+def _kol_card(kol: KolProfile) -> str:
+    if kol.median_engagement_rate is None:
+        rate = "unknown"
+    else:
+        rate = f"{kol.median_engagement_rate:.4f}"
+    return "\n".join(
+        [
+            f"handle: {kol.handle}",
+            f"nickname: {kol.nickname or ''}",
+            f"followers: {kol.followers}",
+            f"language: {kol.language or ''}",
+            f"region: {kol.region or ''}",
+            f"engagement_rate: {rate}",
+            f"bio: {_clip(kol.bio, _BIO_CHARS)}",
+            f"content: {_clip(kol.content_summary, _SUMMARY_CHARS)}",
+        ]
+    )
+
+
+def _clip(text: str | None, limit: int) -> str:
+    if not text:
+        return ""
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 3].rstrip() + "..."

@@ -1,7 +1,8 @@
 # TikTok KOL Matcher
 
 A LangGraph pipeline that turns a brand's website and Facebook page into a ranked
-shortlist of Thai TikTok creators. It runs as a CLI or as an HTTP service.
+shortlist of Thai TikTok creators. It runs as a CLI, or as an HTTP service with
+a web frontend.
 
 Given a brand website and Facebook page, it scrapes the sources, builds a
 structured brand profile, generates TikTok search queries, discovers creators,
@@ -94,6 +95,8 @@ output. Five pieces can run live:
 - Pydantic for domain models and structured outputs, pydantic-settings for
   service configuration
 - FastAPI for the HTTP API, with SQLite job storage and server-sent events
+- Frontend: Vite, React, TypeScript, Tailwind CSS, shadcn/ui, and TanStack
+  Query, built with pnpm and served by nginx in Docker
 
 ## How to run
 
@@ -166,6 +169,31 @@ The API has no authentication and is meant for local use. Anyone who can reach
 the port can start jobs, which spend Apify and LLM credit in live mode. Keep it
 on localhost (uvicorn's default) or put it behind something that authenticates.
 
+### Frontend
+
+The frontend in `frontend/` is a single page: a brand form, a live stepper of
+the pipeline nodes, the brand profile, and the ranked KOLs with a CSV export.
+It needs Node 24 and pnpm 11. Start the API on port 8000 first (demo mode
+needs no keys), then the Vite dev server, which proxies `/api` to it:
+
+```bash
+cd backend && DEMO_MODE=1 uv run uvicorn app.api.main:app --port 8000
+cd frontend && pnpm install && pnpm dev
+```
+
+Open http://localhost:5173. The selected job id stays in the URL as `?job=`,
+so a refresh or a shared link reopens that job. Other scripts:
+
+```bash
+pnpm lint    # ESLint and Prettier
+pnpm test    # Vitest and React Testing Library
+pnpm build   # type-check and build into dist/
+```
+
+The colors, type scale, radii, spacing, and shadows are design tokens in
+`frontend/src/styles/tokens.css`, which Tailwind and the shadcn/ui components
+read.
+
 ### Docker Compose
 
 From the repository root:
@@ -175,12 +203,16 @@ cp .env.example .env   # optional: fill in keys for live mode
 docker compose up --build
 ```
 
+Open http://localhost:5173. The `frontend` service builds the app and serves
+it with nginx on `127.0.0.1:5173`. nginx proxies `/api` to the backend and
+turns off buffering on the event stream, so progress events arrive as they
+happen.
+
 The `backend` service listens on `127.0.0.1:8000` only, since the API has no
 authentication. Compose loads `.env` when it exists
 and runs in demo mode without it. The caches and `jobs.db` live in the
 `backend-data` volume, mounted at `/app/data`. The container runs as a non-root
-user, and a health check calls `/api/health`. A commented-out `frontend` service
-in `docker-compose.yml` is a placeholder for a Vite dev server on port 5173.
+user, and a health check calls `/api/health`.
 
 The image installs the default dependencies only. To bake in the local
 embedder, build with the `embed` extra (this downloads the CPU build of torch):
@@ -194,9 +226,17 @@ docker build --build-arg INSTALL_EMBED=true -t tkm-backend backend
 ```bash
 cd backend
 uv run pytest
+cd ../frontend
+pnpm test
 ```
 
 The tests make no network calls.
+
+### Screenshots
+
+<!-- Add screenshots of the frontend here: the empty state, a run in progress, and the ranked results. -->
+
+Screenshots of the frontend go here.
 
 ## Configuration
 
@@ -712,6 +752,15 @@ backend/
   tests/
   Dockerfile
   pyproject.toml
+frontend/
+  src/
+    api/             # wire types, fetch client, TanStack Query hooks, SSE follower
+    lib/             # step reducer, formatting, CSV export, form validation
+    hooks/           # job progress over SSE, ?job= URL state
+    components/      # page sections; components/ui/ holds the shadcn/ui primitives
+    styles/tokens.css  # design tokens
+  Dockerfile         # pnpm build, then nginx
+  nginx.conf         # static files, /api proxy, unbuffered event stream
 docker-compose.yml
 .env.example
 README.md

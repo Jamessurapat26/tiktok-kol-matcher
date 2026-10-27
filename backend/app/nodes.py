@@ -6,7 +6,13 @@ from langgraph.graph import END
 from pydantic import ValidationError
 
 from .integrations import Integrations
-from .integrations.embeddings import brand_query_text, kol_document_text, kol_title
+from .integrations.embeddings import (
+    MockEmbedder,
+    brand_query_text,
+    kol_document_text,
+    kol_title,
+)
+from .integrations.llm import MockBrandAnalyzer
 from .integrations.web_reader import truncate
 from .models import KolProfile, RankedKol, normalize_handle
 from .state import MatchState
@@ -261,7 +267,16 @@ def make_nodes(
             raise ValueError("brand_profile is required before reranking")
         if state.prefilter_scores and len(state.prefilter_scores) != len(state.shortlisted):
             raise ValueError("prefilter_scores must have one score per shortlisted creator")
-        if len(state.prefilter_scores) == len(state.shortlisted):
+        # MockEmbedder scores are hashed bag-of-words noise. The mock reranker
+        # needs them as its deterministic relevance; a live model must not be
+        # told they are evidence.
+        mock_scores_for_live_model = isinstance(
+            integrations.embedder, MockEmbedder
+        ) and not isinstance(integrations.llm, MockBrandAnalyzer)
+        similarities: list[float] | None
+        if mock_scores_for_live_model:
+            similarities = None
+        elif len(state.prefilter_scores) == len(state.shortlisted):
             similarities = list(state.prefilter_scores)
         else:
             similarities = _similarities(state.brand_profile, state.shortlisted)

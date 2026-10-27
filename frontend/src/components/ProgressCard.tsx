@@ -72,14 +72,14 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
           <span className="min-w-0">
             <span
               className={cn(
-                'block text-body-sm font-bold',
+                'flex flex-wrap items-center gap-x-2 text-body-sm font-bold',
                 step.status === 'pending' ? 'text-muted-foreground' : 'text-ink',
                 step.status === 'running' && 'text-primary',
               )}
             >
               {LABELS[step.node]}
               {step.runs > 1 && (
-                <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-body-xs text-info">
+                <span className="rounded-full bg-accent-soft px-2 py-0.5 text-body-xs whitespace-nowrap text-info">
                   round {step.runs}
                 </span>
               )}

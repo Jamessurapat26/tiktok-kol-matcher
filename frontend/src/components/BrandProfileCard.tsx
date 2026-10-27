@@ -50,8 +50,11 @@ export function BrandProfileCard({ websiteUrl, profile, unavailable }: Props) {
             <Item label="Keywords" wide>
               <ul className="flex flex-wrap gap-2">
                 {[...new Set([...profile.keywords_th, ...profile.keywords_en])].map((keyword) => (
-                  <li key={keyword}>
-                    <Badge variant="secondary" className="h-6 px-3 text-body-xs">
+                  <li key={keyword} className="min-w-0">
+                    <Badge
+                      variant="secondary"
+                      className="h-auto max-w-full px-3 py-1 text-left text-body-xs whitespace-normal wrap-anywhere"
+                    >
                       {keyword}
                     </Badge>
                   </li>

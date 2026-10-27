@@ -1,0 +1,227 @@
+[
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 1,
+    "type": "node",
+    "node": "scrape_facebook",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.008304+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 2,
+    "type": "node",
+    "node": "scrape_website",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.008965+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 3,
+    "type": "node",
+    "node": "scrape_website",
+    "status": "finished",
+    "summary": "website=1330 chars",
+    "timestamp": "2026-10-27T07:34:40.012337+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 4,
+    "type": "node",
+    "node": "scrape_facebook",
+    "status": "finished",
+    "summary": "facebook=ExampleBrand",
+    "timestamp": "2026-10-27T07:34:40.013071+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 5,
+    "type": "node",
+    "node": "analyze_brand",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.014716+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 6,
+    "type": "node",
+    "node": "analyze_brand",
+    "status": "finished",
+    "summary": "brand=profile",
+    "timestamp": "2026-10-27T07:34:40.015869+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 7,
+    "type": "node",
+    "node": "generate_queries",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.017899+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 8,
+    "type": "node",
+    "node": "generate_queries",
+    "status": "finished",
+    "summary": "queries+8",
+    "timestamp": "2026-10-27T07:34:40.019238+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 9,
+    "type": "node",
+    "node": "discover_kols",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.020511+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 10,
+    "type": "node",
+    "node": "discover_kols",
+    "status": "finished",
+    "summary": "round=1 discovered+22",
+    "timestamp": "2026-10-27T07:34:40.021589+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 11,
+    "type": "node",
+    "node": "generate_queries",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.023298+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 12,
+    "type": "node",
+    "node": "generate_queries",
+    "status": "finished",
+    "summary": "queries+8",
+    "timestamp": "2026-10-27T07:34:40.023820+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 13,
+    "type": "node",
+    "node": "discover_kols",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.024233+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 14,
+    "type": "node",
+    "node": "discover_kols",
+    "status": "finished",
+    "summary": "round=2 discovered+18",
+    "timestamp": "2026-10-27T07:34:40.025935+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 15,
+    "type": "node",
+    "node": "filter_thai",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.027137+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 16,
+    "type": "node",
+    "node": "filter_thai",
+    "status": "finished",
+    "summary": "candidates=25",
+    "timestamp": "2026-10-27T07:34:40.028078+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 17,
+    "type": "node",
+    "node": "enrich_kols",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.029225+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 18,
+    "type": "node",
+    "node": "enrich_kols",
+    "status": "finished",
+    "summary": "candidates=25",
+    "timestamp": "2026-10-27T07:34:40.031834+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 19,
+    "type": "node",
+    "node": "embed_and_prefilter",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.032986+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 20,
+    "type": "node",
+    "node": "embed_and_prefilter",
+    "status": "finished",
+    "summary": "shortlisted=25",
+    "timestamp": "2026-10-27T07:34:40.035407+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 21,
+    "type": "node",
+    "node": "llm_rerank",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.036735+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 22,
+    "type": "node",
+    "node": "llm_rerank",
+    "status": "finished",
+    "summary": "ranked=25",
+    "timestamp": "2026-10-27T07:34:40.038119+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 23,
+    "type": "node",
+    "node": "rank_and_output",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.039355+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 24,
+    "type": "node",
+    "node": "rank_and_output",
+    "status": "finished",
+    "summary": "results=3",
+    "timestamp": "2026-10-27T07:34:40.040284+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 25,
+    "type": "done",
+    "node": null,
+    "status": null,
+    "summary": "ranked 3 KOLs",
+    "timestamp": "2026-10-27T07:34:40.041569+00:00"
+  }
+]

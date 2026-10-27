@@ -64,7 +64,8 @@ export function BrandProfileCard({ websiteUrl, profile, unavailable }: Props) {
             No brand profile: the run stopped before brand analysis finished.
           </p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2" aria-label="Loading brand profile">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <span className="sr-only">Loading brand profile</span>
             <Skeleton className="h-12" />
             <Skeleton className="h-12" />
             <Skeleton className="h-8 sm:col-span-2" />

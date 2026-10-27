@@ -25,7 +25,7 @@ export function ResultsCard({ jobId, results, pending, failed }: Props) {
     <Card>
       <CardHeader>
         <CardTitle>Ranked KOLs</CardTitle>
-        <CardDescription>
+        <CardDescription aria-live="polite">
           {pending
             ? 'Ranking creators…'
             : failed
@@ -46,7 +46,8 @@ export function ResultsCard({ jobId, results, pending, failed }: Props) {
       </CardHeader>
       <CardContent>
         {pending ? (
-          <div className="flex flex-col gap-3" aria-label="Loading results">
+          <div className="flex flex-col gap-3">
+            <span className="sr-only">Loading results</span>
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-20" />
             ))}
@@ -75,10 +76,8 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
   return (
     <li className="py-4 first:pt-0 last:pb-0">
       <div className="flex gap-4">
-        <span
-          className="w-6 shrink-0 pt-2 text-right text-heading-sm text-subtle"
-          aria-label={`Rank ${rank}`}
-        >
+        <span className="w-6 shrink-0 pt-2 text-right text-heading-sm text-muted-foreground">
+          <span className="sr-only">Rank </span>
           {rank}
         </span>
         <span
@@ -93,7 +92,7 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
               href={kol.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-sm text-body-md font-bold text-ink underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="inline-flex items-center gap-1 rounded-sm text-body-md font-bold text-ink underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring"
             >
               @{kol.handle}
               <ExternalLink aria-hidden className="size-3.5 text-muted-foreground" />
@@ -124,7 +123,7 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
             aria-expanded={open}
             aria-controls={detailId}
             onClick={() => setOpen((o) => !o)}
-            className="mt-2 inline-flex items-center gap-1 rounded-sm text-body-xs font-bold text-muted-foreground outline-none hover:text-ink focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="mt-2 inline-flex items-center gap-1 rounded-sm text-body-xs font-bold text-muted-foreground outline-none hover:text-ink focus-visible:ring-3 focus-visible:ring-ring"
           >
             Score breakdown
             <ChevronDown aria-hidden className={cn('size-4 transition-transform', open && 'rotate-180')} />

@@ -162,7 +162,7 @@ function Field({
       </Label>
       {input}
       {error && (
-        <p id={errorId} className="text-body-xs text-error">
+        <p id={errorId} role="alert" className="text-body-xs text-error">
           {error}
         </p>
       )}

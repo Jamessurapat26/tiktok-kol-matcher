@@ -55,7 +55,7 @@ export function HistorySheet({ open, onOpenChange, selectedId, onSelect }: Props
                       onOpenChange(false)
                     }}
                     className={cn(
-                      'flex w-full flex-col gap-1 rounded-xl border p-4 text-left outline-none hover:bg-surface focus-visible:ring-3 focus-visible:ring-ring/50',
+                      'flex w-full flex-col gap-1 rounded-xl border p-4 text-left outline-none hover:bg-surface focus-visible:ring-3 focus-visible:ring-ring',
                       job.id === selectedId && 'border-primary',
                     )}
                   >

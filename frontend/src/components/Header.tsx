@@ -12,7 +12,8 @@ export function Header({ onOpenHistory }: { onOpenHistory: () => void }) {
       <div className="flex items-center gap-3">
         <h1 className="text-heading-md text-ink">KOL Matcher</h1>
         {mode && (
-          <Badge variant={mode === 'live' ? 'success' : 'info'} aria-label={`Mode: ${mode}`}>
+          <Badge variant={mode === 'live' ? 'success' : 'info'}>
+            <span className="sr-only">Mode: </span>
             {mode === 'live' ? 'Live' : 'Demo'}
           </Badge>
         )}

@@ -63,7 +63,7 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
       <div className="min-w-0 flex-1">
         <button
           type="button"
-          className="flex w-full items-start justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default"
+          className="flex w-full items-start justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-default"
           aria-expanded={hasDetail ? open : undefined}
           aria-controls={hasDetail ? detailId : undefined}
           disabled={!hasDetail}

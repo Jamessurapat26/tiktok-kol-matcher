@@ -1,11 +1,13 @@
 import json
 from dataclasses import replace
 
+import pytest
 from langgraph.errors import GraphRecursionError
 
 from app.cli import main
 from app.graph import build_graph
 from app.integrations import mock_integrations
+from app.integrations.web_reader_live import CachedWebReader
 
 _WEBSITE = "https://ophtus.com"
 _FACEBOOK = "https://www.facebook.com/ophtus"
@@ -188,3 +190,47 @@ def test_graph_recursion_error_exits_1_without_traceback(monkeypatch, capsys):
     assert "error: pipeline exceeded the recursion limit" in captured.err
     assert "Traceback" not in captured.err
     assert "Traceback" not in captured.out
+
+
+def test_help_mentions_live_web(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["match", "--help"])
+
+    assert exc.value.code == 0
+    assert "--live-web" in capsys.readouterr().out
+
+
+def test_live_web_flag_uses_cached_reader_without_running_it(monkeypatch, capsys):
+    captured: dict = {}
+
+    def spy(integrations=None, **kwargs):
+        captured["integrations"] = integrations
+        captured["kwargs"] = kwargs
+
+        class _Graph:
+            def stream(self, *args, **kwargs):
+                return iter(
+                    [("values", {"stage": "done", "results": [], "errors": []})]
+                )
+
+        return _Graph()
+
+    monkeypatch.setattr("app.cli.build_graph", spy)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--top-k",
+            "5",
+            "--json",
+            "--live-web",
+        ]
+    )
+
+    assert exit_code == 0
+    assert isinstance(captured["integrations"].web_reader, CachedWebReader)
+    assert captured["kwargs"]["min_candidates"]
+    assert json.loads(capsys.readouterr().out)["stage"] == "done"

@@ -45,10 +45,9 @@ runs after that target is met and can shrink the list.
 
 This is a working skeleton with deterministic mocks. Every external service in
 `backend/app/integrations/` has a `Protocol` and a `Mock` implementation, so the
-whole pipeline runs offline and produces stable output. Swap in real
-implementations later for:
+whole pipeline runs offline and produces stable output. Web page reading can run
+live with `--live-web` (see below). Swap in real implementations later for:
 
-- web page reading and text extraction
 - Facebook page scraping
 - TikTok creator search via Apify (profiles and posts)
 - embeddings and vector similarity
@@ -91,6 +90,30 @@ uv run python -m app.cli match \
 
 Tune discovery with `--min-candidates N` and `--max-rounds N`.
 
+## Web reading
+
+The default run uses the offline website fixture and does not touch the network.
+`--live-web` fetches the brand site for real and leaves Facebook, TikTok search,
+embeddings, and the LLM mocked:
+
+- **Jina Reader** (`https://r.jina.ai/`) is the primary fetcher. Set `JINA_API_KEY`
+  to send a bearer token and raise the rate limit. The key is not written to logs
+  or error messages. Image links and empty bullets are stripped from its markdown.
+- **trafilatura** is the fallback. It fetches the page directly when Jina errors
+  or returns fewer than 200 characters.
+- Successful pages are cached as JSON under `data/cache/web` for 7 days. The cache
+  key is the SHA-256 of the normalized URL. Set `KOL_CACHE_DIR` to move the cache
+  root (`$KOL_CACHE_DIR/web`). A cache hit skips the network.
+- Page text is cut to 20,000 characters before it enters graph state.
+
+```bash
+uv run python -m app.cli match \
+  --website https://ophtus.com \
+  --facebook https://www.facebook.com/ophtus \
+  --top-k 5 \
+  --live-web
+```
+
 Run the tests:
 
 ```bash
@@ -107,7 +130,7 @@ backend/
     models.py        # MatchRequest, BrandProfile, KolProfile, RankedKol, ...
     state.py         # MatchState and list reducers
     cli.py           # argparse CLI (table or JSON)
-    integrations/    # Protocol + deterministic Mock per external service
+    integrations/    # Protocol + Mock per service; web_reader_live.py is the opt-in reader
     fixtures/        # mock website, Facebook page, and KOL records
   tests/
   pyproject.toml

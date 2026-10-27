@@ -6,6 +6,7 @@ from langgraph.graph import END
 from pydantic import ValidationError
 
 from .integrations import Integrations
+from .integrations.web_reader import truncate
 from .models import BrandProfile, KolProfile, RankedKol, normalize_handle
 from .state import MatchState
 
@@ -87,7 +88,7 @@ def make_nodes(
 
     @_guarded("scrape_website", stage_on_error=False)
     def scrape_website(state: MatchState) -> dict[str, Any]:
-        content = integrations.web_reader.read(str(state.request.website_url))
+        content = truncate(integrations.web_reader.read(str(state.request.website_url)))
         # No stage update: scrape_facebook runs in the same superstep.
         return {"website_content": content}
 

@@ -162,6 +162,10 @@ does not read `.env` itself, so export the variables or use Docker Compose.
 Jobs go to `data/jobs.db` relative to the working directory, so run it from
 `backend/` or set `JOBS_DB`. [HTTP API](#http-api) lists the endpoints.
 
+The API has no authentication and is meant for local use. Anyone who can reach
+the port can start jobs, which spend Apify and LLM credit in live mode. Keep it
+on localhost (uvicorn's default) or put it behind something that authenticates.
+
 ### Docker Compose
 
 From the repository root:
@@ -171,7 +175,8 @@ cp .env.example .env   # optional: fill in keys for live mode
 docker compose up --build
 ```
 
-The `backend` service listens on port 8000. Compose loads `.env` when it exists
+The `backend` service listens on `127.0.0.1:8000` only, since the API has no
+authentication. Compose loads `.env` when it exists
 and runs in demo mode without it. The caches and `jobs.db` live in the
 `backend-data` volume, mounted at `/app/data`. The container runs as a non-root
 user, and a health check calls `/api/health`. A commented-out `frontend` service

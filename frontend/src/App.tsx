@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useJob } from '@/api/queries'
+import type { MatchRequest } from '@/api/types'
 import { type BrandDraft, BrandForm } from '@/components/BrandForm'
 import { BrandProfileCard } from '@/components/BrandProfileCard'
 import { EmptyState } from '@/components/EmptyState'
@@ -17,12 +18,22 @@ const DEMO_DRAFT: BrandDraft = {
   topK: '10',
 }
 
+function toDraft(request: MatchRequest): BrandDraft {
+  return { website: request.website_url, facebook: request.facebook_url, topK: String(request.top_k) }
+}
+
 export default function App() {
   const [jobId, setJobId] = useJobParam()
-  const [draft, setDraft] = useState(EMPTY_DRAFT)
   const [historyOpen, setHistoryOpen] = useState(false)
   const { progress, connected } = useJobProgress(jobId)
   const job = useJob(jobId)
+
+  // Edits belong to the job they were typed under. A job loaded from ?job= or
+  // History shows its own request until the user types again.
+  const [edits, setEdits] = useState<{ jobId: string | null; draft: BrandDraft }>({ jobId: null, draft: EMPTY_DRAFT })
+  const request = job.data?.request
+  const draft = edits.jobId === jobId || !request ? edits.draft : toDraft(request)
+  const setDraft = (next: BrandDraft) => setEdits({ jobId, draft: next })
 
   // The stream refetches the job on its terminal event, so the job's own status is the source of truth.
   const status = job.data?.status

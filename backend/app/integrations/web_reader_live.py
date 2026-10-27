@@ -49,6 +49,15 @@ _EMPTY_BULLET_RE = re.compile(r"^\s*[-*+]\s*$")
 _JINA_BODY_MARKER = "\nMarkdown Content:\n"
 _JINA_TARGET_ERROR_RE = re.compile(r"^Warning: Target URL returned error.*$", re.MULTILINE)
 
+# r.jina.ai occasionally answers a transient 400 for a URL it can read moments
+# later, so treat that plus the usual timeout/rate-limit statuses as retryable.
+# Every 5xx is retryable too; other 4xx (401, 403, 404, 410, 422, ...) are not.
+_JINA_RETRYABLE_STATUSES = frozenset({400, 408, 425, 429})
+
+
+def _is_jina_retryable_status(status: int) -> bool:
+    return status in _JINA_RETRYABLE_STATUSES or status >= 500
+
 
 def clean_markdown(text: str) -> str:
     """Drop image links, empty links, and empty bullets that Jina emits for nav and icons."""
@@ -80,11 +89,13 @@ class JinaWebReader:
         target = f"https://r.jina.ai/{url}"
         attempts = self._max_retries + 1
         reason = ""
+        last_status: int | None = None
         for attempt in range(attempts):
             try:
                 resp = self._client.get(target, headers=headers)
             except httpx.TransportError as exc:
                 reason = f"{type(exc).__name__}: {exc}"
+                last_status = None
             else:
                 if resp.status_code < 300:
                     header, marker, body = resp.text.partition(_JINA_BODY_MARKER)
@@ -95,13 +106,15 @@ class JinaWebReader:
                     if error := _JINA_TARGET_ERROR_RE.search(header):
                         raise WebReadError(f"Jina could not read {url}: {error.group()}")
                     return WebPage(truncate(clean_markdown(body)), "jina")
+                last_status = resp.status_code
                 reason = f"HTTP {resp.status_code}"
-                if resp.status_code != 429 and resp.status_code < 500:
+                if not _is_jina_retryable_status(resp.status_code):
                     raise WebReadError(f"Jina could not read {url}: {reason}")
             if attempt < attempts - 1:
                 time.sleep(self._backoff * 2**attempt)
 
-        raise WebReadError(f"Jina failed to read {url} after {attempts} attempts: {reason}")
+        detail = f"last HTTP status {last_status}" if last_status is not None else reason
+        raise WebReadError(f"Jina failed to read {url} after {attempts} attempts: {detail}")
 
     def read(self, url: str) -> str:
         return self.fetch(url).content

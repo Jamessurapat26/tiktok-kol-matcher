@@ -1,0 +1,106 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { act, render, screen, within } from '@testing-library/react'
+import type { JobEvent } from '@/api/types'
+import { ProgressCard } from '@/components/ProgressCard'
+import demoEvents from '@/test/demo-events.json'
+import { useJobProgress } from './useJobProgress'
+
+const events = demoEvents as JobEvent[]
+
+class FakeEventSource {
+  static last: FakeEventSource
+  readonly url: string
+  closed = false
+  onopen: (() => void) | null = null
+  onerror: (() => void) | null = null
+  private listeners = new Map<string, (message: MessageEvent<string>) => void>()
+
+  constructor(url: string) {
+    this.url = url
+    FakeEventSource.last = this
+  }
+
+  addEventListener(type: string, listener: (message: MessageEvent<string>) => void) {
+    this.listeners.set(type, listener)
+  }
+
+  close() {
+    this.closed = true
+  }
+
+  emit(list: JobEvent[]) {
+    act(() => {
+      for (const event of list) {
+        this.listeners.get(event.type)?.(
+          new MessageEvent(event.type, { data: JSON.stringify(event), lastEventId: String(event.seq) }),
+        )
+      }
+    })
+  }
+}
+
+function Harness({ jobId }: { jobId: string }) {
+  const { progress, connected } = useJobProgress(jobId)
+  return <ProgressCard progress={progress} connected={connected} />
+}
+
+function renderHarness() {
+  const client = new QueryClient()
+  const invalidate = vi.spyOn(client, 'invalidateQueries')
+  render(
+    <QueryClientProvider client={client}>
+      <Harness jobId={events[0].job_id} />
+    </QueryClientProvider>,
+  )
+  return { source: FakeEventSource.last, invalidate }
+}
+
+function row(name: string) {
+  const item = screen.getByText(name).closest('li')
+  if (!item) throw new Error(`no row ${name}`)
+  return within(item)
+}
+
+beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource))
+afterEach(() => vi.unstubAllGlobals())
+
+describe('job progress over SSE', () => {
+  it('subscribes to the job stream and fills the stepper as events arrive', () => {
+    const { source, invalidate } = renderHarness()
+    expect(source.url).toBe(`/api/jobs/${events[0].job_id}/events`)
+    act(() => source.onopen?.())
+    expect(screen.getByText('Waiting for the pipeline to start')).toBeInTheDocument()
+
+    source.emit(events.slice(0, 8))
+    expect(row('Analyze brand').getByText('brand=profile')).toBeInTheDocument()
+    expect(row('Analyze brand').getByText(', finished')).toBeInTheDocument()
+    expect(row('Generate search queries').getByText('queries+8')).toBeInTheDocument()
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['jobs', events[0].job_id] })
+    expect(row('Discover KOLs').getByText(', pending')).toBeInTheDocument()
+  })
+
+  it('shows the discovery loop as round 2 of the same step', () => {
+    const { source } = renderHarness()
+    source.emit(events.slice(0, 13))
+    expect(row('Discover KOLs').getByText('round 2')).toBeInTheDocument()
+    expect(row('Discover KOLs').getByText(', running')).toBeInTheDocument()
+    expect(screen.getByText('Running: Discover KOLs')).toBeInTheDocument()
+
+    source.emit(events.slice(13, 14))
+    expect(row('Discover KOLs').getByText('round=2 discovered+18')).toBeInTheDocument()
+  })
+
+  it('survives a dropped connection whose replay overlaps, then closes on done', () => {
+    const { source } = renderHarness()
+    source.emit(events.slice(0, 12))
+    act(() => source.onerror?.())
+    // The server resumes after Last-Event-ID, but a replay may still overlap.
+    source.emit(events.slice(9))
+
+    expect(screen.getByText('Done: ranked 3 KOLs')).toBeInTheDocument()
+    expect(screen.getAllByText(', finished')).toHaveLength(10)
+    expect(row('Discover KOLs').getByText('round 2')).toBeInTheDocument()
+    expect(screen.queryByText('round 3')).not.toBeInTheDocument()
+    expect(source.closed).toBe(true)
+  })
+})

@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 from dataclasses import replace
 
 import pytest
@@ -290,6 +291,19 @@ def test_events_reconnect_replays_only_later_events(make_client):
     assert [e["seq"] for e in by_header] == [e["seq"] for e in everything[5:]]
     assert by_query == by_header
     assert by_header[-1]["type"] == "done"
+
+
+def test_events_reconnect_past_the_terminal_event_ends_at_once(make_client):
+    with make_client() as client:
+        job_id = client.post("/api/jobs", json=_BODY).json()["job_id"]
+        last = read_events(client, job_id)[-1]
+        started = time.monotonic()
+        replayed = read_events(client, job_id, headers={"Last-Event-ID": last["sse_id"]})
+        elapsed = time.monotonic() - started
+
+    assert last["type"] == "done"
+    assert replayed == []
+    assert elapsed < 2
 
 
 def test_fatal_node_failure_fails_job(make_client):

@@ -20,7 +20,7 @@ from ..integrations.web_reader_live import is_public_address
 from ..models import MatchRequest
 from .runner import run_job
 from .settings import FlagUnavailable, LiveFlags, Mode, Settings
-from .store import TERMINAL_EVENTS, Job, JobStore
+from .store import TERMINAL_EVENTS, TERMINAL_STATUSES, Job, JobStore
 
 # Same as the CLI's --max-enrich default: each enrichment is a paid Apify run.
 _MAX_ENRICH = 10
@@ -197,12 +197,17 @@ def create_app(
         # Replay and live share one path: poll stored events after the cursor.
         cursor = int(last_event_id) if last_event_id and last_event_id.isdigit() else after
         while True:
+            # Status is read before the events: a job that finishes between the two
+            # reads still delivers its terminal event instead of ending early.
+            current = await run_in_threadpool(store.get, job.id)
+            finished = current is not None and current.status in TERMINAL_STATUSES
             for event in await run_in_threadpool(store.events_after, job.id, cursor):
                 yield ServerSentEvent(id=str(event.seq), event=event.type, data=event)
                 cursor = event.seq
                 if event.type in TERMINAL_EVENTS:
                     return
-            if await request.is_disconnected():
+            # finished here means the cursor already sits past the terminal event.
+            if finished or await request.is_disconnected():
                 return
             await asyncio.sleep(_POLL_SECONDS)
 

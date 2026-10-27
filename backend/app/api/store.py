@@ -24,6 +24,7 @@ _NEXT_STATUS: dict[JobStatus, frozenset[JobStatus]] = {
     "failed": frozenset(),
 }
 _TERMINAL_EVENT: dict[JobStatus, EventType] = {"succeeded": "done", "failed": "failed"}
+TERMINAL_STATUSES: frozenset[JobStatus] = frozenset(_TERMINAL_EVENT)
 TERMINAL_EVENTS: frozenset[EventType] = frozenset(_TERMINAL_EVENT.values())
 
 _SCHEMA = """

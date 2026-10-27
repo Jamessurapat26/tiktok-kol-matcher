@@ -7,6 +7,7 @@ from langgraph.errors import GraphRecursionError
 from pydantic import ValidationError
 
 from .graph import MAX_SEARCH_ROUNDS, MIN_CANDIDATES, build_graph, initial_state
+from .integrations import build_integrations
 from .models import MatchRequest, RankedKol
 
 _LIST_FIELDS = ("discovered", "candidates", "shortlisted", "ranked", "results")
@@ -54,6 +55,14 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=MAX_SEARCH_ROUNDS,
         help=f"maximum discovery rounds (default: {MAX_SEARCH_ROUNDS})",
+    )
+    match.add_argument(
+        "--live-web",
+        action="store_true",
+        help=(
+            "read the brand website live (Jina, then trafilatura) "
+            "instead of the offline mock; other services stay mocked"
+        ),
     )
     return parser
 
@@ -248,10 +257,15 @@ def _cmd_match(args: argparse.Namespace) -> int:
         print(f"error: invalid match request:\n{exc}", file=sys.stderr)
         return 2
 
-    graph = build_graph(
-        min_candidates=args.min_candidates,
-        max_search_rounds=args.max_rounds,
-    )
+    graph_kwargs: dict[str, Any] = {
+        "min_candidates": args.min_candidates,
+        "max_search_rounds": args.max_rounds,
+    }
+    # Default stays on build_graph's mocked bundle so the CLI never opens a
+    # socket unless --live-web is set.
+    if args.live_web:
+        graph_kwargs["integrations"] = build_integrations(live_web=True)
+    graph = build_graph(**graph_kwargs)
     try:
         final_state = _run_pipeline(graph, request, show_progress=not args.as_json)
     except GraphRecursionError as exc:

@@ -20,15 +20,48 @@ class Integrations:
     embedder: Embedder
 
 
-def mock_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
-    """Build a fully mocked integration bundle."""
+def build_integrations(
+    *,
+    live_web: bool = False,
+    kol_fixtures: list[dict] | None = None,
+) -> Integrations:
+    """Build the integration bundle.
+
+    Web reading is live only when ``live_web`` is true. Every other service
+    stays mocked, and the default (``live_web=False``) never touches the network.
+    """
     return Integrations(
-        web_reader=MockWebReader(),
+        web_reader=_live_web_reader() if live_web else MockWebReader(),
         facebook=MockFacebookScraper(),
         llm=MockBrandAnalyzer(),
         kol_search=MockKolSearch(kol_fixtures),
         enricher=MockKolEnricher(kol_fixtures),
         embedder=MockEmbedder(),
+    )
+
+
+def mock_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
+    """Build a fully mocked integration bundle."""
+    return build_integrations(kol_fixtures=kol_fixtures)
+
+
+def real_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
+    """Live web reader; every other service stays mocked."""
+    return build_integrations(live_web=True, kol_fixtures=kol_fixtures)
+
+
+def _live_web_reader() -> WebReader:
+    from .web_reader_live import (
+        CachedWebReader,
+        FallbackWebReader,
+        JinaWebReader,
+        TrafilaturaWebReader,
+        default_cache_dir,
+    )
+
+    return CachedWebReader(
+        FallbackWebReader(JinaWebReader(), TrafilaturaWebReader()),
+        default_cache_dir(),
     )
 
 
@@ -40,5 +73,7 @@ __all__ = [
     "KolEnricher",
     "KolSearch",
     "WebReader",
+    "build_integrations",
     "mock_integrations",
+    "real_integrations",
 ]

@@ -22,6 +22,10 @@ _USER_AGENT = (
 _IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 _LINKED_IMAGE_RE = re.compile(r"\[\s*\]\([^)]*\)")
 _EMPTY_BULLET_RE = re.compile(r"^\s*[-*+]\s*$")
+# r.jina.ai text replies: "Title: ...", "URL Source: ...", optional "Warning: ..." lines,
+# then "Markdown Content:" and the body (jina-ai/reader snapshot-formatter.ts).
+_JINA_BODY_MARKER = "\nMarkdown Content:\n"
+_JINA_TARGET_ERROR_RE = re.compile(r"^Warning: Target URL returned error.*$", re.MULTILINE)
 
 
 def clean_markdown(text: str) -> str:
@@ -61,7 +65,14 @@ class JinaWebReader:
                 reason = f"{type(exc).__name__}: {exc}"
             else:
                 if resp.status_code < 300:
-                    return WebPage(truncate(clean_markdown(resp.text)), "jina")
+                    header, marker, body = resp.text.partition(_JINA_BODY_MARKER)
+                    if not marker:
+                        header, body = "", resp.text
+                    # Jina answers 200 even when the target site failed; the error page
+                    # (often a CAPTCHA) is only flagged by this header line.
+                    if error := _JINA_TARGET_ERROR_RE.search(header):
+                        raise WebReadError(f"Jina could not read {url}: {error.group()}")
+                    return WebPage(truncate(clean_markdown(body)), "jina")
                 reason = f"HTTP {resp.status_code}"
                 if resp.status_code != 429 and resp.status_code < 500:
                     raise WebReadError(f"Jina could not read {url}: {reason}")

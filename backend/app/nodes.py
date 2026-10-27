@@ -6,6 +6,7 @@ from langgraph.graph import END
 from pydantic import ValidationError
 
 from .integrations import Integrations
+from .integrations.apify import ApifyBudgetExceeded
 from .integrations.embeddings import (
     MockEmbedder,
     brand_query_text,
@@ -213,9 +214,15 @@ def make_nodes(
                 key=lambda k: (-k.followers, normalize_handle(k.handle)),
             )[:enrich_limit]
         }
+        budget_reached = False
+        skipped = 0
         for kol in state.candidates:
             if normalize_handle(kol.handle) not in to_enrich:
                 enriched.append(kol)
+                continue
+            if budget_reached:
+                enriched.append(kol)
+                skipped += 1
                 continue
             try:
                 # model_validate re-checks enrichment. model_dump() leaves url
@@ -225,6 +232,11 @@ def make_nodes(
                         {**kol.model_dump(), **integrations.enricher.enrich(kol)}
                     )
                 )
+            except ApifyBudgetExceeded:
+                # Keep this profile and the rest un-enriched instead of failing.
+                enriched.append(kol)
+                budget_reached = True
+                skipped += 1
             except ValidationError as exc:
                 enriched.append(kol)
                 errors.append(
@@ -233,6 +245,12 @@ def make_nodes(
             except Exception as exc:  # noqa: BLE001 - one profile must not drop the rest
                 enriched.append(kol)
                 errors.append(f"enrich_kols: failed for {kol.handle}: {exc}")
+        if skipped:
+            noun = "profile" if skipped == 1 else "profiles"
+            errors.append(
+                "enrich_kols: Apify job budget reached, skipped enrichment "
+                f"for {skipped} {noun}"
+            )
         update: dict[str, Any] = {
             "candidates": enriched,
             "stage": "enriching_kols",

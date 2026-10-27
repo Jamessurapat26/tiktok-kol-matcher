@@ -26,7 +26,7 @@ import httpx
 from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from ..models import MAX_RECENT_POSTS, FacebookPage
-from .apify import ApifyClient, ApifyError, as_count
+from .apify import ApifyBudget, ApifyBudgetExceeded, ApifyClient, ApifyError, as_count
 from .web_reader import WebReader, WebReadError
 from .web_reader_live import _DEFAULT_TTL_SECONDS, _normalize_url
 
@@ -150,6 +150,7 @@ class ApifyFacebookScraper:
         max_retries: int = 1,
         backoff: float = 1.0,
         max_charge_usd: float = 0.50,
+        budget: ApifyBudget | None = None,
         cache_dir: Path | None = None,
         ttl_seconds: float = _DEFAULT_TTL_SECONDS,
         clock: Callable[[], float] = time.time,
@@ -165,6 +166,7 @@ class ApifyFacebookScraper:
             "max_retries": max_retries,
             "backoff": backoff,
             "max_charge_usd": max_charge_usd,
+            "budget": budget,
         }
         if sleeper is not None:
             client_kwargs["sleeper"] = sleeper
@@ -198,11 +200,15 @@ class ApifyFacebookScraper:
         return page
 
     def _from_fallback(self, url: str, apify_error: Exception) -> FacebookPage:
+        if isinstance(apify_error, ApifyBudgetExceeded):
+            apify_note = f"Apify budget reached ({apify_error})"
+        else:
+            apify_note = f"Apify failed ({apify_error})"
         try:
             return page_from_text(url, self._fallback.read(url))
         except WebReadError as exc:
             raise WebReadError(
-                f"Could not read Facebook page {url}: Apify failed ({apify_error}); "
+                f"Could not read Facebook page {url}: {apify_note}; "
                 f"web fallback failed ({exc})"
             ) from exc
 

@@ -13,7 +13,7 @@ from app.integrations.web_reader import MockWebReader, WebReadError
 from app.integrations.web_reader_live import CachedWebReader
 from app.models import MAX_POST_CHARS, MAX_RECENT_POSTS, FacebookPage, MatchRequest
 from app.nodes import make_nodes
-from app.prompts import brand_messages
+from app.prompts import MAX_PROMPT_POSTS, MAX_PROMPT_POST_CHARS, brand_messages
 from app.state import MatchState
 
 
@@ -42,14 +42,45 @@ def test_recent_posts_are_trimmed_clipped_and_capped():
 def test_brand_prompt_includes_recent_posts_and_website():
     page = _page(
         website="https://example-brand.co.th",
-        recent_posts=["New blue-light frames are in stock", "y" * 2_000],
+        categories=["Eyewear Store"],
+        intro="Blue-light glasses for gamers and students.",
+        recent_posts=[
+            "New blue-light frames are in stock",
+            "y" * 2_000,
+            "Third post",
+            "Fourth post",
+        ],
     )
 
-    user = brand_messages("site text", page)[1]["content"]
+    messages = brand_messages("site text", page)
+    system = messages[0]["content"]
+    user = messages[1]["content"]
+
+    assert "weak signal" in system.lower()
+    assert "at most 3 words" in system
+    assert "at most 4 words" in system
+    assert "at most 8 items" in system
+    assert "at most 10 hashtags" in system
 
     assert "website: https://example-brand.co.th" in user
-    assert "recent_posts:\n- New blue-light frames are in stock" in user
-    assert "y" * 400 not in user
+    assert "categories: Eyewear Store" in user
+    assert "intro: Blue-light glasses for gamers and students." in user
+    assert (
+        "weak_signals_recent_posts (weak signal only: use for tone and"
+        " current campaigns; never as the sole source of a product):" in user
+    )
+    posts_block = user.split("weak_signals_recent_posts", 1)[1]
+    assert posts_block.count("\n- ") == MAX_PROMPT_POSTS
+    assert "New blue-light frames are in stock" in user
+    assert "Third post" in user
+    assert "Fourth post" not in user
+    assert "y" * (MAX_PROMPT_POST_CHARS - 3) in user
+    assert "y" * (MAX_PROMPT_POST_CHARS + 1) not in user
+
+    assert user.index("Website text") < user.index("weak_signals_recent_posts")
+    assert user.index("categories:") < user.index("intro:")
+    assert user.index("intro:") < user.index("website:")
+    assert user.index("website:") < user.index("weak_signals_recent_posts")
 
 
 # Documented-shape fixtures: field names and value types follow the example
@@ -345,4 +376,7 @@ def test_scraped_posts_reach_brand_analysis(tmp_path):
 
     (page,) = seen
     assert len(page.recent_posts) == MAX_RECENT_POSTS
-    assert "Post 3: new blue-light frames" in brand_messages("site text", page)[1]["content"]
+    prompt = brand_messages("site text", page)[1]["content"]
+    assert "Post 0: new blue-light frames" in prompt
+    assert "Post 2: new blue-light frames" in prompt
+    assert "Post 3: new blue-light frames" not in prompt

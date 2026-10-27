@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-from .apify import ApifyConfigError
+from .apify import ApifyBudget, ApifyBudgetExceeded, ApifyConfigError, ApifyLimits
 from .embeddings import Embedder, MockEmbedder
 from .facebook import FacebookScraper, MockFacebookScraper
 from .kol_enricher import KolEnricher, MockKolEnricher
@@ -33,6 +33,7 @@ def build_integrations(
     max_results_per_query: int = 10,
     apify_token: str | None = None,
     llm_api_key: str | None = None,
+    apify_limits: ApifyLimits | None = None,
 ) -> Integrations:
     """Build the integration bundle.
 
@@ -48,19 +49,38 @@ def build_integrations(
     even without ``live_web``, because the mock website fixture is not a
     Facebook page. The default never touches the network and does not
     download a model.
+
+    When any live Apify flag is on, one ``ApifyBudget`` is shared by Facebook,
+    TikTok search, and enrichment. ``apify_limits`` defaults to
+    ``ApifyLimits.from_env()``; the API builds this bundle per job, so the
+    budget lasts one job, and the CLI gets one per run.
     """
     if max_results_per_query < 1:
         raise ValueError("max_results_per_query must be at least 1")
 
+    limits = apify_limits
+    if limits is None and (live_kols or live_fb):
+        limits = ApifyLimits.from_env()
+    budget: ApifyBudget | None = limits.budget() if limits is not None else None
+
     if live_kols:
         token = _apify_token(apify_token, "live KOL search")
-        kol_search, enricher = _live_kol_services(token, max_results_per_query)
+        kol_search, enricher = _live_kol_services(
+            token,
+            max_results_per_query,
+            budget,
+            limits,
+        )
     else:
         kol_search = MockKolSearch(kol_fixtures)
         enricher = MockKolEnricher(kol_fixtures)
 
     if live_fb:
-        facebook = _live_facebook(_apify_token(apify_token, "the live Facebook reader"))
+        facebook = _live_facebook(
+            _apify_token(apify_token, "the live Facebook reader"),
+            budget,
+            limits,
+        )
     else:
         facebook = MockFacebookScraper()
 
@@ -92,19 +112,47 @@ def _apify_token(apify_token: str | None, purpose: str) -> str:
     return token
 
 
-def _live_facebook(token: str) -> FacebookScraper:
+def _live_facebook(
+    token: str,
+    budget: ApifyBudget | None,
+    limits: ApifyLimits | None,
+) -> FacebookScraper:
     from .facebook_live import ApifyFacebookScraper
 
-    return ApifyFacebookScraper(token=token, fallback=_live_web_reader())
+    if limits is None:
+        limits = ApifyLimits.from_env()
+    return ApifyFacebookScraper(
+        token=token,
+        fallback=_live_web_reader(),
+        max_charge_usd=limits.facebook_max_charge_usd,
+        budget=budget,
+    )
 
 
-def _live_kol_services(token: str, max_results: int) -> tuple[KolSearch, KolEnricher]:
+def _live_kol_services(
+    token: str,
+    max_results: int,
+    budget: ApifyBudget | None,
+    limits: ApifyLimits | None,
+) -> tuple[KolSearch, KolEnricher]:
     from .kol_enricher_live import ApifyKolEnricher
     from .kol_search_live import ApifyKolSearch
 
+    if limits is None:
+        limits = ApifyLimits.from_env()
     return (
-        ApifyKolSearch(token=token, max_results=max_results),
-        ApifyKolEnricher(token=token, max_videos=max_results),
+        ApifyKolSearch(
+            token=token,
+            max_results=max_results,
+            max_charge_usd=limits.tiktok_search_max_charge_usd,
+            budget=budget,
+        ),
+        ApifyKolEnricher(
+            token=token,
+            max_videos=max_results,
+            max_charge_usd=limits.tiktok_profile_max_charge_usd,
+            budget=budget,
+        ),
     )
 
 
@@ -136,7 +184,10 @@ def _live_web_reader() -> WebReader:
 
 
 __all__ = [
+    "ApifyBudget",
+    "ApifyBudgetExceeded",
     "ApifyConfigError",
+    "ApifyLimits",
     "BrandAnalyzer",
     "Embedder",
     "FacebookScraper",

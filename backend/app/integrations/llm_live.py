@@ -30,6 +30,7 @@ from urllib.parse import quote
 from openai import OpenAI
 from pydantic import Field, ValidationError
 
+from ..brand_tidy import tidy_brand_profile
 from ..models import (
     BrandProfile,
     DomainModel,
@@ -316,11 +317,12 @@ class LiveBrandAnalyzer:
         website_content: str | None,
         facebook_page: FacebookPage | None,
     ) -> BrandProfile:
-        return self._structured(
+        profile = self._structured(
             brand_messages(website_content, facebook_page),
             BrandProfile,
             coerce=_coerce_brand_lists,
         )
+        return tidy_brand_profile(profile)
 
     def generate_queries(
         self,

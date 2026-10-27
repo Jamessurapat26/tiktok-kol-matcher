@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, within } from '@testing-library/react'
+import { ApiError, api } from '@/api/client'
 import type { JobEvent } from '@/api/types'
 import { ProgressCard } from '@/components/ProgressCard'
 import demoEvents from '@/test/demo-events.json'
@@ -64,7 +65,11 @@ function row(name: string) {
 }
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource))
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
 
 describe('job progress over SSE', () => {
   it('subscribes to the job stream and fills the stepper as events arrive', () => {
@@ -106,20 +111,23 @@ describe('job progress over SSE', () => {
     expect(source.closed).toBe(true)
   })
 
-  it('reopens after the last seq when the browser gives up on the stream', () => {
+  it('reopens after the last seq when the browser gives up on the stream', async () => {
     vi.useFakeTimers()
+    vi.spyOn(api, 'job').mockRejectedValue(new ApiError(503, null))
     const { source, invalidate } = renderHarness()
     source.emit(events.slice(0, 12))
     invalidate.mockClear()
 
     // A non-200 reconnect response (a 502 while the backend restarts) closes
     // the EventSource for good instead of retrying.
-    act(() => {
+    await act(async () => {
       source.readyState = FakeEventSource.CLOSED
       source.onerror?.()
     })
     expect(FakeEventSource.last).toBe(source)
-    act(() => vi.advanceTimersByTime(1000))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
 
     const reopened = FakeEventSource.last
     expect(reopened).not.toBe(source)
@@ -131,6 +139,5 @@ describe('job progress over SSE', () => {
     expect(screen.getAllByText(', finished')).toHaveLength(10)
     expect(screen.queryByText('round 3')).not.toBeInTheDocument()
     expect(reopened.closed).toBe(true)
-    vi.useRealTimers()
   })
 })

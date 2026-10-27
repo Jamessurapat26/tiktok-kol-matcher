@@ -167,6 +167,82 @@ def test_jina_retries_server_error_then_succeeds():
     assert "recovered from Jina" in page.content
 
 
+def test_jina_retries_transient_400_then_succeeds():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(400, text="transient bad request")
+        return httpx.Response(200, text="ExampleBrand page recovered after a transient 400. " * 5)
+
+    page = _jina(handler).fetch(_URL)
+
+    assert calls["n"] == 2
+    assert page.source == "jina"
+    assert "recovered after a transient 400" in page.content
+
+
+def test_jina_retries_503_then_succeeds():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(503, text="unavailable")
+        return httpx.Response(200, text="ExampleBrand page recovered after a 503. " * 5)
+
+    page = _jina(handler).fetch(_URL)
+
+    assert calls["n"] == 2
+    assert page.source == "jina"
+    assert "recovered after a 503" in page.content
+
+
+def test_jina_names_the_attempt_count_and_last_status_when_400_persists():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(400, text="bad request")
+
+    with pytest.raises(WebReadError) as exc_info:
+        _jina(handler).fetch(_URL)
+
+    assert calls["n"] == 3
+    message = str(exc_info.value)
+    assert "after 3 attempts" in message
+    assert "last HTTP status 400" in message
+
+
+def test_jina_does_not_retry_a_non_retryable_4xx():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(404, text="missing")
+
+    with pytest.raises(WebReadError) as exc_info:
+        _jina(handler).fetch(_URL)
+
+    assert calls["n"] == 1
+    assert "HTTP 404" in str(exc_info.value)
+
+
+def test_jina_persistent_400_falls_back_to_trafilatura():
+    def jina_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text="transient bad request")
+
+    def direct_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=_article_html())
+
+    page = FallbackWebReader(_jina(jina_handler), _trafilatura(direct_handler)).fetch(_URL)
+
+    assert page.source == "trafilatura"
+    assert len(page.content) >= 200
+    assert "blue-light glasses" in page.content
+
+
 def test_long_jina_page_does_not_call_fallback():
     def jina_handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text="ExampleBrand blue-light glasses. " * 20)

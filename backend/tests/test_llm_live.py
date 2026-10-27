@@ -520,6 +520,16 @@ def test_generate_queries_drops_previous_and_retries_when_all_repeat():
     assert "no new queries" in prompts[1]
 
 
+def test_generate_queries_caps_an_oversized_batch_at_the_prompt_limit():
+    sent = [f"query {i}" for i in range(60)]
+    chat = _ScriptedChat([json.dumps({"queries": sent})])
+    analyzer = LiveBrandAnalyzer(settings=LlmSettings(api_key=_KEY), chat=chat)
+
+    queries = analyzer.generate_queries(_brand(), [], 1)
+
+    assert queries == sent[:10]
+
+
 def test_rerank_batches_and_keeps_heuristic_scores_in_the_total():
     kols = [
         _kol("Alpha"),

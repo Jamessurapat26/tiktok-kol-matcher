@@ -133,7 +133,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _summarize_update(
+def summarize_update(
     update: dict[str, Any],
     *,
     node: str | None = None,
@@ -206,7 +206,7 @@ def _run_pipeline(
         for node, update in pending:
             step += 1
             if show_progress:
-                summary = _summarize_update(
+                summary = summarize_update(
                     update,
                     node=node,
                     discovered_total=discovered_now,

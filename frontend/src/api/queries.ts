@@ -8,7 +8,13 @@ export const queryKeys = {
 }
 
 export function useHealth() {
-  return useQuery({ queryKey: queryKeys.health, queryFn: api.health, staleTime: 60_000 })
+  return useQuery({
+    queryKey: queryKeys.health,
+    queryFn: api.health,
+    staleTime: 60_000,
+    // Poll while the API is unreachable, so "API offline" clears without a reload.
+    refetchInterval: (query) => (query.state.status === 'error' ? 5_000 : false),
+  })
 }
 
 export function useJobs(enabled: boolean) {

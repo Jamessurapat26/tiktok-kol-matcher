@@ -12,8 +12,8 @@ from app.integrations.kol_search_live import ApifyKolSearch
 from app.integrations.web_reader import MockWebReader
 from app.integrations.web_reader_live import CachedWebReader
 
-_WEBSITE = "https://ophtus.com"
-_FACEBOOK = "https://www.facebook.com/ophtus"
+_WEBSITE = "https://example-brand.co.th"
+_FACEBOOK = "https://www.facebook.com/examplebrand"
 
 
 def test_json_output(capsys):
@@ -381,3 +381,164 @@ def test_max_enrich_must_be_positive(capsys):
     )
     assert exit_code == 2
     assert "--max-enrich" in capsys.readouterr().err
+
+
+def test_help_mentions_live_embed(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["match", "--help"])
+
+    assert exc.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "--live-embed" in help_text
+    assert "--prefilter-limit" in help_text
+    assert "google/embeddinggemma-2" in help_text
+    assert "Ollama" not in help_text
+    assert "OLLAMA" not in help_text
+
+
+def test_prefilter_limit_validation(monkeypatch, capsys):
+    def fail_build(*args, **kwargs):
+        raise AssertionError("graph should not run")
+
+    monkeypatch.setattr("app.cli.build_graph", fail_build)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--prefilter-limit",
+            "0",
+        ]
+    )
+    assert exit_code == 2
+    assert "--prefilter-limit" in capsys.readouterr().err
+
+    monkeypatch.setenv("PREFILTER_LIMIT", "nope")
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+        ]
+    )
+    assert exit_code == 2
+    assert "PREFILTER_LIMIT" in capsys.readouterr().err
+
+
+def test_prefilter_limit_flag_overrides_env(monkeypatch):
+    monkeypatch.setenv("PREFILTER_LIMIT", "12")
+    captured: dict = {}
+
+    def spy(integrations=None, **kwargs):
+        captured["kwargs"] = kwargs
+
+        class _Graph:
+            def stream(self, *args, **kwargs):
+                return iter([("values", {"stage": "done", "results": [], "errors": []})])
+
+        return _Graph()
+
+    monkeypatch.setattr("app.cli.build_graph", spy)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--json",
+            "--prefilter-limit",
+            "8",
+            "--top-k",
+            "40",
+        ]
+    )
+    assert exit_code == 0
+    assert captured["kwargs"]["prefilter_n"] == 8
+
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--json",
+        ]
+    )
+    assert exit_code == 0
+    assert captured["kwargs"]["prefilter_n"] == 12
+
+
+def test_live_embed_flag_does_not_load_the_model(monkeypatch, capsys):
+    from app.integrations.embeddings_live import SentenceTransformerEmbedder
+    from app.integrations.llm import MockBrandAnalyzer
+
+    for name in ("EMBED_MODEL", "EMBED_DEVICE", "EMBED_DIM", "EMBED_DTYPE"):
+        monkeypatch.delenv(name, raising=False)
+    captured: dict = {}
+
+    def spy(integrations=None, **kwargs):
+        captured["integrations"] = integrations
+        captured["kwargs"] = kwargs
+
+        class _Graph:
+            def stream(self, *args, **kwargs):
+                return iter([("values", {"stage": "done", "results": [], "errors": []})])
+
+        return _Graph()
+
+    monkeypatch.setattr("app.cli.build_graph", spy)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--top-k",
+            "5",
+            "--json",
+            "--live-embed",
+        ]
+    )
+    captured_io = capsys.readouterr()
+    embedder = captured["integrations"].embedder
+    assert exit_code == 0
+    assert isinstance(embedder, SentenceTransformerEmbedder)
+    assert isinstance(captured["integrations"].llm, MockBrandAnalyzer)
+    assert isinstance(captured["integrations"].web_reader, MockWebReader)
+    assert embedder.model_name == "google/embeddinggemma-2"
+    assert embedder.device == "cpu"
+    assert embedder.dim == 768
+    assert embedder._model is None
+    assert captured["kwargs"]["prefilter_n"] == 25
+    assert "OLLAMA" not in captured_io.out
+    assert "OLLAMA" not in captured_io.err
+
+
+def test_bad_embed_dim_exits_2(monkeypatch, capsys):
+    monkeypatch.setenv("EMBED_DIM", "300")
+
+    def fail_build(*args, **kwargs):
+        raise AssertionError("graph should not run")
+
+    monkeypatch.setattr("app.cli.build_graph", fail_build)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--live-embed",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "EMBED_DIM" in captured.err
+    assert "Traceback" not in captured.err

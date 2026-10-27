@@ -136,7 +136,7 @@ def test_flat_author_meta_keys_are_mapped():
 
 def test_classify_query_splits_hashtags_from_keyword_search():
     assert classify_query("  #Gaming ") == ("hashtags", ["Gaming"])
-    assert classify_query("#Ophtus tiktok") == ("hashtags", ["Ophtus"])
+    assert classify_query("#ExampleBrand tiktok") == ("hashtags", ["ExampleBrand"])
     assert classify_query("#a #b tiktok") == ("hashtags", ["a", "b"])
     assert classify_query("#fyp gaming thailand") == ("search", "#fyp gaming thailand")
     assert classify_query("blue light glasses thailand") == (
@@ -153,7 +153,7 @@ def test_search_posts_one_run_per_query_without_putting_the_token_in_the_url():
         return httpx.Response(201, json=[])
 
     rows = _search(handler, max_results=4).search(
-        ["blue light glasses", "#Ophtus tiktok", "  "],
+        ["blue light glasses", "#ExampleBrand tiktok", "  "],
         round=2,
     )
 
@@ -183,7 +183,7 @@ def test_search_posts_one_run_per_query_without_putting_the_token_in_the_url():
     assert keyword["shouldDownloadCovers"] is False
     assert keyword["downloadSubtitlesOptions"] == "NEVER_DOWNLOAD_SUBTITLES"
     assert keyword["commentsPerPost"] == 0
-    assert hashtag["hashtags"] == ["Ophtus"]
+    assert hashtag["hashtags"] == ["ExampleBrand"]
     assert "searchQueries" not in hashtag
 
 
@@ -300,8 +300,8 @@ def test_discover_records_bad_rows_from_the_search_fixture():
     ](
         MatchState(
             request=MatchRequest(
-                website_url="https://ophtus.com",
-                facebook_url="https://www.facebook.com/ophtus",
+                website_url="https://example-brand.co.th",
+                facebook_url="https://www.facebook.com/examplebrand",
             ),
             last_queries=["ootd"],
         )

@@ -27,6 +27,7 @@ def build_integrations(
     live_web: bool = False,
     live_kols: bool = False,
     live_llm: bool = False,
+    live_embed: bool = False,
     kol_fixtures: list[dict] | None = None,
     max_results_per_query: int = 10,
     apify_token: str | None = None,
@@ -38,8 +39,11 @@ def build_integrations(
     enrichment are live only when ``live_kols`` is true (requires
     ``APIFY_TOKEN``). Brand analysis, query generation, and reranking are
     live only when ``live_llm`` is true (requires ``LLM_API_KEY``,
-    ``NVIDIA_API_KEY``, or ``OPENAI_API_KEY``). Facebook and embeddings stay
-    mocked. The default never touches the network.
+    ``NVIDIA_API_KEY``, or ``OPENAI_API_KEY``). Embeddings are live only when
+    ``live_embed`` is true. That loads ``google/embeddinggemma-2`` through
+    sentence-transformers on the first embed call (install the ``embed`` extra).
+    Facebook stays mocked. The default never touches the network and does not
+    download a model.
     """
     if max_results_per_query < 1:
         raise ValueError("max_results_per_query must be at least 1")
@@ -62,7 +66,7 @@ def build_integrations(
         llm=_live_llm(llm_api_key) if live_llm else MockBrandAnalyzer(),
         kol_search=kol_search,
         enricher=enricher,
-        embedder=MockEmbedder(),
+        embedder=_live_embedder() if live_embed else MockEmbedder(),
     )
 
 
@@ -84,6 +88,12 @@ def _live_kol_services(token: str, max_results: int) -> tuple[KolSearch, KolEnri
         ApifyKolSearch(token=token, max_results=max_results),
         ApifyKolEnricher(token=token, max_videos=max_results),
     )
+
+
+def _live_embedder() -> Embedder:
+    from .embeddings_live import SentenceTransformerEmbedder
+
+    return SentenceTransformerEmbedder.from_env()
 
 
 def _live_llm(api_key: str | None) -> BrandAnalyzer:

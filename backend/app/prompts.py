@@ -66,6 +66,12 @@ short sentence in Thai or English. Include every handle from the input exactly
 once. Copy each handle unchanged.
 """
 
+_RERANK_SIMILARITY_NOTE = """
+Each creator includes embedding_similarity, the cosine similarity between the
+brand and that creator. Higher means closer. Use it as a hint and still set
+relevance from the creator's content.
+"""
+
 JSON_RETRY_USER = (
     "That response failed validation:\n"
     "{error}\n\n"
@@ -110,8 +116,21 @@ def query_messages(
     ]
 
 
-def rerank_messages(brand: BrandProfile, kols: list[KolProfile]) -> list[dict[str, str]]:
-    cards = "\n\n".join(_kol_card(kol) for kol in kols)
+def rerank_messages(
+    brand: BrandProfile,
+    kols: list[KolProfile],
+    similarities: list[float] | None = None,
+) -> list[dict[str, str]]:
+    if similarities is not None and len(similarities) != len(kols):
+        raise ValueError("similarities must have one score per creator")
+    if similarities is None:
+        cards = "\n\n".join(_kol_card(kol) for kol in kols)
+        system = RERANK_SYSTEM
+    else:
+        cards = "\n\n".join(
+            _kol_card(kol, similarity) for kol, similarity in zip(kols, similarities, strict=True)
+        )
+        system = RERANK_SYSTEM + _RERANK_SIMILARITY_NOTE
     user = (
         "Brand:\n"
         f"{_brand_summary(brand)}\n\n"
@@ -119,7 +138,7 @@ def rerank_messages(brand: BrandProfile, kols: list[KolProfile]) -> list[dict[st
         f"{cards}"
     )
     return [
-        {"role": "system", "content": RERANK_SYSTEM},
+        {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
 
@@ -161,23 +180,24 @@ def _facebook_text(page: FacebookPage | None) -> str:
     )
 
 
-def _kol_card(kol: KolProfile) -> str:
+def _kol_card(kol: KolProfile, similarity: float | None = None) -> str:
     if kol.median_engagement_rate is None:
         rate = "unknown"
     else:
         rate = f"{kol.median_engagement_rate:.4f}"
-    return "\n".join(
-        [
-            f"handle: {kol.handle}",
-            f"nickname: {kol.nickname or ''}",
-            f"followers: {kol.followers}",
-            f"language: {kol.language or ''}",
-            f"region: {kol.region or ''}",
-            f"engagement_rate: {rate}",
-            f"bio: {_clip(kol.bio, _BIO_CHARS)}",
-            f"content: {_clip(kol.content_summary, _SUMMARY_CHARS)}",
-        ]
-    )
+    lines = [
+        f"handle: {kol.handle}",
+        f"nickname: {kol.nickname or ''}",
+        f"followers: {kol.followers}",
+        f"language: {kol.language or ''}",
+        f"region: {kol.region or ''}",
+        f"engagement_rate: {rate}",
+        f"bio: {_clip(kol.bio, _BIO_CHARS)}",
+        f"content: {_clip(kol.content_summary, _SUMMARY_CHARS)}",
+    ]
+    if similarity is not None:
+        lines.append(f"embedding_similarity: {similarity:.4f}")
+    return "\n".join(lines)
 
 
 def _clip(text: str | None, limit: int) -> str:

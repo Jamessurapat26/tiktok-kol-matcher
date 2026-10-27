@@ -12,8 +12,8 @@ _KOL_FIXTURE = Path(__file__).resolve().parents[1] / "app" / "fixtures" / "kols.
 
 def make_request(top_k: int = 10) -> MatchRequest:
     return MatchRequest(
-        website_url="https://ophtus.com",
-        facebook_url="https://www.facebook.com/ophtus",
+        website_url="https://example-brand.co.th",
+        facebook_url="https://www.facebook.com/examplebrand",
         top_k=top_k,
     )
 
@@ -83,7 +83,7 @@ def test_loop_stops_at_max_rounds_even_with_too_few_candidates():
 
     queries = final["search_queries"]
     assert "blue light glasses thailand" in queries  # round 1
-    assert "#Ophtus tiktok" in queries  # round 2
+    assert "#ExampleBrand tiktok" in queries  # round 2
     normalized = [query.strip().casefold() for query in queries]
     assert len(set(normalized)) == len(normalized)
 
@@ -136,13 +136,15 @@ def test_dedupe_across_sources():
 
 
 def test_prefilter_cuts_shortlist_and_is_deterministic():
+    request = make_request(top_k=3)
     graph = build_graph(prefilter_n=5)
 
-    first = graph.invoke(initial_state(make_request()))
-    second = graph.invoke(initial_state(make_request()))
+    first = graph.invoke(initial_state(request))
+    second = graph.invoke(initial_state(request))
 
     assert len(first["shortlisted"]) == 5
     assert len(first["ranked"]) == 5
+    assert len(first["results"]) == 3
     assert [item.kol.handle for item in first["results"]] == [
         item.kol.handle for item in second["results"]
     ]
@@ -264,7 +266,7 @@ def test_discover_searches_only_the_latest_round_queries():
     assert set(round_1).isdisjoint(round_2)
     assert "blue light glasses thailand" in round_1
     assert "blue light glasses thailand" not in round_2
-    assert "#Ophtus tiktok" in round_2
+    assert "#ExampleBrand tiktok" in round_2
     assert round_2 == final["last_queries"]
     assert final["search_queries"] == round_1 + round_2
 

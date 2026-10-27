@@ -14,10 +14,36 @@ dependencies = [
     "uvicorn>=0.54.0",
 ]
 
+# Local embeddinggemma. Not installed by `uv sync`.
+# `uv sync --extra embed` pulls sentence-transformers and the CPU torch build.
+[project.optional-dependencies]
+embed = [
+    "sentence-transformers>=6.1.0",
+    "transformers>=4.57.0",
+    # The model's processor config names image and video processors. They need
+    # Pillow and torchvision to import even though only text is embedded.
+    "pillow>=10.0.0",
+    "torchvision>=0.21.0",
+    "torch>=2.6.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "embed" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "embed" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

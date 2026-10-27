@@ -45,18 +45,17 @@ runs after that target is met and can shrink the list.
 
 This is a working skeleton with deterministic mocks. Every external service in
 `backend/app/integrations/` has a `Protocol` and a `Mock` implementation, so the
-whole pipeline runs offline and produces stable output. Three pieces can run live:
+whole pipeline runs offline and produces stable output. Four pieces can run live:
 
 - Web page reading, with `--live-web` (see below).
 - TikTok creator search and enrichment, with `--live-kols` (see below). It calls
   Apify and needs `APIFY_TOKEN`. The default stays on the offline fixtures.
 - Brand analysis, query generation, and relevance reranking, with `--live-llm`
   (see below). The default stays on the offline mock.
+- Embeddings and the cosine prefilter, with `--live-embed` (see below). The
+  default stays on the offline mock and does not download a model.
 
-Swap in real implementations later for:
-
-- Facebook page scraping
-- embeddings and vector similarity
+Swap in a real implementation later for Facebook page scraping.
 
 ## Tech stack
 
@@ -77,8 +76,8 @@ Run the CLI:
 
 ```bash
 uv run python -m app.cli match \
-  --website https://ophtus.com \
-  --facebook https://www.facebook.com/ophtus \
+  --website https://example-brand.co.th \
+  --facebook https://www.facebook.com/example-brand \
   --top-k 10
 ```
 
@@ -87,8 +86,8 @@ the same run as a single JSON object on stdout:
 
 ```bash
 uv run python -m app.cli match \
-  --website https://ophtus.com \
-  --facebook https://www.facebook.com/ophtus \
+  --website https://example-brand.co.th \
+  --facebook https://www.facebook.com/example-brand \
   --top-k 10 \
   --json
 ```
@@ -107,7 +106,7 @@ embeddings, and the LLM mocked:
 - **trafilatura** is the fallback. It fetches the page directly when Jina errors
   or returns fewer than 200 characters. The request uses browser-like
   `Accept`, `Accept-Language`, and `Accept-Encoding` headers and HTTP/2, because
-  some storefronts (including ophtus.com) answer 200 to curl and 429 to a bare
+  some storefronts answer 200 to curl and 429 to a bare
   HTTP/1.1 client.
 - Successful pages are cached as JSON under `data/cache/web` for 7 days. The cache
   key is the SHA-256 of the normalized URL. Set `KOL_CACHE_DIR` to move the cache
@@ -116,8 +115,8 @@ embeddings, and the LLM mocked:
 
 ```bash
 uv run python -m app.cli match \
-  --website https://ophtus.com \
-  --facebook https://www.facebook.com/ophtus \
+  --website https://example-brand.co.th \
+  --facebook https://www.facebook.com/example-brand \
   --top-k 5 \
   --live-web
 ```
@@ -135,7 +134,7 @@ exits with code 2 before the pipeline starts.
 
 - **Search** uses [clockworks/tiktok-scraper](https://apify.com/clockworks/tiktok-scraper).
   A query that is only a hashtag (a trailing "tiktok" is ignored, so
-  `#Ophtus tiktok` counts) is sent as `hashtags`. Every other query is sent as
+  `#examplebrand tiktok` counts) is sent as `hashtags`. Every other query is sent as
   `searchQueries` with `searchSection` set to `/video`, so each item is a video
   with `authorMeta`. Authors are deduped. Rows without a handle, and actor
   `errorCode` items, are skipped and recorded by `discover_kols`.
@@ -162,8 +161,8 @@ exits with code 2 before the pipeline starts.
 ```bash
 export APIFY_TOKEN=...
 uv run python -m app.cli match \
-  --website https://ophtus.com \
-  --facebook https://www.facebook.com/ophtus \
+  --website https://example-brand.co.th \
+  --facebook https://www.facebook.com/example-brand \
   --top-k 5 \
   --live-kols \
   --max-results-per-query 5 \
@@ -182,8 +181,9 @@ uv run python scripts/apify_smoke.py "รีวิวแว่นตา"
 
 The default run uses the offline brand analyzer and does not call a model.
 `--live-llm` sends brand analysis, TikTok query generation, and relevance
-reranking to an OpenAI-compatible chat completions API. Facebook scraping and
-embeddings stay mocked. Combine the flag with `--live-web` and `--live-kols`
+reranking to an OpenAI-compatible chat completions API. Facebook scraping
+stays mocked. Embeddings stay on the offline mock unless `--live-embed` is
+set. Combine the flag with `--live-web` and `--live-kols`
 when those sources should be live too. Switching providers is configuration
 only: set `LLM_BASE_URL`, `LLM_MODEL`, and a key.
 
@@ -253,6 +253,71 @@ with a message and code 2 when no key is set:
 uv run python scripts/llm_smoke.py
 ```
 
+## Embeddings
+
+The default run uses an offline embedder. It does not download a model and it
+does not touch the network. `--live-embed` loads `google/embeddinggemma-2`
+with sentence-transformers, on CPU unless `EMBED_DEVICE` is set. The model is
+loaded once per process and reused. Vision and audio towers are left unloaded
+so only the text tower stays in memory.
+
+The model is Apache 2.0. `HF_TOKEN` is optional.
+
+Install the extra before a live run. It pulls sentence-transformers,
+transformers, and the CPU build of torch. A plain `uv sync` does not install
+them, so the default install and the tests stay offline.
+
+```bash
+cd backend
+uv sync --extra embed
+uv run python -m app.cli match \
+  --website https://example-brand.co.th \
+  --facebook https://www.facebook.com/example-brand \
+  --top-k 5 \
+  --live-embed
+```
+
+| Variable | Default | Role |
+| --- | --- | --- |
+| `EMBED_MODEL` | `google/embeddinggemma-2` | sentence-transformers model id |
+| `EMBED_DEVICE` | `cpu` | device passed to the model |
+| `EMBED_DIM` | `768` | Matryoshka size passed as `truncate_dim` (`768`, `512`, `256`, or `128`) |
+| `EMBED_DTYPE` | `float32` | `float32` or `bfloat16` |
+| `EMBED_BATCH_SIZE` | `32` | texts encoded per call |
+| `PREFILTER_LIMIT` | `25` | candidates kept after cosine ranking, before rerank |
+| `KOL_CACHE_DIR` | `data/cache` | cache root; embeddings are `$KOL_CACHE_DIR/embeddings` |
+| `HF_TOKEN` | unset | optional download token |
+
+The brand text (category, products, audience, keywords, hashtags) is the
+query. Each creator (nickname, bio, caption summary, hashtags) is a document.
+Queries use the `SearchQuery` prompt (`task: search result | query: `).
+Documents use the `Document` prompt (`title: none | text: `). If those prompts
+are not on the model, a document is formatted as
+`title: {nickname or handle} | text: {content}`.
+
+Similarity is cosine on L2-normalized vectors. `EMBED_DIM` truncates the
+vector. The context window is 8192 tokens. Dtype is float32 or bfloat16, not
+float16.
+
+`--prefilter-limit` (or `PREFILTER_LIMIT`) sets how many creators go to the
+reranker. The default is 25. If `--top-k` is larger, the width is raised to
+`--top-k`, so a larger shortlist is not silently cut.
+
+The offline reranker uses that cosine as the relevance score. The live
+reranker still scores relevance itself and sees the cosine as
+`embedding_similarity`. Engagement, audience fit, and tier fit are unchanged.
+The total still uses the weights 0.4, 0.25, 0.2, and 0.15.
+
+Vectors are cached as JSON under `data/cache/embeddings`. The file name is the
+SHA-256 of the model, the prompt prefix, the text, and the dimension. Writes
+are atomic. A cache hit does not call the model.
+
+`backend/scripts/embed_smoke.py` embeds one query and two short documents:
+
+```bash
+uv run python scripts/embed_smoke.py
+```
+
 Run the tests:
 
 ```bash
@@ -270,9 +335,9 @@ backend/
     state.py         # MatchState and list reducers
     cli.py           # argparse CLI (table or JSON)
     prompts.py       # LLM prompt text for brand analysis, queries, and rerank
-    integrations/    # Protocol + Mock per service; live web, Apify, and LLM clients
+    integrations/    # Protocol + Mock per service; live web, Apify, LLM, and embedder
     fixtures/        # mock website, Facebook page, KOL records, Apify samples
-  scripts/           # apify_smoke.py and llm_smoke.py
+  scripts/           # apify_smoke.py, llm_smoke.py, and embed_smoke.py
   tests/
   pyproject.toml
 README.md

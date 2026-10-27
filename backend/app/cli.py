@@ -7,9 +7,16 @@ from typing import Any
 from langgraph.errors import GraphRecursionError
 from pydantic import ValidationError
 
-from .graph import MAX_SEARCH_ROUNDS, MIN_CANDIDATES, build_graph, initial_state
+from .graph import (
+    MAX_SEARCH_ROUNDS,
+    MIN_CANDIDATES,
+    PREFILTER_N,
+    build_graph,
+    initial_state,
+)
 from .integrations import build_integrations
 from .integrations.apify import ApifyConfigError
+from .integrations.embeddings import EmbedConfigError
 from .integrations.llm_live import LlmConfigError, llm_api_key_from_env
 from .models import MatchRequest, RankedKol
 
@@ -100,6 +107,26 @@ def _build_parser() -> argparse.ArgumentParser:
             "run brand analysis, query generation, and reranking through an "
             "OpenAI-compatible chat API (LLM_API_KEY, NVIDIA_API_KEY, or "
             "OPENAI_API_KEY; default stays on the offline mock)"
+        ),
+    )
+    match.add_argument(
+        "--live-embed",
+        action="store_true",
+        help=(
+            "embed brand and creator text locally with sentence-transformers "
+            "(EMBED_MODEL, default google/embeddinggemma-2; EMBED_DEVICE, "
+            "default cpu; EMBED_DIM, default 768). Requires the embed extra. "
+            "The default stays on the offline mock"
+        ),
+    )
+    match.add_argument(
+        "--prefilter-limit",
+        type=int,
+        default=None,
+        help=(
+            "candidates kept after cosine ranking, before rerank "
+            f"(default: {PREFILTER_N}, or PREFILTER_LIMIT). "
+            "Raised to --top-k when that is larger"
         ),
     )
     return parser
@@ -280,6 +307,24 @@ def _json_payload(final_state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _resolve_prefilter_limit(args: argparse.Namespace) -> int:
+    """CLI flag wins, then ``PREFILTER_LIMIT``, then the graph default."""
+    if args.prefilter_limit is not None:
+        if args.prefilter_limit < 1:
+            raise ValueError("--prefilter-limit must be at least 1")
+        return args.prefilter_limit
+    raw = os.environ.get("PREFILTER_LIMIT", "").strip()
+    if not raw:
+        return PREFILTER_N
+    try:
+        value = int(raw, 10)
+    except ValueError:
+        raise ValueError("PREFILTER_LIMIT must be an integer") from None
+    if value < 1:
+        raise ValueError("PREFILTER_LIMIT must be at least 1")
+    return value
+
+
 def _cmd_match(args: argparse.Namespace) -> int:
     if args.max_rounds < 0:
         print("error: --max-rounds must be zero or greater", file=sys.stderr)
@@ -292,6 +337,11 @@ def _cmd_match(args: argparse.Namespace) -> int:
         return 2
     if args.max_enrich < 1:
         print("error: --max-enrich must be at least 1", file=sys.stderr)
+        return 2
+    try:
+        prefilter_limit = _resolve_prefilter_limit(args)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 2
     if args.live_kols and not os.environ.get("APIFY_TOKEN", "").strip():
         print(
@@ -320,20 +370,22 @@ def _cmd_match(args: argparse.Namespace) -> int:
     graph_kwargs: dict[str, Any] = {
         "min_candidates": args.min_candidates,
         "max_search_rounds": args.max_rounds,
+        "prefilter_n": prefilter_limit,
     }
     if args.live_kols:
         graph_kwargs["enrich_limit"] = args.max_enrich
     # Default stays on build_graph's mocked bundle so the CLI never opens a
-    # socket unless a live flag is set.
-    if args.live_web or args.live_kols or args.live_llm:
+    # socket or loads a model unless a live flag is set.
+    if args.live_web or args.live_kols or args.live_llm or args.live_embed:
         try:
             graph_kwargs["integrations"] = build_integrations(
                 live_web=args.live_web,
                 live_kols=args.live_kols,
                 live_llm=args.live_llm,
+                live_embed=args.live_embed,
                 max_results_per_query=args.max_results_per_query,
             )
-        except (ApifyConfigError, LlmConfigError) as exc:
+        except (ApifyConfigError, LlmConfigError, EmbedConfigError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
     graph = build_graph(**graph_kwargs)

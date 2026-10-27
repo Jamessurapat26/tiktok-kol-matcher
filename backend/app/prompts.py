@@ -12,6 +12,7 @@ from .models import BrandProfile, FacebookPage, KolProfile
 _SOURCE_CHARS = 12_000
 _BIO_CHARS = 300
 _SUMMARY_CHARS = 400
+_POST_CHARS = 300
 
 BRAND_ANALYSIS_SYSTEM = """\
 You extract a structured brand profile from a brand's website text and, when
@@ -172,16 +173,19 @@ def _facebook_text(page: FacebookPage | None) -> str:
     if page is None:
         return "(no Facebook page was scraped)"
     categories = ", ".join(page.categories)
-    return "\n".join(
-        [
-            f"name: {page.page_name}",
-            f"title: {page.title}",
-            f"categories: {categories}",
-            f"intro: {_clip(page.intro, _SOURCE_CHARS)}",
-            f"followers: {page.followers}",
-            f"price_range: {page.price_range or ''}",
-        ]
-    )
+    lines = [
+        f"name: {page.page_name}",
+        f"title: {page.title}",
+        f"categories: {categories}",
+        f"intro: {_clip(page.intro, _SOURCE_CHARS)}",
+        f"followers: {page.followers}",
+        f"price_range: {page.price_range or ''}",
+        f"website: {page.website or ''}",
+    ]
+    if page.recent_posts:
+        lines.append("recent_posts:")
+        lines.extend(f"- {_clip(post, _POST_CHARS)}" for post in page.recent_posts)
+    return "\n".join(lines)
 
 
 def _kol_card(kol: KolProfile, similarity: float | None = None) -> str:

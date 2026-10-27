@@ -48,7 +48,7 @@ export default function App() {
       <main className="grid items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           <BrandForm draft={draft} onDraftChange={setDraft} onCreated={setJobId} />
-          {jobId && <ProgressCard progress={progress} connected={connected} />}
+          {jobId && !job.isError && <ProgressCard progress={progress} connected={connected} />}
         </div>
         <div className="flex flex-col gap-6">
           {!jobId ? (

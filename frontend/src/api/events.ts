@@ -1,4 +1,4 @@
-import { api } from './client'
+import { ApiError, api } from './client'
 import { EVENT_TYPES, type JobEvent, NODE_STATUSES, type NodeStatus } from './types'
 
 /** Parse one SSE `data` payload; null when it is not a job event. */
@@ -28,17 +28,24 @@ export interface EventStreamHandlers {
   onConnectionChange: (open: boolean) => void
   /** A fresh EventSource was opened; the job may have changed meanwhile. */
   onReopen: () => void
+  /** The job itself is gone, so the stream was closed for good. */
+  onGone?: (error: ApiError) => void
 }
 
 const MAX_RETRY_MS = 10_000
+
+function isGoneStatus(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429
+}
 
 /**
  * Follow a job's events. EventSource reconnects on its own and sends
  * Last-Event-ID, so the server resumes after the last seq it delivered.
  * A reconnect that gets a non-200 (a 502 while the backend restarts) closes
- * the EventSource for good, so that case reopens one after a backoff with
- * `?after=<last seq>`. The stream is closed on the terminal event; otherwise
- * it would reconnect to a finished job forever.
+ * the EventSource for good, so that case probes the job and reopens one after
+ * a backoff with `?after=<last seq>` unless the job itself is gone. The stream
+ * is closed on the terminal event; otherwise it would reconnect to a finished
+ * job forever.
  */
 export function followJobEvents(jobId: string, handlers: EventStreamHandlers): () => void {
   let source: EventSource
@@ -51,6 +58,35 @@ export function followJobEvents(jobId: string, handlers: EventStreamHandlers): (
     stopped = true
     clearTimeout(retry)
     source.close()
+  }
+
+  const scheduleReopen = () => {
+    if (stopped) return
+    retry = setTimeout(
+      () => {
+        if (stopped) return
+        open()
+        handlers.onReopen()
+      },
+      Math.min(MAX_RETRY_MS, 1000 * 2 ** attempt++),
+    )
+  }
+
+  // A closed EventSource after a non-200 response may mean the job was deleted
+  // rather than the backend restarting. Probe once so a 404 stops the retries.
+  const probeJob = () => {
+    void api.job(jobId).then(
+      () => scheduleReopen(),
+      (error: unknown) => {
+        if (stopped) return
+        if (error instanceof ApiError && isGoneStatus(error.status)) {
+          stop()
+          handlers.onGone?.(error)
+          return
+        }
+        scheduleReopen()
+      },
+    )
   }
 
   const open = () => {
@@ -70,13 +106,7 @@ export function followJobEvents(jobId: string, handlers: EventStreamHandlers): (
     source.onerror = () => {
       handlers.onConnectionChange(false)
       if (stopped || source.readyState !== EventSource.CLOSED) return
-      retry = setTimeout(
-        () => {
-          open()
-          handlers.onReopen()
-        },
-        Math.min(MAX_RETRY_MS, 1000 * 2 ** attempt++),
-      )
+      probeJob()
     }
   }
 

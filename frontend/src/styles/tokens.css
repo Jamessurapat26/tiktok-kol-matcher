@@ -1,0 +1,149 @@
+/*
+ * Design tokens: the single source for colors, type, radii, spacing, and
+ * shadows. Raw tokens live in :root; the @theme block exposes them to
+ * Tailwind and maps the shadcn/ui semantic variables onto them.
+ */
+
+:root {
+  /* Palette */
+  --dt-primary: #0536d2;
+  --dt-on-primary: #ffffff;
+  --dt-canvas: #ffffff;
+  --dt-ink: #2d303c;
+  /* 3.94:1 on white: large or secondary text only, never body copy. */
+  --dt-muted: #75809d;
+  /* 5.1:1 on white: small secondary text that must stay readable. */
+  --dt-link: #5e6e91;
+  --dt-faint: #f1f5f9;
+  --dt-surface: #f7f7f7;
+  --dt-surface-raised: #efeff0;
+  --dt-border: #e6e6e8;
+  --dt-accent-soft: #e3e8ff;
+  --dt-accent-mid: #597ef3;
+  --dt-neutral-light: #d9d9d9;
+  --dt-neutral-tint: #eeeeee;
+
+  /*
+   * Status colors. The design tokens define none, so these are picked to sit
+   * with the palette. Each foreground is at least 4.5:1 on white and on its
+   * own soft background.
+   */
+  --dt-success: #0f7a43;
+  --dt-success-soft: #e7f6ee;
+  --dt-warning: #9a5700;
+  --dt-warning-soft: #fff4de;
+  --dt-error: #c0262d;
+  --dt-error-soft: #fdecec;
+  --dt-info: #1d5bbf;
+  --dt-info-soft: #e3e8ff;
+
+  /* Radii */
+  --dt-radius-xs: 8px;
+  --dt-radius-sm: 10px;
+  --dt-radius-md: 16px;
+  --dt-radius-lg: 20px;
+
+  /* Shadows */
+  --dt-shadow-sm: rgba(0, 0, 0, 0.1) 0px 8px 8px 0px;
+  --dt-shadow-md: rgba(147, 178, 199, 0.15) -1.256px -1.256px 21.485px 0px;
+  --dt-shadow-xl: rgba(0, 0, 0, 0.15) 0px 15px 15px 0px;
+  --dt-shadow-cta: rgba(0, 0, 0, 0.3) 0px 0px 10px 0px;
+
+  /* shadcn/ui semantic variables */
+  --background: var(--dt-canvas);
+  --foreground: var(--dt-ink);
+  --card: var(--dt-canvas);
+  --card-foreground: var(--dt-ink);
+  --popover: var(--dt-canvas);
+  --popover-foreground: var(--dt-ink);
+  --primary: var(--dt-primary);
+  --primary-foreground: var(--dt-on-primary);
+  --secondary: var(--dt-surface);
+  --secondary-foreground: var(--dt-ink);
+  --muted: var(--dt-faint);
+  --muted-foreground: var(--dt-link);
+  --accent: var(--dt-surface-raised);
+  --accent-foreground: var(--dt-ink);
+  --destructive: var(--dt-error);
+  --border: var(--dt-border);
+  --input: var(--dt-border);
+  --ring: var(--dt-primary);
+  --radius: var(--dt-radius-xs);
+}
+
+@theme inline {
+  /* Manrope has no Thai glyphs, so Thai text falls through to Noto Sans Thai. */
+  --font-sans: Manrope, 'Noto Sans Thai', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-ink: var(--dt-ink);
+  --color-subtle: var(--dt-muted);
+  --color-surface: var(--dt-surface);
+  --color-accent-soft: var(--dt-accent-soft);
+  --color-track: var(--dt-neutral-tint);
+  --color-success: var(--dt-success);
+  --color-success-soft: var(--dt-success-soft);
+  --color-warning: var(--dt-warning);
+  --color-warning-soft: var(--dt-warning-soft);
+  --color-error: var(--dt-error);
+  --color-error-soft: var(--dt-error-soft);
+  --color-info: var(--dt-info);
+  --color-info-soft: var(--dt-info-soft);
+
+  /* shadcn components use sm..xl; xl and 2xl are the card radii. */
+  --radius-sm: var(--dt-radius-xs);
+  --radius-md: var(--dt-radius-sm);
+  --radius-lg: var(--dt-radius-xs);
+  --radius-xl: var(--dt-radius-md);
+  --radius-2xl: var(--dt-radius-lg);
+
+  --shadow-card: var(--dt-shadow-md);
+  --shadow-raised: var(--dt-shadow-sm);
+  --shadow-overlay: var(--dt-shadow-xl);
+  --shadow-cta: var(--dt-shadow-cta);
+
+  /* The 4px spacing base already covers 4..40px; these are the larger steps. */
+  --spacing-section: 56px;
+  --spacing-band: 60px;
+
+  --text-display-lg: 40px;
+  --text-display-lg--line-height: 1.4;
+  --text-display-lg--letter-spacing: -1px;
+  --text-display-lg--font-weight: 700;
+  --text-heading-md: 24px;
+  --text-heading-md--line-height: 1.4;
+  --text-heading-md--letter-spacing: -1px;
+  --text-heading-md--font-weight: 700;
+  --text-heading-sm: 18px;
+  --text-heading-sm--line-height: 1.4;
+  --text-heading-sm--letter-spacing: -0.5px;
+  --text-heading-sm--font-weight: 700;
+  --text-body-md: 16px;
+  --text-body-md--line-height: 1.4;
+  --text-body-md--font-weight: 500;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 1.5;
+  --text-body-sm--font-weight: 500;
+  --text-body-xs: 12px;
+  --text-body-xs--line-height: 1.4;
+  --text-body-xs--font-weight: 500;
+}

@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform != 'darwin'",
@@ -67,6 +67,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "openai" },
     { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "trafilatura" },
     { name = "uvicorn" },
 ]
@@ -95,6 +96,7 @@ requires-dist = [
     { name = "openai", specifier = ">=3.39.0" },
     { name = "pillow", marker = "extra == 'embed'", specifier = ">=10.0.0" },
     { name = "pydantic", specifier = ">=2.14.1" },
+    { name = "pydantic-settings", specifier = ">=2.16.1" },
     { name = "sentence-transformers", marker = "extra == 'embed'", specifier = ">=6.1.0" },
     { name = "torch", marker = "extra == 'embed'", specifier = ">=2.6.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "backend", extra = "embed" } },
     { name = "torchvision", marker = "extra == 'embed'", specifier = ">=0.21.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "backend", extra = "embed" } },

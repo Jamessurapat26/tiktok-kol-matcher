@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from .graph import MAX_SEARCH_ROUNDS, MIN_CANDIDATES, build_graph, initial_state
 from .integrations import build_integrations
 from .integrations.apify import ApifyConfigError
+from .integrations.llm_live import LlmConfigError, llm_api_key_from_env
 from .models import MatchRequest, RankedKol
 
 _LIST_FIELDS = ("discovered", "candidates", "shortlisted", "ranked", "results")
@@ -90,6 +91,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "with --live-kols, enrich at most this many candidates (largest "
             "accounts first); each one is a paid Apify run (default: 10)"
+        ),
+    )
+    match.add_argument(
+        "--live-llm",
+        action="store_true",
+        help=(
+            "run brand analysis, query generation, and reranking through an "
+            "OpenAI-compatible chat API (LLM_API_KEY, NVIDIA_API_KEY, or "
+            "OPENAI_API_KEY; default stays on the offline mock)"
         ),
     )
     return parser
@@ -289,6 +299,13 @@ def _cmd_match(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.live_llm and not llm_api_key_from_env():
+        print(
+            "error: --live-llm requires LLM_API_KEY, NVIDIA_API_KEY, or "
+            "OPENAI_API_KEY in the environment",
+            file=sys.stderr,
+        )
+        return 2
 
     try:
         request = MatchRequest(
@@ -307,15 +324,16 @@ def _cmd_match(args: argparse.Namespace) -> int:
     if args.live_kols:
         graph_kwargs["enrich_limit"] = args.max_enrich
     # Default stays on build_graph's mocked bundle so the CLI never opens a
-    # socket unless --live-web or --live-kols is set.
-    if args.live_web or args.live_kols:
+    # socket unless a live flag is set.
+    if args.live_web or args.live_kols or args.live_llm:
         try:
             graph_kwargs["integrations"] = build_integrations(
                 live_web=args.live_web,
                 live_kols=args.live_kols,
+                live_llm=args.live_llm,
                 max_results_per_query=args.max_results_per_query,
             )
-        except ApifyConfigError as exc:
+        except (ApifyConfigError, LlmConfigError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
     graph = build_graph(**graph_kwargs)

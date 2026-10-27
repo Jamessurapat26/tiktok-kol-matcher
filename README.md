@@ -45,17 +45,18 @@ runs after that target is met and can shrink the list.
 
 This is a working skeleton with deterministic mocks. Every external service in
 `backend/app/integrations/` has a `Protocol` and a `Mock` implementation, so the
-whole pipeline runs offline and produces stable output. Two pieces can run live:
+whole pipeline runs offline and produces stable output. Three pieces can run live:
 
 - Web page reading, with `--live-web` (see below).
 - TikTok creator search and enrichment, with `--live-kols` (see below). It calls
   Apify and needs `APIFY_TOKEN`. The default stays on the offline fixtures.
+- Brand analysis, query generation, and relevance reranking, with `--live-llm`
+  (see below). The default stays on the offline mock.
 
 Swap in real implementations later for:
 
 - Facebook page scraping
 - embeddings and vector similarity
-- LLM brand analysis, query generation, and reranking
 
 ## Tech stack
 
@@ -177,6 +178,81 @@ run once a token is available:
 uv run python scripts/apify_smoke.py "รีวิวแว่นตา"
 ```
 
+## LLM
+
+The default run uses the offline brand analyzer and does not call a model.
+`--live-llm` sends brand analysis, TikTok query generation, and relevance
+reranking to an OpenAI-compatible chat completions API. Facebook scraping and
+embeddings stay mocked. Combine the flag with `--live-web` and `--live-kols`
+when those sources should be live too. Switching providers is configuration
+only: set `LLM_BASE_URL`, `LLM_MODEL`, and a key.
+
+| Variable | Default | Role |
+| --- | --- | --- |
+| `LLM_BASE_URL` | `https://integrate.api.nvidia.com/v1` | API root, including the `/v1` prefix |
+| `LLM_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Chat model id |
+| `LLM_API_KEY` | unset | Bearer token. If empty, `NVIDIA_API_KEY` is used, then `OPENAI_API_KEY` |
+| `LLM_TIMEOUT` | `120` | Request timeout in seconds |
+| `LLM_MAX_TOKENS` | `4096` | Completion token budget, shared with any reasoning trace |
+| `LLM_TEMPERATURE` | `0.2` | Sampling temperature |
+| `LLM_RERANK_BATCH_SIZE` | `5` | Creators scored per rerank request |
+| `LLM_DISABLE_REASONING` | `extra_body` for the default endpoint and model, otherwise `off` | Provider-specific reasoning control, below |
+| `LLM_NO_THINK_MESSAGE` | `/no_think` | System message used when reasoning control is `system` or `both` |
+
+The default model is a reasoning model. A short prompt can take tens of seconds
+and spend most of its completion tokens on `reasoning_content`. With a small
+`max_tokens`, `content` comes back null. The client defaults are sized for
+that: 4096 completion tokens and a 120 second timeout. Empty or missing
+`content` is retried once.
+
+`LLM_DISABLE_REASONING` picks how thinking is turned off. When it is unset, the
+default NVIDIA endpoint and model use `extra_body` and every other provider
+gets a plain request. The values are provider-specific:
+
+- `off` sends a normal chat request.
+- `system` prepends `LLM_NO_THINK_MESSAGE` (default `/no_think`). The default
+  model ignores it, so it still thinks.
+- `extra_body` sends `chat_template_kwargs.enable_thinking` set to false. On the
+  default model this turns thinking off: a brand-analysis call dropped from
+  about 30-45 seconds and 2,000-3,700 completion tokens to about 3 seconds and
+  250 tokens.
+- `both`, and also `true`, `1`, or `on`, does both.
+
+A provider that rejects unknown JSON fields works with the default (`off` for
+anything but the NVIDIA default). Point `LLM_BASE_URL` at
+`https://api.openai.com/v1` and set `LLM_MODEL` plus `OPENAI_API_KEY` to use
+OpenAI with no code change.
+
+Each call asks for one JSON object. Code fences and leading prose are stripped,
+the first JSON object is validated with Pydantic, and a validation failure is
+retried once with the error in the next prompt. A second failure raises. The
+graph records that on `errors`, sets `stage` to `failed`, and stops, the same
+way other node failures do.
+
+The model returns relevance from 0 to 1 and a short Thai or English reason.
+Engagement, audience fit, and tier fit stay on the existing heuristics. The
+total still uses the weights 0.4, 0.25, 0.2, and 0.15, with relevance as the
+0.4 term. Query generation returns only the new queries for that round, so the
+discovery loop and `last_queries` keep working. Rerank requests are batched.
+
+The API key is not written to logs. It is stripped from error text.
+
+```bash
+export LLM_API_KEY=...
+uv run python -m app.cli match \
+  --website https://example.com \
+  --facebook https://www.facebook.com/example \
+  --top-k 5 \
+  --live-llm
+```
+
+`backend/scripts/llm_smoke.py` runs one small brand-analysis call. It exits
+with a message and code 2 when no key is set:
+
+```bash
+uv run python scripts/llm_smoke.py
+```
+
 Run the tests:
 
 ```bash
@@ -193,9 +269,10 @@ backend/
     models.py        # MatchRequest, BrandProfile, KolProfile, RankedKol, ...
     state.py         # MatchState and list reducers
     cli.py           # argparse CLI (table or JSON)
-    integrations/    # Protocol + Mock per service; live web reader and Apify KOL clients
+    prompts.py       # LLM prompt text for brand analysis, queries, and rerank
+    integrations/    # Protocol + Mock per service; live web, Apify, and LLM clients
     fixtures/        # mock website, Facebook page, KOL records, Apify samples
-  scripts/           # apify_smoke.py, one live search when APIFY_TOKEN is set
+  scripts/           # apify_smoke.py and llm_smoke.py
   tests/
   pyproject.toml
 README.md

@@ -59,6 +59,89 @@ class BrandAnalyzer(Protocol):
         ...
 
 
+class ChatClient(Protocol):
+    """OpenAI-compatible chat completions client.
+
+    ``complete`` returns the assistant text. Missing or blank content is an
+    error: implementations retry that case once, then raise.
+    """
+
+    def complete(self, messages: list[dict[str, str]]) -> str:
+        """Return the assistant message content."""
+        ...
+
+
+def heuristic_score(
+    brand: BrandProfile,
+    kol: KolProfile,
+) -> tuple[ScoreBreakdown, str]:
+    """Score one KOL with the offline token, engagement, audience, and tier rules.
+
+    The live reranker replaces ``relevance`` and the reason. Engagement,
+    audience fit, and tier fit stay on this breakdown so the 0.4/0.25/0.2/0.15
+    weights still apply the same way.
+    """
+    brand_tokens = _tokens(
+        " ".join(
+            [
+                *brand.keywords_en,
+                *brand.keywords_th,
+                *brand.hashtags,
+                *brand.products,
+                brand.category,
+            ]
+        )
+    )
+    matched = sorted(_kol_topics(kol) & brand_tokens)
+    relevance = min(1.0, 0.2 + 0.2 * len(matched)) if matched else 0.05
+
+    engagement_rate = kol.median_engagement_rate or 0.02
+    engagement = min(1.0, engagement_rate / ENGAGEMENT_CEILING)
+
+    thai_language = (kol.language or "").casefold() in {"th", "thai"}
+    thai_region = (kol.region or "").upper() == "TH"
+    if thai_language and thai_region:
+        audience_fit: float = 1.0
+        confidence: Literal["low", "medium", "high"] = "high"
+    elif thai_language or thai_region:
+        audience_fit = 0.75
+        confidence = "medium"
+    else:
+        audience_fit = 0.35
+        confidence = "low"
+
+    tier = _tier_for(kol.followers)
+    if not brand.preferred_tiers:
+        tier_fit = 0.5
+    elif tier in brand.preferred_tiers:
+        tier_fit = 1.0
+    else:
+        distance = min(
+            abs(_TIER_ORDER.index(tier) - _TIER_ORDER.index(preferred))
+            for preferred in brand.preferred_tiers
+        )
+        tier_fit = 0.5 if distance == 1 else 0.15
+
+    scores = ScoreBreakdown(
+        relevance=round(relevance, 4),
+        engagement=round(engagement, 4),
+        audience_fit=round(audience_fit, 4),
+        tier_fit=round(tier_fit, 4),
+        audience_confidence=confidence,
+    )
+    if matched:
+        reason = (
+            f"Matched topics: {', '.join(matched[:4])}. "
+            f"Tier: {tier}; audience fit: {confidence}."
+        )
+    else:
+        reason = (
+            "No direct topic overlap; broad creator fit. "
+            f"Tier: {tier}; audience fit: {confidence}."
+        )
+    return scores, reason
+
+
 class MockBrandAnalyzer:
     """MOCK: replace with real implementation (LLM calls)."""
 
@@ -168,68 +251,8 @@ class MockBrandAnalyzer:
         brand: BrandProfile,
         kols: list[KolProfile],
     ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
-        brand_tokens = _tokens(
-            " ".join(
-                [
-                    *brand.keywords_en,
-                    *brand.keywords_th,
-                    *brand.hashtags,
-                    *brand.products,
-                    brand.category,
-                ]
-            )
-        )
-
         results: list[tuple[KolProfile, ScoreBreakdown, str]] = []
         for kol in kols:
-            matched = sorted(_kol_topics(kol) & brand_tokens)
-            relevance = min(1.0, 0.2 + 0.2 * len(matched)) if matched else 0.05
-
-            engagement_rate = kol.median_engagement_rate or 0.02
-            engagement = min(1.0, engagement_rate / ENGAGEMENT_CEILING)
-
-            thai_language = (kol.language or "").casefold() in {"th", "thai"}
-            thai_region = (kol.region or "").upper() == "TH"
-            if thai_language and thai_region:
-                audience_fit: float = 1.0
-                confidence: Literal["low", "medium", "high"] = "high"
-            elif thai_language or thai_region:
-                audience_fit = 0.75
-                confidence = "medium"
-            else:
-                audience_fit = 0.35
-                confidence = "low"
-
-            tier = _tier_for(kol.followers)
-            if not brand.preferred_tiers:
-                tier_fit = 0.5
-            elif tier in brand.preferred_tiers:
-                tier_fit = 1.0
-            else:
-                distance = min(
-                    abs(_TIER_ORDER.index(tier) - _TIER_ORDER.index(preferred))
-                    for preferred in brand.preferred_tiers
-                )
-                tier_fit = 0.5 if distance == 1 else 0.15
-
-            scores = ScoreBreakdown(
-                relevance=round(relevance, 4),
-                engagement=round(engagement, 4),
-                audience_fit=round(audience_fit, 4),
-                tier_fit=round(tier_fit, 4),
-                audience_confidence=confidence,
-            )
-
-            if matched:
-                reason = (
-                    f"Matched topics: {', '.join(matched[:4])}. "
-                    f"Tier: {tier}; audience fit: {confidence}."
-                )
-            else:
-                reason = (
-                    "No direct topic overlap; broad creator fit. "
-                    f"Tier: {tier}; audience fit: {confidence}."
-                )
+            scores, reason = heuristic_score(brand, kol)
             results.append((kol, scores, reason))
-
         return results

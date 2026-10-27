@@ -1,12 +1,20 @@
 import json
+from dataclasses import replace
 
 import httpx
 import pytest
 
+from app.cli import main
+from app.integrations import ApifyConfigError, build_integrations, mock_integrations
+from app.integrations.facebook import MockFacebookScraper
 from app.integrations.facebook_live import ApifyFacebookScraper, default_facebook_cache_dir
-from app.integrations.web_reader import WebReadError
-from app.models import MAX_POST_CHARS, MAX_RECENT_POSTS, FacebookPage
+from app.integrations.llm import MockBrandAnalyzer
+from app.integrations.web_reader import MockWebReader, WebReadError
+from app.integrations.web_reader_live import CachedWebReader
+from app.models import MAX_POST_CHARS, MAX_RECENT_POSTS, FacebookPage, MatchRequest
+from app.nodes import make_nodes
 from app.prompts import brand_messages
+from app.state import MatchState
 
 
 def _page(**overrides) -> FacebookPage:
@@ -242,3 +250,99 @@ def test_cache_write_failure_still_returns_page(tmp_path):
 def test_default_cache_dir_respects_kol_cache_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("KOL_CACHE_DIR", str(tmp_path))
     assert default_facebook_cache_dir() == tmp_path / "facebook"
+
+
+def test_build_integrations_live_fb_requires_token(monkeypatch):
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+
+    with pytest.raises(ApifyConfigError, match="APIFY_TOKEN"):
+        build_integrations(live_fb=True)
+    with pytest.raises(ApifyConfigError, match="APIFY_TOKEN"):
+        build_integrations(live_fb=True, apify_token="   ")
+    assert isinstance(build_integrations().facebook, MockFacebookScraper)
+
+
+def test_build_integrations_live_fb_falls_back_to_live_web_reader(monkeypatch):
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+
+    bundle = build_integrations(live_fb=True, apify_token=_TOKEN)
+
+    assert isinstance(bundle.facebook, ApifyFacebookScraper)
+    assert isinstance(bundle.facebook._fallback, CachedWebReader)
+    assert isinstance(bundle.web_reader, MockWebReader)
+
+
+def test_cli_live_fb_without_token_exits_2_before_running(monkeypatch, capsys):
+    monkeypatch.delenv("APIFY_TOKEN", raising=False)
+
+    def fail(*args, **kwargs):
+        raise AssertionError("integrations and graph should not be built")
+
+    monkeypatch.setattr("app.cli.build_integrations", fail)
+    monkeypatch.setattr("app.cli.build_graph", fail)
+    exit_code = main(
+        ["match", "--website", "https://example-brand.co.th", "--facebook", _URL, "--live-fb"]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "--live-fb requires APIFY_TOKEN" in captured.err
+    assert captured.out == ""
+
+
+def test_cli_live_fb_wires_apify_scraper_without_running_it(monkeypatch, capsys):
+    monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
+    captured: dict = {}
+
+    def spy(integrations=None, **kwargs):
+        captured["integrations"] = integrations
+
+        class _Graph:
+            def stream(self, *args, **kwargs):
+                return iter([("values", {"stage": "done", "results": [], "errors": []})])
+
+        return _Graph()
+
+    monkeypatch.setattr("app.cli.build_graph", spy)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            "https://example-brand.co.th",
+            "--facebook",
+            _URL,
+            "--json",
+            "--live-fb",
+        ]
+    )
+
+    captured_io = capsys.readouterr()
+    assert exit_code == 0
+    assert isinstance(captured["integrations"].facebook, ApifyFacebookScraper)
+    assert isinstance(captured["integrations"].web_reader, MockWebReader)
+    assert "cli-test-token" not in captured_io.out + captured_io.err
+
+
+def test_scraped_posts_reach_brand_analysis(tmp_path):
+    seen: list[FacebookPage | None] = []
+
+    class _SpyAnalyzer(MockBrandAnalyzer):
+        def analyze_brand(self, website_content, facebook_page):
+            seen.append(facebook_page)
+            return super().analyze_brand(website_content, facebook_page)
+
+    integrations = replace(
+        mock_integrations(),
+        facebook=_scraper(_Router(), tmp_path),
+        llm=_SpyAnalyzer(),
+    )
+    nodes = make_nodes(integrations, min_candidates=1, max_search_rounds=1)
+    request = MatchRequest(website_url="https://example-brand.co.th", facebook_url=_URL)
+    update = nodes["scrape_facebook"](MatchState(request=request))
+    state = MatchState(request=request, website_content="site text", **update)
+
+    nodes["analyze_brand"](state)
+
+    (page,) = seen
+    assert len(page.recent_posts) == MAX_RECENT_POSTS
+    assert "Post 3: new blue-light frames" in brand_messages("site text", page)[1]["content"]

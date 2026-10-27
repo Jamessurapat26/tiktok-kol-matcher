@@ -84,6 +84,15 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     match.add_argument(
+        "--live-fb",
+        action="store_true",
+        help=(
+            "read the Facebook page and recent posts via Apify, falling back "
+            "to the live web reader (requires APIFY_TOKEN; default stays on "
+            "the offline fixture)"
+        ),
+    )
+    match.add_argument(
         "--max-results-per-query",
         type=int,
         default=10,
@@ -350,6 +359,12 @@ def _cmd_match(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.live_fb and not os.environ.get("APIFY_TOKEN", "").strip():
+        print(
+            "error: --live-fb requires APIFY_TOKEN in the environment",
+            file=sys.stderr,
+        )
+        return 2
     if args.live_llm and not llm_api_key_from_env():
         print(
             "error: --live-llm requires LLM_API_KEY, NVIDIA_API_KEY, or "
@@ -385,13 +400,14 @@ def _cmd_match(args: argparse.Namespace) -> int:
         graph_kwargs["enrich_limit"] = args.max_enrich
     # Default stays on build_graph's mocked bundle so the CLI never opens a
     # socket or loads a model unless a live flag is set.
-    if args.live_web or args.live_kols or args.live_llm or args.live_embed:
+    if args.live_web or args.live_kols or args.live_llm or args.live_embed or args.live_fb:
         try:
             graph_kwargs["integrations"] = build_integrations(
                 live_web=args.live_web,
                 live_kols=args.live_kols,
                 live_llm=args.live_llm,
                 live_embed=args.live_embed,
+                live_fb=args.live_fb,
                 max_results_per_query=args.max_results_per_query,
             )
         except (ApifyConfigError, LlmConfigError, EmbedConfigError) as exc:

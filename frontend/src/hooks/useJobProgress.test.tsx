@@ -8,8 +8,10 @@ import { useJobProgress } from './useJobProgress'
 const events = demoEvents as JobEvent[]
 
 class FakeEventSource {
+  static readonly CLOSED = 2
   static last: FakeEventSource
   readonly url: string
+  readyState = 0
   closed = false
   onopen: (() => void) | null = null
   onerror: (() => void) | null = null
@@ -102,5 +104,33 @@ describe('job progress over SSE', () => {
     expect(row('Discover KOLs').getByText('round 2')).toBeInTheDocument()
     expect(screen.queryByText('round 3')).not.toBeInTheDocument()
     expect(source.closed).toBe(true)
+  })
+
+  it('reopens after the last seq when the browser gives up on the stream', () => {
+    vi.useFakeTimers()
+    const { source, invalidate } = renderHarness()
+    source.emit(events.slice(0, 12))
+    invalidate.mockClear()
+
+    // A non-200 reconnect response (a 502 while the backend restarts) closes
+    // the EventSource for good instead of retrying.
+    act(() => {
+      source.readyState = FakeEventSource.CLOSED
+      source.onerror?.()
+    })
+    expect(FakeEventSource.last).toBe(source)
+    act(() => vi.advanceTimersByTime(1000))
+
+    const reopened = FakeEventSource.last
+    expect(reopened).not.toBe(source)
+    expect(reopened.url).toBe(`/api/jobs/${events[0].job_id}/events?after=12`)
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['jobs', events[0].job_id] })
+
+    reopened.emit(events.slice(9))
+    expect(screen.getByText('Done: ranked 3 KOLs')).toBeInTheDocument()
+    expect(screen.getAllByText(', finished')).toHaveLength(10)
+    expect(screen.queryByText('round 3')).not.toBeInTheDocument()
+    expect(reopened.closed).toBe(true)
+    vi.useRealTimers()
   })
 })

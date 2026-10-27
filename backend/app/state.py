@@ -14,8 +14,31 @@ from .models import (
 )
 
 
+# Identity fields always come from the winning source. Optional fields that are
+# None on the winner are filled from a strictly lower-priority row. Zero is a
+# real value (followers, posts_per_week), so it is not treated as missing.
+_WINNER_FIELDS = frozenset({"handle", "url", "source"})
+
+
+def _fill_missing(winner: KolProfile, donor: KolProfile) -> KolProfile:
+    """Copy fields that are None on ``winner`` from a lower-priority ``donor``."""
+    updates: dict[str, object] = {}
+    for name in type(winner).model_fields:
+        if name in _WINNER_FIELDS:
+            continue
+        if getattr(winner, name) is None and getattr(donor, name) is not None:
+            updates[name] = getattr(donor, name)
+    if not updates:
+        return winner
+    return winner.model_copy(update=updates)
+
+
 def merge_kols(left: list[KolProfile], right: list[KolProfile]) -> list[KolProfile]:
     """Fan-in reducer: dedupe by handle, keeping the highest-priority source.
+
+    The winning row keeps its own values. Fields that are ``None`` on the winner
+    are filled from strictly lower-priority rows (including values those rows
+    already inherited). Equal priority keeps the earlier row unchanged.
 
     LangGraph passes node updates to reducers as raw values, so list items may be
     dicts even though the state annotation says ``KolProfile``. Coerce them here.
@@ -25,8 +48,12 @@ def merge_kols(left: list[KolProfile], right: list[KolProfile]) -> list[KolProfi
         kol = raw if isinstance(raw, KolProfile) else KolProfile.model_validate(raw)
         key = normalize_handle(kol.handle)
         current = merged.get(key)
-        if current is None or outranks(kol.source, current.source):
+        if current is None:
             merged[key] = kol
+        elif outranks(kol.source, current.source):
+            merged[key] = _fill_missing(kol, current)
+        elif outranks(current.source, kol.source):
+            merged[key] = _fill_missing(current, kol)
     return list(merged.values())
 
 
@@ -64,7 +91,7 @@ class MatchState(BaseModel):
 
     # Raw output of discover_kols, accumulated across query rounds. The reducer
     # dedupes by normalized handle (strip whitespace, lowercase, drop leading "@")
-    # with priority apify > seed > cache.
+    # with priority apify > seed > cache. None fields are filled from lower-priority rows.
     discovered: Annotated[list[KolProfile], merge_kols] = Field(default_factory=list)
     # filter_thai output. Plain overwrite (not reducer-backed) so the list can shrink.
     candidates: list[KolProfile] = Field(default_factory=list)

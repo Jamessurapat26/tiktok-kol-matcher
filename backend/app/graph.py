@@ -47,6 +47,7 @@ def build_graph(
     min_candidates: int = MIN_CANDIDATES,
     max_search_rounds: int = MAX_SEARCH_ROUNDS,
     prefilter_n: int = PREFILTER_N,
+    enrich_limit: int | None = None,
 ):
     """Build and compile the mock KOL-matching graph."""
     integrations = integrations or mock_integrations()
@@ -55,6 +56,7 @@ def build_graph(
         min_candidates=min_candidates,
         max_search_rounds=max_search_rounds,
         prefilter_n=prefilter_n,
+        enrich_limit=enrich_limit,
     )
 
     graph = StateGraph(MatchState)

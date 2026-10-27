@@ -18,6 +18,26 @@ _USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
+# Shopify (ophtus.com) answers 200 to curl and 429 to a bare httpx client.
+# curl negotiates HTTP/2 and sends a browser Accept set; httpx defaults to
+# HTTP/1.1 with ``accept: */*``. These headers plus ``http2=True`` close that gap.
+_BROWSER_HEADERS = {
+    "User-Agent": _USER_AGENT,
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,image/apng,*/*;q=0.8"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+}
+
 
 _IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 _LINKED_IMAGE_RE = re.compile(r"\[\s*\]\([^)]*\)")
@@ -93,7 +113,11 @@ class TrafilaturaWebReader:
         max_retries: int = 2,
         backoff: float = 1.0,
     ) -> None:
-        self._client = client or httpx.Client(timeout=timeout)
+        self._client = client or httpx.Client(
+            timeout=timeout,
+            http2=True,
+            follow_redirects=True,
+        )
         self._max_retries = max_retries
         self._backoff = backoff
 
@@ -103,7 +127,7 @@ class TrafilaturaWebReader:
             try:
                 resp = self._client.get(
                     url,
-                    headers={"User-Agent": _USER_AGENT},
+                    headers=_BROWSER_HEADERS,
                     follow_redirects=True,
                 )
                 if resp.status_code != 429 and resp.status_code < 500:

@@ -1,5 +1,7 @@
+import os
 from dataclasses import dataclass
 
+from .apify import ApifyConfigError
 from .embeddings import Embedder, MockEmbedder
 from .facebook import FacebookScraper, MockFacebookScraper
 from .kol_enricher import KolEnricher, MockKolEnricher
@@ -23,19 +25,39 @@ class Integrations:
 def build_integrations(
     *,
     live_web: bool = False,
+    live_kols: bool = False,
     kol_fixtures: list[dict] | None = None,
+    max_results_per_query: int = 10,
+    apify_token: str | None = None,
 ) -> Integrations:
     """Build the integration bundle.
 
-    Web reading is live only when ``live_web`` is true. Every other service
-    stays mocked, and the default (``live_web=False``) never touches the network.
+    Web reading is live only when ``live_web`` is true. TikTok search and
+    enrichment are live only when ``live_kols`` is true (requires
+    ``APIFY_TOKEN``). Facebook, embeddings, and the LLM stay mocked. The
+    default (both flags false) never touches the network.
     """
+    if max_results_per_query < 1:
+        raise ValueError("max_results_per_query must be at least 1")
+
+    if live_kols:
+        token = os.environ.get("APIFY_TOKEN") if apify_token is None else apify_token
+        token = (token or "").strip()
+        if not token:
+            raise ApifyConfigError(
+                "APIFY_TOKEN is not set. Export it before using live KOL search."
+            )
+        kol_search, enricher = _live_kol_services(token, max_results_per_query)
+    else:
+        kol_search = MockKolSearch(kol_fixtures)
+        enricher = MockKolEnricher(kol_fixtures)
+
     return Integrations(
         web_reader=_live_web_reader() if live_web else MockWebReader(),
         facebook=MockFacebookScraper(),
         llm=MockBrandAnalyzer(),
-        kol_search=MockKolSearch(kol_fixtures),
-        enricher=MockKolEnricher(kol_fixtures),
+        kol_search=kol_search,
+        enricher=enricher,
         embedder=MockEmbedder(),
     )
 
@@ -48,6 +70,16 @@ def mock_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
 def real_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
     """Live web reader; every other service stays mocked."""
     return build_integrations(live_web=True, kol_fixtures=kol_fixtures)
+
+
+def _live_kol_services(token: str, max_results: int) -> tuple[KolSearch, KolEnricher]:
+    from .kol_enricher_live import ApifyKolEnricher
+    from .kol_search_live import ApifyKolSearch
+
+    return (
+        ApifyKolSearch(token=token, max_results=max_results),
+        ApifyKolEnricher(token=token, max_videos=max_results),
+    )
 
 
 def _live_web_reader() -> WebReader:
@@ -66,6 +98,7 @@ def _live_web_reader() -> WebReader:
 
 
 __all__ = [
+    "ApifyConfigError",
     "BrandAnalyzer",
     "Embedder",
     "FacebookScraper",

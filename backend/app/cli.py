@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 from typing import Any
 
@@ -8,6 +9,7 @@ from pydantic import ValidationError
 
 from .graph import MAX_SEARCH_ROUNDS, MIN_CANDIDATES, build_graph, initial_state
 from .integrations import build_integrations
+from .integrations.apify import ApifyConfigError
 from .models import MatchRequest, RankedKol
 
 _LIST_FIELDS = ("discovered", "candidates", "shortlisted", "ranked", "results")
@@ -61,7 +63,33 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "read the brand website live (Jina, then trafilatura) "
-            "instead of the offline mock; other services stay mocked"
+            "instead of the offline mock"
+        ),
+    )
+    match.add_argument(
+        "--live-kols",
+        action="store_true",
+        help=(
+            "search and enrich TikTok KOLs via Apify "
+            "(requires APIFY_TOKEN; default stays on the offline fixtures)"
+        ),
+    )
+    match.add_argument(
+        "--max-results-per-query",
+        type=int,
+        default=10,
+        help=(
+            "Apify videos per search query and per profile enrichment "
+            "(default: 10)"
+        ),
+    )
+    match.add_argument(
+        "--max-enrich",
+        type=int,
+        default=10,
+        help=(
+            "with --live-kols, enrich at most this many candidates (largest "
+            "accounts first); each one is a paid Apify run (default: 10)"
         ),
     )
     return parser
@@ -246,6 +274,21 @@ def _cmd_match(args: argparse.Namespace) -> int:
     if args.max_rounds < 0:
         print("error: --max-rounds must be zero or greater", file=sys.stderr)
         return 2
+    if args.max_results_per_query < 1:
+        print(
+            "error: --max-results-per-query must be at least 1",
+            file=sys.stderr,
+        )
+        return 2
+    if args.max_enrich < 1:
+        print("error: --max-enrich must be at least 1", file=sys.stderr)
+        return 2
+    if args.live_kols and not os.environ.get("APIFY_TOKEN", "").strip():
+        print(
+            "error: --live-kols requires APIFY_TOKEN in the environment",
+            file=sys.stderr,
+        )
+        return 2
 
     try:
         request = MatchRequest(
@@ -261,10 +304,20 @@ def _cmd_match(args: argparse.Namespace) -> int:
         "min_candidates": args.min_candidates,
         "max_search_rounds": args.max_rounds,
     }
+    if args.live_kols:
+        graph_kwargs["enrich_limit"] = args.max_enrich
     # Default stays on build_graph's mocked bundle so the CLI never opens a
-    # socket unless --live-web is set.
-    if args.live_web:
-        graph_kwargs["integrations"] = build_integrations(live_web=True)
+    # socket unless --live-web or --live-kols is set.
+    if args.live_web or args.live_kols:
+        try:
+            graph_kwargs["integrations"] = build_integrations(
+                live_web=args.live_web,
+                live_kols=args.live_kols,
+                max_results_per_query=args.max_results_per_query,
+            )
+        except ApifyConfigError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
     graph = build_graph(**graph_kwargs)
     try:
         final_state = _run_pipeline(graph, request, show_progress=not args.as_json)

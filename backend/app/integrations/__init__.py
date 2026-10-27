@@ -28,6 +28,7 @@ def build_integrations(
     live_kols: bool = False,
     live_llm: bool = False,
     live_embed: bool = False,
+    live_fb: bool = False,
     kol_fixtures: list[dict] | None = None,
     max_results_per_query: int = 10,
     apify_token: str | None = None,
@@ -42,27 +43,30 @@ def build_integrations(
     ``NVIDIA_API_KEY``, or ``OPENAI_API_KEY``). Embeddings are live only when
     ``live_embed`` is true. That loads ``google/embeddinggemma-2`` through
     sentence-transformers on the first embed call (install the ``embed`` extra).
-    Facebook stays mocked. The default never touches the network and does not
+    The Facebook page is read live through Apify only when ``live_fb`` is true
+    (requires ``APIFY_TOKEN``). Its fallback is always the live web reader,
+    even without ``live_web``, because the mock website fixture is not a
+    Facebook page. The default never touches the network and does not
     download a model.
     """
     if max_results_per_query < 1:
         raise ValueError("max_results_per_query must be at least 1")
 
     if live_kols:
-        token = os.environ.get("APIFY_TOKEN") if apify_token is None else apify_token
-        token = (token or "").strip()
-        if not token:
-            raise ApifyConfigError(
-                "APIFY_TOKEN is not set. Export it before using live KOL search."
-            )
+        token = _apify_token(apify_token, "live KOL search")
         kol_search, enricher = _live_kol_services(token, max_results_per_query)
     else:
         kol_search = MockKolSearch(kol_fixtures)
         enricher = MockKolEnricher(kol_fixtures)
 
+    if live_fb:
+        facebook = _live_facebook(_apify_token(apify_token, "the live Facebook reader"))
+    else:
+        facebook = MockFacebookScraper()
+
     return Integrations(
         web_reader=_live_web_reader() if live_web else MockWebReader(),
-        facebook=MockFacebookScraper(),
+        facebook=facebook,
         llm=_live_llm(llm_api_key) if live_llm else MockBrandAnalyzer(),
         kol_search=kol_search,
         enricher=enricher,
@@ -78,6 +82,20 @@ def mock_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
 def real_integrations(kol_fixtures: list[dict] | None = None) -> Integrations:
     """Live web reader; every other service stays mocked."""
     return build_integrations(live_web=True, kol_fixtures=kol_fixtures)
+
+
+def _apify_token(apify_token: str | None, purpose: str) -> str:
+    token = os.environ.get("APIFY_TOKEN") if apify_token is None else apify_token
+    token = (token or "").strip()
+    if not token:
+        raise ApifyConfigError(f"APIFY_TOKEN is not set. Export it before using {purpose}.")
+    return token
+
+
+def _live_facebook(token: str) -> FacebookScraper:
+    from .facebook_live import ApifyFacebookScraper
+
+    return ApifyFacebookScraper(token=token, fallback=_live_web_reader())
 
 
 def _live_kol_services(token: str, max_results: int) -> tuple[KolSearch, KolEnricher]:

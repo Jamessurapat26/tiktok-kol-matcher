@@ -1,4 +1,6 @@
+import http.server
 import json
+import threading
 from dataclasses import replace
 
 import httpx
@@ -21,12 +23,14 @@ from app.integrations.web_reader_live import (
     JinaWebReader,
     TrafilaturaWebReader,
     default_cache_dir,
+    is_public_address,
 )
 from app.models import MatchRequest
 from app.nodes import make_nodes
 from app.state import MatchState
 
 _URL = "https://example-brand.co.th/glasses"
+_PUBLIC_IP = "93.184.216.34"
 _API_KEY = "test-jina-key-not-a-secret-value"
 _ARTICLE = (
     "ExampleBrand makes blue-light glasses in Bangkok for gamers and students who "
@@ -72,6 +76,7 @@ def _jina(handler, **kwargs) -> JinaWebReader:
 
 def _trafilatura(handler, **kwargs) -> TrafilaturaWebReader:
     kwargs.setdefault("backoff", 0)
+    kwargs.setdefault("resolve", lambda host: [_PUBLIC_IP])
     return TrafilaturaWebReader(client=_client(handler), **kwargs)
 
 
@@ -479,6 +484,77 @@ def test_trafilatura_default_client_uses_http2():
         assert pool._http2 is True
     finally:
         reader._client.close()
+
+
+@pytest.mark.parametrize(
+    "address",
+    ["127.0.0.1", "10.0.0.1", "169.254.1.1", "224.0.0.1", "0.0.0.0", "100.64.0.1",
+     "::1", "fe80::1", "ff02::1", "::ffff:10.0.0.1", "::"],
+)
+def test_non_public_addresses_are_refused(address):
+    assert not is_public_address(address)
+
+
+def test_public_addresses_are_allowed():
+    assert is_public_address(_PUBLIC_IP)
+    assert is_public_address("2606:4700::1111")
+
+
+def test_trafilatura_never_connects_to_a_loopback_server():
+    hits = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append(self.path)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(_article_html().encode())
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    reader = TrafilaturaWebReader(max_retries=0, backoff=0)
+    try:
+        with pytest.raises(WebReadError) as exc_info:
+            reader.fetch(f"http://127.0.0.1:{server.server_port}/admin")
+    finally:
+        server.shutdown()
+        reader._client.close()
+
+    assert hits == []
+    assert "refused" in str(exc_info.value).lower()
+
+
+def test_trafilatura_refuses_a_redirect_to_a_private_address():
+    hits = []
+    addresses = {"example-brand.co.th": [_PUBLIC_IP], "127.0.0.1": ["127.0.0.1"]}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        hits.append(request.url.host)
+        if request.url.host == "example-brand.co.th":
+            return httpx.Response(302, headers={"location": "http://127.0.0.1:9/"})
+        return httpx.Response(200, text=_article_html())
+
+    reader = _trafilatura(handler, max_retries=0, resolve=addresses.__getitem__)
+
+    with pytest.raises(WebReadError):
+        reader.fetch(_URL)
+
+    assert hits == ["example-brand.co.th"]
+
+
+def test_trafilatura_follows_a_public_redirect():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/glasses":
+            return httpx.Response(301, headers={"location": "/glasses/"})
+        return httpx.Response(200, text=_article_html())
+
+    page = _trafilatura(handler).fetch(_URL)
+
+    assert page.source == "trafilatura"
+    assert "blue-light glasses" in page.content
 
 
 def test_trafilatura_does_not_retry_client_errors():

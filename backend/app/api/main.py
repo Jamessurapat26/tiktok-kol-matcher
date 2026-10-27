@@ -53,20 +53,13 @@ class Health(BaseModel):
 
 
 def _live_integrations(settings: Settings, flags: LiveFlags) -> Integrations:
-    kwargs: dict[str, object] = {
-        "live_web": flags.live_web,
-        "live_kols": flags.live_kols,
-        "live_llm": flags.live_llm,
-        "live_embed": flags.live_embed,
-        "apify_token": (
+    return build_integrations(
+        **flags.model_dump(),
+        apify_token=(
             settings.apify_token.get_secret_value() if settings.apify_token else None
         ),
-        "llm_api_key": settings.llm_key(),
-    }
-    # Passed only when on: older build_integrations has no live_fb parameter.
-    if flags.live_fb:
-        kwargs["live_fb"] = True
-    return build_integrations(**kwargs)
+        llm_api_key=settings.llm_key(),
+    )
 
 
 def _start_thread(work: Callable[[], None]) -> None:

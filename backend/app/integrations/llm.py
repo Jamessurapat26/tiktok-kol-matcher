@@ -5,6 +5,9 @@ from ..models import BrandProfile, FacebookPage, KolProfile, ScoreBreakdown, Tar
 
 _TOKEN_RE = re.compile(r"[\w\u0E00-\u0E7F]+")
 _TIER_ORDER: tuple[str, ...] = ("nano", "micro", "macro", "mega")
+# Engagement rates at or above this fraction score 1.0. 0.15 keeps a 9% rate
+# and a 14% rate from both saturating, which a 0.08 ceiling used to do.
+ENGAGEMENT_CEILING = 0.15
 
 
 def _tokens(text: str) -> set[str]:
@@ -183,7 +186,7 @@ class MockBrandAnalyzer:
             relevance = min(1.0, 0.2 + 0.2 * len(matched)) if matched else 0.05
 
             engagement_rate = kol.median_engagement_rate or 0.02
-            engagement = min(1.0, engagement_rate / 0.08)
+            engagement = min(1.0, engagement_rate / ENGAGEMENT_CEILING)
 
             thai_language = (kol.language or "").casefold() in {"th", "thai"}
             thai_region = (kol.region or "").upper() == "TH"

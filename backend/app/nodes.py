@@ -2,15 +2,24 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
+from langgraph.graph import END
+from pydantic import ValidationError
+
 from .integrations import Integrations
-from .models import BrandProfile, KolProfile, RankedKol
+from .models import BrandProfile, KolProfile, RankedKol, normalize_handle
 from .state import MatchState
 
 Node = Callable[[MatchState], dict[str, Any]]
 
 
 def _guarded(name: str, *, stage_on_error: bool = True) -> Callable[[Node], Node]:
-    """Turn any node exception into an ``errors`` update instead of a crash."""
+    """Turn any node exception into an ``errors`` update instead of a crash.
+
+    With ``stage_on_error`` (the default) the exception is fatal: ``stage``
+    becomes ``"failed"`` and fail-fast routers stop the graph immediately.
+    Scrapers pass ``stage_on_error=False`` because they share a parallel
+    superstep and must not write ``stage``; they only record errors.
+    """
 
     def decorator(fn: Node) -> Node:
         @wraps(fn)
@@ -26,10 +35,6 @@ def _guarded(name: str, *, stage_on_error: bool = True) -> Callable[[Node], Node
         return wrapper
 
     return decorator
-
-
-def _normalize_handle(handle: str) -> str:
-    return handle.strip().lower().lstrip("@")
 
 
 def _kol_from_fixture(raw: dict) -> KolProfile:
@@ -94,13 +99,11 @@ def make_nodes(
 
     @_guarded("analyze_brand")
     def analyze_brand(state: MatchState) -> dict[str, Any]:
-        missing = []
+        # The website is the primary source. Missing it is fatal so the
+        # fail-fast router ends the graph. A missing Facebook page is a warning.
         if not state.website_content:
-            missing.append("website_content")
-        if state.facebook_page is None:
-            missing.append("facebook_page")
+            raise ValueError("missing website_content")
 
-        # The mock still returns a usable profile when a source is missing.
         profile = integrations.llm.analyze_brand(
             state.website_content,
             state.facebook_page,
@@ -109,10 +112,8 @@ def make_nodes(
             "brand_profile": profile,
             "stage": "analyzing_brand",
         }
-        if missing:
-            update["errors"] = [
-                f"analyze_brand: missing {name}" for name in missing
-            ]
+        if state.facebook_page is None:
+            update["errors"] = ["analyze_brand: missing facebook_page"]
         return update
 
     @_guarded("generate_queries")
@@ -126,25 +127,56 @@ def make_nodes(
         )
         return {
             "search_queries": new_queries,
+            "last_queries": new_queries,
             "stage": "generating_queries",
         }
 
     @_guarded("discover_kols")
     def discover_kols(state: MatchState) -> dict[str, Any]:
         next_round = state.search_rounds + 1
-        raw_kols = integrations.kol_search.search(
-            state.search_queries,
-            round=next_round,
-        )
-        kols = [_kol_from_fixture(raw) for raw in raw_kols]
-        return {
-            "discovered": kols,
+        errors: list[str] = []
+        kols: list[KolProfile] = []
+        try:
+            raw_kols = integrations.kol_search.search(
+                state.last_queries,
+                round=next_round,
+            )
+        except Exception as exc:  # noqa: BLE001 - search failure is a state update
+            errors.append(f"discover_kols: search failed: {exc}")
+            raw_kols = None
+
+        if raw_kols is not None:
+            for index, raw in enumerate(raw_kols):
+                try:
+                    kols.append(_kol_from_fixture(raw))
+                except Exception as exc:  # noqa: BLE001 - one bad row must not drop the rest
+                    errors.append(f"discover_kols: skipped row {index}: {exc}")
+
+        # Nothing usable yet (search raised, or every row was invalid) is fatal.
+        # A later-round failure after round 1 already found KOLs is only a warning.
+        if not state.discovered and not kols:
+            stage = "failed"
+        else:
+            stage = "discovering_kols"
+
+        update: dict[str, Any] = {
             "search_rounds": next_round,
-            "stage": "discovering_kols",
+            "stage": stage,
         }
+        if kols:
+            update["discovered"] = kols
+        if errors:
+            update["errors"] = errors
+        return update
 
     def route_after_discover(state: MatchState) -> str:
-        """Loop for more queries until enough KOLs or the round cap is hit."""
+        """Loop for more queries until enough KOLs or the round cap is hit.
+
+        ``stage == "failed"`` (search raised or nothing valid was found, and
+        no KOLs were discovered yet) stops the graph instead of retrying.
+        """
+        if state.stage == "failed":
+            return END
         if (
             len(state.discovered) < min_candidates
             and state.search_rounds < max_search_rounds
@@ -161,15 +193,35 @@ def make_nodes(
             if (kol.language or "").casefold() in {"th", "thai"}
             or (kol.region or "").upper() == "TH"
         ]
+        if not candidates:
+            raise ValueError("no Thai KOLs found")
         return {"candidates": candidates, "stage": "filtering_thai"}
 
     @_guarded("enrich_kols")
     def enrich_kols(state: MatchState) -> dict[str, Any]:
-        enriched = [
-            kol.model_copy(update=integrations.enricher.enrich(kol))
-            for kol in state.candidates
-        ]
-        return {"candidates": enriched, "stage": "enriching_kols"}
+        enriched: list[KolProfile] = []
+        errors: list[str] = []
+        for kol in state.candidates:
+            try:
+                # model_validate re-checks enrichment. model_dump() leaves url
+                # as an HttpUrl; model_validate accepts that.
+                enriched.append(
+                    KolProfile.model_validate(
+                        {**kol.model_dump(), **integrations.enricher.enrich(kol)}
+                    )
+                )
+            except ValidationError as exc:
+                enriched.append(kol)
+                errors.append(
+                    f"enrich_kols: rejected enrichment for {kol.handle}: {exc}"
+                )
+        update: dict[str, Any] = {
+            "candidates": enriched,
+            "stage": "enriching_kols",
+        }
+        if errors:
+            update["errors"] = errors
+        return update
 
     @_guarded("embed_and_prefilter")
     def embed_and_prefilter(state: MatchState) -> dict[str, Any]:
@@ -181,7 +233,7 @@ def make_nodes(
         )
         ranked_pairs = sorted(
             zip(state.candidates, scores, strict=True),
-            key=lambda pair: (-pair[1], _normalize_handle(pair[0].handle)),
+            key=lambda pair: (-pair[1], normalize_handle(pair[0].handle)),
         )
         shortlisted = [kol for kol, _ in ranked_pairs[:prefilter_n]]
         return {"shortlisted": shortlisted, "stage": "embedding_prefilter"}
@@ -203,16 +255,25 @@ def make_nodes(
             )
         ]
         ranked.sort(
-            key=lambda item: (-item.total_score, _normalize_handle(item.kol.handle))
+            key=lambda item: (
+                -item.total_score,
+                -(item.kol.median_engagement_rate or 0.0),
+                -item.kol.followers,
+                normalize_handle(item.kol.handle),
+            )
         )
         return {"ranked": ranked, "stage": "reranking"}
 
     @_guarded("rank_and_output")
     def rank_and_output(state: MatchState) -> dict[str, Any]:
-        return {
+        # Fail-fast routing should not reach this node after a failure. Never
+        # rewrite a failed run as done if it does.
+        update: dict[str, Any] = {
             "results": state.ranked[: state.request.top_k],
-            "stage": "done",
         }
+        if state.stage != "failed":
+            update["stage"] = "done"
+        return update
 
     return {
         "scrape_website": scrape_website,

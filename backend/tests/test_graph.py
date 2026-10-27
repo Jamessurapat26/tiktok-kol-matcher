@@ -4,7 +4,8 @@ from pathlib import Path
 
 from app.graph import build_graph, initial_state
 from app.integrations import mock_integrations
-from app.models import MatchRequest
+from app.integrations.kol_enricher import MockKolEnricher
+from app.models import KolProfile, MatchRequest
 
 _KOL_FIXTURE = Path(__file__).resolve().parents[1] / "app" / "fixtures" / "kols.json"
 
@@ -153,6 +154,226 @@ def test_failing_integration_is_reported_not_raised():
             raise RuntimeError("boom")
 
     integrations = replace(mock_integrations(), web_reader=BoomReader())
+    names, final = run_stream(build_graph(integrations), make_request())
+
+    assert final["stage"] == "failed"
+    assert "scrape_website: boom" in final["errors"]
+    assert "analyze_brand: missing website_content" in final["errors"]
+    assert names[-1] == "analyze_brand"
+    assert "generate_queries" not in names
+
+
+def test_facebook_scrape_failure_is_a_warning():
+    class BoomFacebook:
+        def fetch_page(self, url: str):
+            raise RuntimeError("fb down")
+
+    integrations = replace(mock_integrations(), facebook=BoomFacebook())
     final = build_graph(integrations).invoke(initial_state(make_request()))
 
-    assert "scrape_website: boom" in final["errors"]
+    assert final["stage"] == "done"
+    assert any(error.startswith("scrape_facebook:") for error in final["errors"])
+    assert "analyze_brand: missing facebook_page" in final["errors"]
+
+
+def test_search_failure_stops_without_retrying():
+    class BoomSearch:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def search(self, queries: list[str], round: int) -> list[dict]:
+            self.calls += 1
+            raise RuntimeError("search down")
+
+    search = BoomSearch()
+    integrations = replace(mock_integrations(), kol_search=search)
+    names, final = run_stream(build_graph(integrations), make_request())
+
+    assert search.calls == 1
+    assert final["stage"] == "failed"
+    assert final["search_rounds"] == 1
+    assert any(
+        "discover_kols: search failed: search down" in error
+        for error in final["errors"]
+    )
+    assert "filter_thai" not in names
+
+
+def test_search_failure_after_a_successful_round_is_a_warning():
+    class FailSecondRound:
+        def __init__(self, inner) -> None:
+            self.inner = inner
+            self.calls = 0
+
+        def search(self, queries: list[str], round: int) -> list[dict]:
+            self.calls += 1
+            if self.calls >= 2:
+                raise RuntimeError("round 2 down")
+            return self.inner.search(queries, round)
+
+    base = mock_integrations()
+    search = FailSecondRound(base.kol_search)
+    integrations = replace(base, kol_search=search)
+    final = build_graph(integrations, min_candidates=30).invoke(
+        initial_state(make_request())
+    )
+
+    assert search.calls == 2
+    assert final["stage"] == "done"
+    assert final["discovered"]
+    assert any("discover_kols: search failed:" in error for error in final["errors"])
+
+
+def test_invalid_discovery_row_is_skipped():
+    fixtures = json.loads(_KOL_FIXTURE.read_text(encoding="utf-8"))
+    fixtures.append(make_fixture("this-row-is-invalid", 1, source="not-a-source"))
+    baseline = build_graph().invoke(initial_state(make_request()))
+    final = build_graph(mock_integrations(kol_fixtures=fixtures)).invoke(
+        initial_state(make_request())
+    )
+
+    assert final["stage"] == "done"
+    assert {kol.handle for kol in final["discovered"]} == {
+        kol.handle for kol in baseline["discovered"]
+    }
+    assert "this-row-is-invalid" not in {kol.handle for kol in final["discovered"]}
+    assert any("discover_kols: skipped row" in error for error in final["errors"])
+
+
+def test_discover_searches_only_the_latest_round_queries():
+    class RecordingSearch:
+        def __init__(self, inner) -> None:
+            self.inner = inner
+            self.calls: list[tuple[int, list[str]]] = []
+
+        def search(self, queries: list[str], round: int) -> list[dict]:
+            self.calls.append((round, list(queries)))
+            return self.inner.search(queries, round)
+
+    base = mock_integrations()
+    search = RecordingSearch(base.kol_search)
+    integrations = replace(base, kol_search=search)
+    final = build_graph(integrations, min_candidates=30).invoke(
+        initial_state(make_request())
+    )
+
+    assert [round_no for round_no, _ in search.calls] == [1, 2]
+    round_1 = search.calls[0][1]
+    round_2 = search.calls[1][1]
+    assert round_1 and round_2
+    assert set(round_1).isdisjoint(round_2)
+    assert "blue light glasses thailand" in round_1
+    assert "blue light glasses thailand" not in round_2
+    assert "#Ophtus tiktok" in round_2
+    assert round_2 == final["last_queries"]
+    assert final["search_queries"] == round_1 + round_2
+
+
+def test_invalid_enrichment_keeps_the_original_kol():
+    class SelectiveEnricher:
+        def enrich(self, kol):
+            if kol.handle == "BadRate":
+                return {"median_engagement_rate": 1.5}
+            if kol.handle == "BadFollowers":
+                return {"followers": -5}
+            return {"median_engagement_rate": 0.05, "posts_per_week": 2.0}
+
+    fixtures = [
+        make_fixture("BadRate", 1, followers=10_000),
+        make_fixture("BadFollowers", 1, followers=20_000),
+        make_fixture("GoodKol", 1, followers=30_000),
+    ]
+    integrations = replace(
+        mock_integrations(kol_fixtures=fixtures),
+        enricher=SelectiveEnricher(),
+    )
+    final = build_graph(integrations, min_candidates=1).invoke(
+        initial_state(make_request())
+    )
+
+    by_handle = {kol.handle: kol for kol in final["candidates"]}
+    assert final["stage"] == "done"
+    assert by_handle["BadRate"].median_engagement_rate is None
+    assert by_handle["BadRate"].followers == 10_000
+    assert by_handle["BadFollowers"].followers == 20_000
+    assert by_handle["BadFollowers"].median_engagement_rate is None
+    assert by_handle["GoodKol"].median_engagement_rate == 0.05
+    assert any(
+        "enrich_kols: rejected enrichment for BadRate" in error
+        for error in final["errors"]
+    )
+    assert any(
+        "enrich_kols: rejected enrichment for BadFollowers" in error
+        for error in final["errors"]
+    )
+
+
+def test_higher_engagement_ranks_first_when_handles_would_not():
+    fixtures = [
+        make_fixture("aaa_low", 1, followers=50_000, engagement_rate=0.09),
+        make_fixture("zzz_high", 1, followers=50_000, engagement_rate=0.14),
+    ]
+    final = build_graph(
+        mock_integrations(kol_fixtures=fixtures),
+        min_candidates=1,
+    ).invoke(initial_state(make_request()))
+
+    ranked = final["ranked"]
+    assert [item.kol.handle for item in ranked] == ["zzz_high", "aaa_low"]
+    assert ranked[0].scores.engagement > ranked[1].scores.engagement
+    assert ranked[0].total_score > ranked[1].total_score
+
+
+def test_no_thai_kols_is_fatal():
+    fixtures = [
+        make_fixture("foreign", 1, text_language="en", location_created="US")
+    ]
+    names, final = run_stream(
+        build_graph(mock_integrations(kol_fixtures=fixtures), min_candidates=1),
+        make_request(),
+    )
+
+    assert final["stage"] == "failed"
+    assert any("filter_thai: no Thai KOLs found" in error for error in final["errors"])
+    assert "enrich_kols" not in names
+
+
+def test_enricher_prefers_higher_priority_fixture_and_keeps_ties():
+    apify = {
+        "handle": "@Creator",
+        "source": "apify",
+        "engagement_rate": 0.11,
+        "topics": ["from-apify"],
+    }
+    seed = {
+        "handle": "creator",
+        "source": "seed",
+        "engagement_rate": 0.02,
+        "topics": ["from-seed"],
+    }
+    kol = KolProfile(
+        handle="creator",
+        url="https://www.tiktok.com/@creator",
+        source="cache",
+    )
+
+    for fixtures in ([apify, seed], [seed, apify]):
+        update = MockKolEnricher(fixtures).enrich(kol)
+        assert update["median_engagement_rate"] == 0.11
+        assert "from-apify" in update["content_summary"]
+
+    earlier = {
+        "handle": "creator",
+        "source": "seed",
+        "engagement_rate": 0.03,
+        "topics": ["earlier"],
+    }
+    later = {
+        "handle": "CREATOR",
+        "source": "seed",
+        "engagement_rate": 0.09,
+        "topics": ["later"],
+    }
+    update = MockKolEnricher([earlier, later]).enrich(kol)
+    assert update["median_engagement_rate"] == 0.03
+    assert "earlier" in update["content_summary"]

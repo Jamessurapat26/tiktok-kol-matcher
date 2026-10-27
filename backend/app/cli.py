@@ -3,6 +3,7 @@ import json
 import sys
 from typing import Any
 
+from langgraph.errors import GraphRecursionError
 from pydantic import ValidationError
 
 from .graph import MAX_SEARCH_ROUNDS, MIN_CANDIDATES, build_graph, initial_state
@@ -57,8 +58,18 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _summarize_update(update: dict[str, Any]) -> str:
-    """Turn one node update into a short, single-line progress summary."""
+def _summarize_update(
+    update: dict[str, Any],
+    *,
+    node: str | None = None,
+    discovered_total: int | None = None,
+    discovered_before: int | None = None,
+) -> str:
+    """Turn one node update into a short, single-line progress summary.
+
+    ``discover_kols`` reports the merged unique total from the values snapshot
+    (after the reducer dedupes), plus how many of those are new this round.
+    """
     parts: list[str] = []
 
     if "search_rounds" in update:
@@ -66,7 +77,14 @@ def _summarize_update(update: dict[str, Any]) -> str:
     if "search_queries" in update:
         parts.append(f"queries+{len(update['search_queries'] or [])}")
 
+    show_merged_discovered = (
+        node == "discover_kols" and discovered_total is not None
+    )
     for key in _LIST_FIELDS:
+        if key == "discovered" and show_merged_discovered:
+            added = discovered_total - (discovered_before or 0)
+            parts.append(f"discovered={discovered_total} (+{added} new)")
+            continue
         if key not in update:
             continue
         count = len(update[key] or [])
@@ -102,22 +120,41 @@ def _run_pipeline(
 ) -> dict[str, Any]:
     final_state: dict[str, Any] = {}
     step = 0
+    # Updates are buffered until the matching values event so discover_kols can
+    # print the merged discovered length instead of the raw update size.
+    pending: list[tuple[str, dict[str, Any]]] = []
+    discovered_before = 0
+
+    def flush(snapshot: dict[str, Any]) -> None:
+        nonlocal step, discovered_before
+        discovered_now = len(snapshot.get("discovered") or [])
+        for node, update in pending:
+            step += 1
+            if show_progress:
+                summary = _summarize_update(
+                    update,
+                    node=node,
+                    discovered_total=discovered_now,
+                    discovered_before=discovered_before,
+                )
+                print(f"[{step:>2}] {node:<18} {summary}", file=sys.stderr)
+        pending.clear()
+        discovered_before = discovered_now
 
     for mode, payload in graph.stream(
         initial_state(request),
         stream_mode=["updates", "values"],
     ):
-        if mode == "values":
-            final_state = payload
+        if mode == "updates":
+            pending.extend(payload.items())
             continue
-        if mode != "updates":
+        if mode != "values":
             continue
+        final_state = payload
+        flush(payload)
 
-        for node, update in payload.items():
-            step += 1
-            if show_progress:
-                summary = _summarize_update(update)
-                print(f"[{step:>2}] {node:<18} {summary}", file=sys.stderr)
+    if pending:
+        flush(final_state)
 
     return final_state
 
@@ -197,6 +234,10 @@ def _json_payload(final_state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _cmd_match(args: argparse.Namespace) -> int:
+    if args.max_rounds < 0:
+        print("error: --max-rounds must be zero or greater", file=sys.stderr)
+        return 2
+
     try:
         request = MatchRequest(
             website_url=args.website,
@@ -211,8 +252,18 @@ def _cmd_match(args: argparse.Namespace) -> int:
         min_candidates=args.min_candidates,
         max_search_rounds=args.max_rounds,
     )
-    final_state = _run_pipeline(graph, request, show_progress=not args.as_json)
+    try:
+        final_state = _run_pipeline(graph, request, show_progress=not args.as_json)
+    except GraphRecursionError as exc:
+        detail = str(exc).strip()
+        message = "error: pipeline exceeded the recursion limit"
+        if detail:
+            message = f"{message}: {detail}"
+        print(message, file=sys.stderr)
+        return 1
 
+    errors = list(final_state.get("errors") or [])
+    stage = final_state.get("stage")
     if args.as_json:
         print(
             json.dumps(
@@ -223,10 +274,14 @@ def _cmd_match(args: argparse.Namespace) -> int:
         )
     else:
         _print_table(final_state.get("results") or [])
-        for error in final_state.get("errors") or []:
+
+    # Warnings stay in the JSON body. Failures also go to stderr, and the
+    # human table always lists them.
+    if stage != "done" or not args.as_json:
+        for error in errors:
             print(f"error: {error}", file=sys.stderr)
 
-    return 0 if final_state.get("stage") == "done" else 1
+    return 0 if stage == "done" else 1
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -23,6 +23,24 @@ _NODE_ORDER = (
 )
 
 
+def _stop_if_failed(next_node: str):
+    """Return a router that stops the graph after a fatal node failure.
+
+    A node exception caught by ``_guarded`` sets ``stage`` to ``"failed"``.
+    That is fatal: the graph must stop immediately instead of running the
+    next node. Warnings only append to ``errors`` and leave ``stage`` alone,
+    so the router continues to ``next_node``.
+    """
+
+    def router(state: MatchState) -> str:
+        if state.stage == "failed":
+            return END
+        return next_node
+
+    router.__name__ = f"stop_if_failed_before_{next_node}"
+    return router
+
+
 def build_graph(
     integrations: Integrations | None = None,
     *,
@@ -49,20 +67,30 @@ def build_graph(
     graph.add_edge(START, "scrape_facebook")
     graph.add_edge(["scrape_website", "scrape_facebook"], "analyze_brand")
 
-    graph.add_edge("analyze_brand", "generate_queries")
-    graph.add_edge("generate_queries", "discover_kols")
+    def _edge(source: str, target: str) -> None:
+        graph.add_conditional_edges(
+            source,
+            _stop_if_failed(target),
+            {target: target, END: END},
+        )
+
+    # Fatal node failures (stage "failed") end the graph. discover_kols uses
+    # its own router; rank_and_output is the sink.
+    _edge("analyze_brand", "generate_queries")
+    _edge("generate_queries", "discover_kols")
     graph.add_conditional_edges(
         "discover_kols",
         nodes["route_after_discover"],
         {
             "generate_queries": "generate_queries",
             "filter_thai": "filter_thai",
+            END: END,
         },
     )
-    graph.add_edge("filter_thai", "enrich_kols")
-    graph.add_edge("enrich_kols", "embed_and_prefilter")
-    graph.add_edge("embed_and_prefilter", "llm_rerank")
-    graph.add_edge("llm_rerank", "rank_and_output")
+    _edge("filter_thai", "enrich_kols")
+    _edge("enrich_kols", "embed_and_prefilter")
+    _edge("embed_and_prefilter", "llm_rerank")
+    _edge("llm_rerank", "rank_and_output")
     graph.add_edge("rank_and_output", END)
 
     return graph.compile()

@@ -3,18 +3,14 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from ..models import KolProfile
+from ..models import KolProfile, normalize_handle, outranks
 
 _KOL_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "kols.json"
 
 
-def _normalize_handle(handle: str) -> str:
-    return handle.strip().lower().lstrip("@")
-
-
 def _handle_seed(handle: str) -> int:
     """Stable integer derived from a handle (never Python's salted hash)."""
-    digest = hashlib.sha256(_normalize_handle(handle).encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(normalize_handle(handle).encode("utf-8")).hexdigest()
     return int(digest[:8], 16)
 
 
@@ -33,13 +29,20 @@ class MockKolEnricher:
         self.fixtures = fixtures
         self._by_handle: dict[str, dict] = {}
         for item in fixtures:
-            handle = _normalize_handle(str(item.get("handle", "")))
-            if handle:
-                # Later fixtures win, mirroring the round-by-round discovery order.
+            handle = normalize_handle(str(item.get("handle", "")))
+            if not handle:
+                continue
+            current = self._by_handle.get(handle)
+            # Strictly higher priority replaces the stored row. Equal priority
+            # keeps the earlier fixture.
+            if current is None or outranks(
+                str(item.get("source", "")),
+                str(current.get("source", "")),
+            ):
                 self._by_handle[handle] = item
 
     def enrich(self, kol: KolProfile) -> dict[str, Any]:
-        raw = self._by_handle.get(_normalize_handle(kol.handle), {})
+        raw = self._by_handle.get(normalize_handle(kol.handle), {})
         seed = _handle_seed(kol.handle)
 
         fixture_rate = raw.get("engagement_rate")

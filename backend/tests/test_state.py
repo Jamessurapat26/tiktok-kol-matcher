@@ -66,6 +66,52 @@ def test_merge_kols_prefers_seed_over_cache():
     assert merge_kols([seed], [cache])[0].source == "seed"
 
 
+def test_merge_kols_equal_priority_keeps_the_earlier_row():
+    earlier = make_kol("creator", "seed", followers=1)
+    later = make_kol("CREATOR", "seed", followers=2)
+
+    merged = merge_kols([earlier], [later])
+
+    assert merged[0].source == "seed"
+    assert merged[0].followers == 1
+    assert merged[0].handle == "creator"
+
+
+def test_handle_strips_at_sign_and_preserves_case():
+    foo = KolProfile(
+        handle="@Foo",
+        url="https://www.tiktok.com/@Foo",
+        source="apify",
+    )
+    bar = KolProfile(
+        handle="  @Bar ",
+        url="https://www.tiktok.com/@Bar",
+        source="seed",
+    )
+
+    assert foo.handle == "Foo"
+    assert bar.handle == "Bar"
+
+    merged = merge_kols(
+        [
+            {
+                "handle": "@Foo",
+                "url": "https://www.tiktok.com/@Foo",
+                "source": "apify",
+            }
+        ],
+        [
+            {
+                "handle": "  @Bar ",
+                "url": "https://www.tiktok.com/@Bar",
+                "source": "seed",
+            }
+        ],
+    )
+
+    assert [kol.handle for kol in merged] == ["Foo", "Bar"]
+
+
 def test_match_weights_normalize_to_one():
     weights = MatchWeights(relevance=4, engagement=2, audience=2, tier=2)
 

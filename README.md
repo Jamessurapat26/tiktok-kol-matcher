@@ -27,8 +27,8 @@ flowchart TD
     F --> A
     A --> G[generate_queries]
     G --> D[discover_kols]
-    D -->|"under 30 KOLs and under 2 rounds"| G
-    D -->|"enough KOLs or 2 rounds"| T[filter_thai]
+    D -->|"under 30 discovered KOLs before the Thai filter, and under 2 rounds"| G
+    D -->|"enough discovered KOLs or 2 rounds"| T[filter_thai]
     T --> E[enrich_kols]
     E --> P[embed_and_prefilter]
     P --> R[llm_rerank]
@@ -37,7 +37,9 @@ flowchart TD
 ```
 
 The website and Facebook scrapers run in parallel. Discovery loops back to query
-generation until it has at least 30 candidates or reaches the 2-round cap.
+generation until it has at least 30 KOLs or reaches the 2-round cap. The 30-KOL
+target counts discovered (deduped) KOLs before the Thai filter. `filter_thai`
+runs after that target is met and can shrink the list.
 
 ## Current status
 

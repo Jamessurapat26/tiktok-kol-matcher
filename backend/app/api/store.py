@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from ..models import MatchRequest, RankedKol
+from ..models import BrandProfile, MatchRequest, RankedKol
 from .settings import LiveFlags
 
 JobStatus = Literal["queued", "running", "succeeded", "failed"]
@@ -55,6 +55,7 @@ class Job(BaseModel):
     request: MatchRequest
     flags: LiveFlags
     errors: list[str] = []
+    brand_profile: BrandProfile | None = None
     results: list[RankedKol] = []
     created_at: str
     updated_at: str
@@ -123,13 +124,20 @@ class JobStore:
             ).fetchall()
         return [Job.model_validate_json(row[0]) for row in rows]
 
-    def progress(self, job_id: str, *, stage: str, errors: list[str]) -> None:
-        """Record a running job's latest stage and errors."""
+    def progress(
+        self,
+        job_id: str,
+        *,
+        stage: str,
+        errors: list[str],
+        brand_profile: BrandProfile | None = None,
+    ) -> None:
+        """Record a running job's latest stage, errors, and brand profile."""
         with self._lock, closing(self._connect()) as conn, conn:
             job = self._load(conn, job_id)
             if job.status != "running":
                 raise IllegalTransition(f"job {job_id} is {job.status}, not running")
-            self._save(conn, job, stage=stage, errors=errors)
+            self._save(conn, job, stage=stage, errors=errors, brand_profile=brand_profile)
 
     def transition(
         self,

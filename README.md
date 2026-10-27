@@ -45,17 +45,17 @@ runs after that target is met and can shrink the list.
 
 This is a working skeleton with deterministic mocks. Every external service in
 `backend/app/integrations/` has a `Protocol` and a `Mock` implementation, so the
-whole pipeline runs offline and produces stable output. Four pieces can run live:
+whole pipeline runs offline and produces stable output. Five pieces can run live:
 
 - Web page reading, with `--live-web` (see below).
+- Facebook page reading, with `--live-fb` (see below). It calls Apify and needs
+  `APIFY_TOKEN`. The default stays on the offline fixture.
 - TikTok creator search and enrichment, with `--live-kols` (see below). It calls
   Apify and needs `APIFY_TOKEN`. The default stays on the offline fixtures.
 - Brand analysis, query generation, and relevance reranking, with `--live-llm`
   (see below). The default stays on the offline mock.
 - Embeddings and the cosine prefilter, with `--live-embed` (see below). The
   default stays on the offline mock and does not download a model.
-
-Swap in a real implementation later for Facebook page scraping.
 
 ## Tech stack
 
@@ -121,6 +121,46 @@ uv run python -m app.cli match \
   --live-web
 ```
 
+## Facebook page (Apify)
+
+The default run uses the offline Facebook fixture and does not call Apify.
+`--live-fb` reads the page through Apify. It needs `APIFY_TOKEN`, handled the
+same way as `--live-kols`: if the token is missing, the CLI exits with code 2
+before the pipeline starts.
+
+- **Profile** uses [apify/facebook-pages-scraper](https://apify.com/apify/facebook-pages-scraper)
+  with `startUrls`. The page name, title, `intro`, `categories`, `followers`
+  (or `likes` when followers is missing), website (`websites`, then the bare
+  `website` domain), and `ad_status` are mapped onto the Facebook page.
+- **Recent posts** use [apify/facebook-posts-scraper](https://apify.com/apify/facebook-posts-scraper)
+  with `resultsLimit` 20. Up to 20 post texts are kept, each with its
+  whitespace collapsed and cut to 1,000 characters. Brand analysis sees each
+  post cut to 300 characters.
+- **Cost controls.** Each page is two runs, and each run sets `maxItems`,
+  `limit`, and `maxTotalChargeUsd` ($0.50). The store lists the page scraper
+  from about $5–$12 per 1,000 pages and the posts scraper from about $2–$5 per
+  1,000 posts.
+- **Fallback.** When the profile run fails or returns no usable item, the page
+  URL is read with the live web reader (Jina, then trafilatura, with its own
+  cache), even without `--live-web`. The page name comes from the URL, the title
+  from the first heading, and the intro from the page text. If that also
+  fails, `scrape_facebook` records a warning and brand analysis runs on the
+  website alone. When only the posts run fails, the page is kept with no posts.
+- **Cache.** Complete Apify results are stored as JSON under
+  `data/cache/facebook` for 7 days. The key is the SHA-256 of the normalized
+  URL. Set `KOL_CACHE_DIR` to move the root (`$KOL_CACHE_DIR/facebook`). A hit
+  does not call Apify. Fallback pages and pages without posts are not cached.
+  A failed cache write keeps the fetched page.
+
+```bash
+export APIFY_TOKEN=...
+uv run python -m app.cli match \
+  --website https://example-brand.co.th \
+  --facebook https://www.facebook.com/example-brand \
+  --top-k 5 \
+  --live-fb
+```
+
 ## TikTok KOL search (Apify)
 
 The default run uses the offline KOL fixtures and does not call Apify.
@@ -182,7 +222,7 @@ uv run python scripts/apify_smoke.py "รีวิวแว่นตา"
 The default run uses the offline brand analyzer and does not call a model.
 `--live-llm` sends brand analysis, TikTok query generation, and relevance
 reranking to an OpenAI-compatible chat completions API. Facebook scraping
-stays mocked. Embeddings stay on the offline mock unless `--live-embed` is
+stays mocked unless `--live-fb` is set. Embeddings stay on the offline mock unless `--live-embed` is
 set. Combine the flag with `--live-web` and `--live-kols`
 when those sources should be live too. Switching providers is configuration
 only: set `LLM_BASE_URL`, `LLM_MODEL`, and a key.
@@ -335,7 +375,7 @@ backend/
     state.py         # MatchState and list reducers
     cli.py           # argparse CLI (table or JSON)
     prompts.py       # LLM prompt text for brand analysis, queries, and rerank
-    integrations/    # Protocol + Mock per service; live web, Apify, LLM, and embedder
+    integrations/    # Protocol + Mock per service; live web, Facebook, Apify, LLM, and embedder
     fixtures/        # mock website, Facebook page, KOL records, Apify samples
   scripts/           # apify_smoke.py, llm_smoke.py, and embed_smoke.py
   tests/

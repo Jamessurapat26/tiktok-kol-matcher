@@ -1,5 +1,5 @@
 import { api } from './client'
-import { EVENT_TYPES, type JobEvent } from './types'
+import { EVENT_TYPES, type JobEvent, NODE_STATUSES, type NodeStatus } from './types'
 
 /** Parse one SSE `data` payload; null when it is not a job event. */
 export function parseJobEvent(data: string): JobEvent | null {
@@ -14,7 +14,12 @@ export function parseJobEvent(data: string): JobEvent | null {
   if (typeof event.seq !== 'number' || !EVENT_TYPES.includes(event.type as JobEvent['type'])) {
     return null
   }
-  if (event.type === 'node' && typeof event.node !== 'string') return null
+  if (
+    event.type === 'node' &&
+    (typeof event.node !== 'string' || !NODE_STATUSES.includes(event.status as NodeStatus))
+  ) {
+    return null
+  }
   return event as JobEvent
 }
 

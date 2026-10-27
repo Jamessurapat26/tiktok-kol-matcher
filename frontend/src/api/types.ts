@@ -132,6 +132,8 @@ export interface Job {
 /** store.py `NodeStatus` */
 export type NodeStatus = 'started' | 'finished' | 'failed'
 
+export const NODE_STATUSES = ['started', 'finished', 'failed'] as const satisfies readonly NodeStatus[]
+
 interface EventBase {
   job_id: string
   seq: number

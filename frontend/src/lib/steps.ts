@@ -90,6 +90,7 @@ export function applyEvent(progress: Progress, event: JobEvent): Progress {
         steps: updateStep(progress, event.node, (step) => ({
           ...step,
           status: 'running',
+          summary: '',
           startedAt: at,
           finishedAt: null,
           error: null,
@@ -116,6 +117,8 @@ export function applyEvent(progress: Progress, event: JobEvent): Progress {
           finishedAt: at,
         })),
       }
+    default:
+      return progress
   }
 }
 

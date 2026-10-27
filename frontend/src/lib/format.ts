@@ -15,10 +15,12 @@ export function formatScore(score: number): string {
   return score.toFixed(2)
 }
 
-/** 420 -> "420 ms", 1530 -> "1.5 s", 95000 -> "1m 35s". */
+/** 420 -> "420 ms", 1530 -> "1.5 s", 95000 -> "1m 35s". Rounds before picking the unit. */
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)} ms`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
+  const whole = Math.round(ms)
+  if (whole < 1000) return `${whole} ms`
+  const tenths = Math.round(ms / 100) / 10
+  if (tenths < 60) return `${tenths.toFixed(1)} s`
   const seconds = Math.round(ms / 1000)
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 }

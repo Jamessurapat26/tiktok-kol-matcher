@@ -1,4 +1,6 @@
 import json
+import logging
+import sqlite3
 import threading
 import time
 from dataclasses import replace
@@ -7,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.main import create_app
+from app.api.runner import run_job
 from app.api.settings import LiveFlags, Settings
 from app.api.store import JobStore
 from app.graph import _NODE_ORDER
@@ -321,6 +324,44 @@ def test_fatal_node_failure_fails_job(make_client):
     assert "model unavailable" in analyze[-1]["summary"]
     assert events[-1]["type"] == "failed"
     assert not any(e["node"] == "generate_queries" for e in events)
+
+
+class FlakyStore(JobStore):
+    """Every status write raises until ``failures`` is used up."""
+
+    def __init__(self, path, failures):
+        super().__init__(path)
+        self.failures = failures
+
+    def transition(self, *args, **kwargs):
+        if self.failures:
+            self.failures -= 1
+            raise sqlite3.OperationalError("disk I/O error")
+        return super().transition(*args, **kwargs)
+
+
+def test_job_still_ends_failed_when_the_first_store_write_raises(tmp_path):
+    store = FlakyStore(tmp_path / "jobs.db", failures=1)
+    job = store.create(MatchRequest(**_BODY), flags=LiveFlags())
+
+    run_job(store, job.id, mock_integrations())
+
+    after = store.get(job.id)
+    assert after.status == "failed"
+    assert any("disk I/O error" in error for error in after.errors)
+    assert [e.type for e in store.events_after(job.id, 0)] == ["failed"]
+
+
+def test_runner_logs_instead_of_raising_when_no_write_succeeds(tmp_path, caplog):
+    store = FlakyStore(tmp_path / "jobs.db", failures=99)
+    job = store.create(MatchRequest(**_BODY), flags=LiveFlags())
+
+    with caplog.at_level(logging.ERROR):
+        run_job(store, job.id, mock_integrations())
+
+    assert store.get(job.id).status == "queued"
+    assert job.id in caplog.text
+    assert "disk I/O error" in caplog.text
 
 
 def test_restart_fails_jobs_left_running(make_client, tmp_path):

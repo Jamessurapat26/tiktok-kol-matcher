@@ -40,6 +40,7 @@ from ..models import (
 )
 from ..prompts import (
     JSON_RETRY_USER,
+    MAX_QUERIES,
     brand_messages,
     query_messages,
     rerank_messages,
@@ -345,7 +346,7 @@ class LiveBrandAnalyzer:
             raise LlmOutputError(
                 f"LLM returned no new search queries for round {round}"
             )
-        return fresh
+        return fresh[:MAX_QUERIES]
 
     def rerank(
         self,

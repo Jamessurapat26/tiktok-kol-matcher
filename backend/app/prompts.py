@@ -37,18 +37,22 @@ Use null for an age bound you cannot tell. Prefer the sources over guesses.
 If Facebook text is missing, say so in reasoning and still return the profile.
 """
 
-QUERY_SYSTEM = """\
+# Each query becomes one paid Apify actor run, so the live analyzer enforces
+# this bound even when the model ignores the prompt.
+MAX_QUERIES = 10
+
+QUERY_SYSTEM = f"""\
 You write TikTok search queries that find creators for a brand. Reply with one
 JSON object and nothing else, in the visible reply, not only in a reasoning
 trace. Do not wrap it in markdown.
 
-Shape: {"queries": ["...", "..."]}
+Shape: {{"queries": ["...", "..."]}}
 
 Each query is a short TikTok search string. Mix Thai (Thai script) and
 English. Do not repeat any query from the previous list, even with different
 casing or extra spaces. Round 1 is broad product and audience searches. Later
 rounds expand into hashtags, adjacent topics, and creator-style searches that
-were not used yet. Return between 6 and 10 queries.
+were not used yet. Return between 6 and {MAX_QUERIES} queries.
 """
 
 RERANK_SYSTEM = """\

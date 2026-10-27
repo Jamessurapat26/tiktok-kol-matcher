@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from ..cli import summarize_update
@@ -6,6 +7,8 @@ from ..integrations import Integrations
 from .store import JobStore
 
 _SUMMARY_LIMIT = 160
+
+log = logging.getLogger(__name__)
 
 
 def _short(text: str) -> str:
@@ -27,11 +30,12 @@ def run_job(
 ) -> None:
     """Run one job's graph to completion, recording per-node events.
 
-    Never raises: any failure ends the job as ``failed``.
+    Never raises: any failure ends the job as ``failed`` whenever the store
+    accepts the write, so the event stream always gets its terminal event.
     """
-    job = store.transition(job_id, "running")
     final: dict[str, Any] = {}
     try:
+        job = store.transition(job_id, "running")
         graph = build_graph(integrations, enrich_limit=enrich_limit)
         for mode, payload in graph.stream(
             initial_state(job.request),
@@ -56,27 +60,30 @@ def run_job(
                     status="failed" if failed else "finished",
                     summary=_short(summary),
                 )
-    except Exception as exc:  # noqa: BLE001 - a job must never stay running
-        errors = [*(final.get("errors") or []), f"pipeline: {exc}"]
-        store.transition(job_id, "failed", errors=errors, summary=_short(errors[-1]))
-        return
 
-    errors = list(final.get("errors") or [])
-    if final.get("stage") == "done":
-        results = final.get("results") or []
-        store.transition(
-            job_id,
-            "succeeded",
-            stage="done",
-            errors=errors,
-            results=results,
-            summary=f"ranked {len(results)} KOLs",
-        )
-    else:
-        store.transition(
-            job_id,
-            "failed",
-            stage=final.get("stage") or "failed",
-            errors=errors,
-            summary=_short(errors[-1] if errors else "pipeline stopped before output"),
-        )
+        errors = list(final.get("errors") or [])
+        if final.get("stage") == "done":
+            results = final.get("results") or []
+            store.transition(
+                job_id,
+                "succeeded",
+                stage="done",
+                errors=errors,
+                results=results,
+                summary=f"ranked {len(results)} KOLs",
+            )
+        else:
+            store.transition(
+                job_id,
+                "failed",
+                stage=final.get("stage") or "failed",
+                errors=errors,
+                summary=_short(errors[-1] if errors else "pipeline stopped before output"),
+            )
+    except Exception as exc:  # noqa: BLE001 - a job must never stay queued or running
+        errors = [*(final.get("errors") or []), f"pipeline: {exc}"]
+        try:
+            store.transition(job_id, "failed", errors=errors, summary=_short(errors[-1]))
+        except Exception as store_exc:  # noqa: BLE001
+            # Only the store's own error is logged: the pipeline error may quote page text.
+            log.error("job %s could not be marked failed: %s", job_id, store_exc)

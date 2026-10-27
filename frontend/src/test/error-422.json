@@ -1,0 +1,25 @@
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": ["body", "website_url"],
+      "msg": "Value error, website_url must not point at a private or local address",
+      "input": "http://localhost",
+      "ctx": { "error": {} }
+    },
+    {
+      "type": "value_error",
+      "loc": ["body", "facebook_url"],
+      "msg": "Value error, facebook_url must be a facebook.com or fb.com page",
+      "input": "https://example.com/x",
+      "ctx": { "error": {} }
+    },
+    {
+      "type": "greater_than_equal",
+      "loc": ["body", "top_k"],
+      "msg": "Input should be greater than or equal to 1",
+      "input": 0,
+      "ctx": { "ge": 1 }
+    }
+  ]
+}

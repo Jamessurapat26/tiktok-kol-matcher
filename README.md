@@ -155,6 +155,11 @@ messages, and `/api/health` reports each one only as set or missing.
 | `APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD` | Per-run cap for each TikTok search, at least 0.50 | `0.50` |
 | `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD` | Per-run cap for each profile enrichment, at least 0.50 | `0.50` |
 | `APIFY_FACEBOOK_MAX_CHARGE_USD` | Per-run cap for each Facebook page or posts run | `0.50` |
+| `APIFY_ENRICH_RESERVE_USD` | Budget TikTok search must leave for enrichment, below the job budget | `0.30` |
+| `TIKTOK_RESULTS_PER_QUERY` | Videos per TikTok search query, 1-50 | `20` |
+| `TIKTOK_PROFILE_VIDEOS` | Recent videos fetched per enriched profile, 1-30 | `10` |
+| `DISCOVERY_MIN_THAI_CANDIDATES` | Thai creators discovery aims for before it stops | `30` |
+| `DISCOVERY_MAX_ROUNDS` | Most query and search rounds, 1-5 | `3` |
 | `JINA_API_KEY` | Optional Jina Reader key for a higher rate limit | unset |
 | `LLM_BASE_URL` | OpenAI-compatible API root | `https://integrate.api.nvidia.com/v1` |
 | `LLM_MODEL` | Chat model id | `nvidia/nemotron-3.5-lightning-30b-a3b` |
@@ -172,7 +177,12 @@ messages, and `/api/health` reports each one only as set or missing.
 | `JOB_WORKERS` | Jobs that run at once | `2` |
 | `MAX_QUEUED_JOBS` | Queued or running jobs before `POST /api/jobs` returns 429 | `20` |
 
-The last five must be unset, not blank, to take their defaults.
+The last five must be unset, not blank, to take their defaults. An invalid
+Apify or discovery value, such as a TikTok cap below 0.50 or a non-numeric
+budget, makes `POST /api/jobs` return 400 naming the variable, and makes the
+CLI exit with code 2, before any Apify run starts. `--max-results-per-query`,
+`--min-candidates`, and `--max-rounds` override the matching variables for one
+CLI run.
 
 ## Architecture
 
@@ -213,10 +223,14 @@ flowchart TD
    200 characters each, go in as weak signals for tone. `tidy_brand_profile`
    then drops sentence-like keywords, caps list lengths, and fixes age bounds.
 3. **Discovery loop.** Query generation and TikTok search repeat until 30
-   unique Thai creators are found or three rounds have run. Each round asks the
-   LLM only for queries it has not tried yet.
-4. **Thai filter.** Keeps creators whose language is Thai, whose account region
-   is Thailand, or whose profile text or search captions use Thai script.
+   unique creators that pass the Thai filter are found, or three rounds have
+   run. Each round asks the LLM only for 6-10 queries it has not tried yet, and
+   each query returns up to 20 videos. Videos are deduped by author, and up to
+   three captions per author are kept.
+4. **Thai filter.** Keeps a creator when the video language is Thai, the
+   account region is Thailand, or the nickname, bio, or search captions contain
+   Thai script (at least two Thai characters, so one stray character does not
+   count). An English-only creator outside Thailand is still dropped.
 5. **Enrichment.** Fetches recent videos for the largest accounts (10 by
    default), then computes the median engagement rate and posts per week.
 6. **Prefilter.** Embeds the brand text and every creator's bio, captions, and
@@ -290,6 +304,16 @@ remaining Apify calls are skipped and recorded as warnings, and the job still
 finishes with what it has. Enrichment goes to the largest accounts first, so
 the budget is spent on the creators most likely to matter.
 
+**A reserve so search cannot starve enrichment.** Search stops starting new
+runs once the estimated spend plus `APIFY_ENRICH_RESERVE_USD` ($0.30) reaches
+the budget, so the 10 profile runs always have room. The per-item estimates are
+the costs measured on real runs times about 1.5. With the defaults, a job
+estimates about $0.13 for Facebook, up to 11 search runs at $0.055 (about 220
+videos), and $0.25 for enrichment: about $0.98 at most, inside the $1.00
+budget. Real spend should be lower, since the estimates carry the 1.5 margin.
+`estimate_default_job_usd` in `backend/app/integrations/apify.py` reproduces
+this sum.
+
 **SSE instead of polling from the browser.** Progress is a one-way stream of
 small events, which is what server-sent events are for. `EventSource`
 reconnects and resends `Last-Event-ID` on its own. Inside the server the stream
@@ -324,9 +348,13 @@ and the web reader checks resolved addresses before a direct fetch.
   may get login text instead of the page's "about".
 - **The ranking weights are not tuned.** 40/25/20/15 is a reasoned starting
   point, not a value fitted to labelled data.
-- **The candidate pool is small.** Three search rounds with 10 videos per query
-  give tens of creators. In the live run above, 48 were discovered and 12 were
-  left after the Thai filter.
+- **The candidate pool is not yet measured live at the new defaults.** The
+  live run above used the old settings (10 videos per query, a filter on
+  language and region only, a loop that counted every creator), which found 48
+  creators and kept 12. The defaults now aim for 30 Thai creators within the
+  budget, but a live job has not confirmed how many a typical brand gets.
+- **The Thai filter is a heuristic.** A Thai creator with English-only text and
+  no TH region is missed, and a non-Thai account that writes in Thai is kept.
 - **Audience fit is a proxy.** It uses the creator's language and region, not
   real audience demographics, which TikTok does not expose to scrapers.
 - **The API has no authentication.** It is built for local use and binds to
@@ -335,7 +363,7 @@ and the web reader checks resolved addresses before a direct fetch.
 ## Testing
 
 ```bash
-cd backend && uv run pytest          # 264 tests
+cd backend && uv run pytest          # 312 tests
 cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 41 Vitest tests
 ```
 
@@ -355,8 +383,9 @@ embedder. They need real keys, and the Apify one spends credit.
 1. **Evaluation set and weight tuning.** Label a few brands with creators a
    marketer would and would not pick, measure precision at k and NDCG, then
    tune the weights and the prefilter width against that set.
-2. **A larger candidate pool.** More results per query and hashtag-based
-   discovery when the Thai filter leaves too few creators.
+2. **A larger candidate pool.** Measure the new defaults on live jobs, try
+   Apify's Thai proxy for search, add hashtag-based discovery, and enrich by
+   relevance instead of follower count.
 3. **Better signals.** Read the Facebook login wall as a failure, add a budget
    warning for skipped Facebook runs, and use comment language as an audience
    signal.

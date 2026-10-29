@@ -26,6 +26,36 @@ class ScoreBreakdown(DomainModel):
     audience_confidence: Literal["low", "medium", "high"]
 
 
+class Scores(DomainModel):
+    """The matching-v2 score components and their confidences."""
+
+    F: float = Field(ge=0, le=1)
+    E: float = Field(ge=0, le=1)
+    T: float = Field(ge=0, le=1)
+    A_eff: float = Field(ge=0, le=1)
+    F_conf: float = Field(ge=0, le=1)
+    E_conf: float = Field(ge=0, le=1)
+    T_conf: float = Field(ge=0, le=1)
+    A_conf: float = Field(ge=0, le=1)
+    sim: float = Field(ge=0, le=1)
+    on_topic: float = Field(ge=0, le=1)
+    judge: float = Field(ge=0, le=1)
+    er_star: float | None = None
+    reach: float | None = None
+    judged: bool = False
+
+
+class Judgement(DomainModel):
+    """One creator's result from the batched LLM judge call."""
+
+    handle: str
+    judge: float = Field(ge=0, le=1)
+    audience: float = Field(ge=0, le=1)
+    audience_confidence: float = Field(ge=0, le=1)
+    reason: str
+    risky: bool = False
+
+
 class MatchWeights(DomainModel):
     # Frozen so the sum==1 invariant cannot be broken by attribute assignment.
     model_config = ConfigDict(frozen=True, extra="forbid")

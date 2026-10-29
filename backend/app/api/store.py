@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..models import BrandProfile, MatchRequest, RankedKol
 from .settings import LiveFlags
@@ -56,6 +56,8 @@ class Job(BaseModel):
     flags: LiveFlags
     errors: list[str] = []
     brand_profile: BrandProfile | None = None
+    rejected: dict[str, int] = Field(default_factory=dict)
+    cost_log: list[str] = Field(default_factory=list)
     results: list[RankedKol] = []
     created_at: str
     updated_at: str
@@ -131,13 +133,24 @@ class JobStore:
         stage: str,
         errors: list[str],
         brand_profile: BrandProfile | None = None,
+        rejected: dict[str, int] | None = None,
+        cost_log: list[str] | None = None,
     ) -> None:
-        """Record a running job's latest stage, errors, and brand profile."""
+        """Record a running job's latest stage, errors, and partial output."""
+        changes: dict[str, object] = {
+            "stage": stage,
+            "errors": errors,
+            "brand_profile": brand_profile,
+        }
+        if rejected is not None:
+            changes["rejected"] = rejected
+        if cost_log is not None:
+            changes["cost_log"] = cost_log
         with self._lock, closing(self._connect()) as conn, conn:
             job = self._load(conn, job_id)
             if job.status != "running":
                 raise IllegalTransition(f"job {job_id} is {job.status}, not running")
-            self._save(conn, job, stage=stage, errors=errors, brand_profile=brand_profile)
+            self._save(conn, job, **changes)
 
     def transition(
         self,

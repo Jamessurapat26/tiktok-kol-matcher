@@ -101,8 +101,26 @@ def test_job_runs_to_succeeded_with_top_k_results(make_client):
     assert job["stage"] == "done"
     assert len(job["results"]) == 5
     assert job["request"]["top_k"] == 5
-    assert job["results"][0]["kol"]["handle"]
     assert job["brand_profile"]["category"]
+    assert job["brand_profile"]["tier_reason"]
+    assert job["brand_profile"]["tier_label"]
+    assert job["rejected"]
+    assert job["cost_log"]
+    first = job["results"][0]
+    assert first["kol"]["handle"]
+    assert first["profile_url"].startswith("https://www.tiktok.com/@")
+    assert first["evidence_urls"]
+    assert {"flags", "reason", "final", "quality"} <= set(first)
+    assert {
+        "F",
+        "E",
+        "T",
+        "A_eff",
+        "F_conf",
+        "E_conf",
+        "T_conf",
+        "A_conf",
+    } <= set(first["scores"])
 
 
 @pytest.mark.parametrize(
@@ -179,6 +197,12 @@ def test_list_jobs_newest_first_with_limit(make_client):
         listed = client.get("/api/jobs", params={"limit": 2}).json()
 
     assert [job["id"] for job in listed] == ids[::-1][:2]
+    latest = listed[0]
+    assert latest["brand_profile"]["tier_reason"]
+    assert latest["rejected"]
+    assert latest["cost_log"]
+    assert {"flags", "evidence_urls", "profile_url"} <= set(latest["results"][0])
+    assert {"F", "E", "T", "A_eff"} <= set(latest["results"][0]["scores"])
 
 
 def test_health_without_env_is_demo(make_client):

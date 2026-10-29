@@ -1,5 +1,6 @@
 import importlib.machinery
 import json
+import re
 import sys
 import types
 from dataclasses import replace
@@ -48,9 +49,25 @@ def test_json_output(capsys):
         payload["counts"]
     )
     assert payload["cost_log"]
+    assert payload["brief"]["tier_reason"]
+    assert payload["brief"]["tier_label"]
+    assert payload["rejected"]
     first = payload["results"][0]
-    assert {"final", "F", "E", "T", "A_eff", "flags", "profile_url"} <= set(first)
+    assert {"final", "quality", "flags", "evidence_urls", "profile_url", "reason"} <= set(
+        first
+    )
+    assert {
+        "F",
+        "E",
+        "T",
+        "A_eff",
+        "F_conf",
+        "E_conf",
+        "T_conf",
+        "A_conf",
+    } <= set(first["scores"])
     assert first["profile_url"].startswith("https://www.tiktok.com/@")
+    assert first["evidence_urls"]
 
 
 def test_human_output_prints_table_and_progress(capsys):
@@ -67,11 +84,18 @@ def test_human_output_prints_table_and_progress(capsys):
     captured = capsys.readouterr()
 
     assert exit_code == 0
+    assert "brief: tier=micro target=30000 conf=0.70" in captured.out
+    assert "a small Bangkok online shop" in captured.out
     assert "rank" in captured.out
     assert "final" in captured.out
     assert "A_eff" in captured.out
+    assert "conf F/E/T/A" in captured.out
     assert "profile_url" in captured.out
     assert "https://www.tiktok.com/@" in captured.out
+    assert re.search(r"https://www\.tiktok\.com/@[^/\s]+/video/\d+", captured.out)
+    assert re.search(r"\d\.\d/\d\.\d/\d\.\d/\d\.\d", captured.out)
+    assert "  1. " in captured.out
+    assert re.search(r"rejected: .+=\d+", captured.out)
     assert "cost log:" in captured.out
     assert "llm: analyze_brand 1 call" in captured.out
     assert "[ 1]" in captured.err

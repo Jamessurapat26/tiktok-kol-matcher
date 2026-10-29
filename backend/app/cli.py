@@ -18,14 +18,15 @@ from .integrations import build_integrations
 from .integrations.apify import ApifyConfigError, DiscoveryLimits
 from .integrations.embeddings import EmbedConfigError
 from .integrations.llm_live import LlmConfigError, llm_api_key_from_env
-from .models import MatchRequest, RankedKol
+from .models import BrandProfile, MatchRequest, RankedKol
 
 _LIST_FIELDS = ("discovered", "candidates", "ranked", "results")
 _ADDITIVE_FIELDS = {"discovered"}
+_MAX_EVIDENCE_LINES = 3
 
 _TABLE_ROW = (
     "{rank:>4}  {handle:<22} {followers:>11} {final:>6} {fit:>6} {eng:>6} "
-    "{tier:>6} {aud:>6} {flags:<30} {profile}"
+    "{tier:>6} {aud:>6} {conf:<17} {flags:<28} {profile}"
 )
 
 
@@ -245,7 +246,28 @@ def _truncate(text: str, limit: int = 50) -> str:
     return text[: limit - 3].rstrip() + "..."
 
 
-def _print_table(results: list[RankedKol]) -> None:
+def _brief_line(brief: BrandProfile | None) -> str:
+    if brief is None:
+        return "brief: unavailable"
+    return (
+        f"brief: tier={brief.tier_label} target={brief.target_followers} "
+        f"conf={brief.tier_confidence:.2f} — {brief.tier_reason}"
+    )
+
+
+def _confidence_text(item: RankedKol) -> str:
+    scores = item.scores
+    return (
+        f"{scores.F_conf:.1f}/{scores.E_conf:.1f}/"
+        f"{scores.T_conf:.1f}/{scores.A_conf:.1f}"
+    )
+
+
+def _print_table(
+    results: list[RankedKol],
+    brief: BrandProfile | None,
+) -> None:
+    print(_brief_line(brief))
     print(
         _TABLE_ROW.format(
             rank="rank",
@@ -256,11 +278,12 @@ def _print_table(results: list[RankedKol]) -> None:
             eng="E",
             tier="T",
             aud="A_eff",
+            conf="conf F/E/T/A",
             flags="flags",
             profile="profile_url",
         )
     )
-    print("-" * 150)
+    print("-" * 170)
 
     for rank, item in enumerate(results, start=1):
         kol = item.kol
@@ -274,23 +297,31 @@ def _print_table(results: list[RankedKol]) -> None:
                 eng=f"{item.scores.E:.2f}",
                 tier=f"{item.scores.T:.2f}",
                 aud=f"{item.scores.A_eff:.2f}",
-                flags=_truncate(",".join(item.flags) or "-", 30),
+                conf=_confidence_text(item),
+                flags=_truncate(",".join(item.flags) or "-", 28),
                 profile=item.profile_url,
             )
         )
 
     if not results:
         print("No results.")
+        return
+
+    print()
+    for rank, item in enumerate(results, start=1):
+        print(f"  {rank}. {item.reason}")
+        for url in item.evidence_urls[:_MAX_EVIDENCE_LINES]:
+            print(f"     {url}")
 
 
 def _result_payload(item: RankedKol) -> dict[str, Any]:
-    data = item.model_dump(mode="json")
-    for key in ("F", "E", "T", "A_eff"):
-        data[key] = data["scores"][key]
-    return data
+    return item.model_dump(mode="json")
 
 
 def _json_payload(final_state: dict[str, Any]) -> dict[str, Any]:
+    brief = final_state.get("brand_profile")
+    if isinstance(brief, BrandProfile):
+        brief = brief.model_dump(mode="json")
     return {
         "stage": final_state.get("stage", "failed"),
         "search_rounds": final_state.get("search_rounds", 0),
@@ -301,6 +332,8 @@ def _json_payload(final_state: dict[str, Any]) -> dict[str, Any]:
             "ranked": len(final_state.get("ranked") or []),
             "results": len(final_state.get("results") or []),
         },
+        "brief": brief,
+        "rejected": final_state.get("rejected") or {},
         "results": [
             _result_payload(result)
             for result in final_state.get("results") or []
@@ -308,6 +341,16 @@ def _json_payload(final_state: dict[str, Any]) -> dict[str, Any]:
         "cost_log": final_state.get("cost_log") or [],
         "errors": final_state.get("errors") or [],
     }
+
+
+def _print_rejected(rejected: dict[str, int]) -> None:
+    if rejected:
+        counts = ", ".join(
+            f"{reason}={count}" for reason, count in sorted(rejected.items())
+        )
+    else:
+        counts = "(none)"
+    print(f"rejected: {counts}")
 
 
 def _print_cost_log(lines: list[str]) -> None:
@@ -430,7 +473,11 @@ def _cmd_match(args: argparse.Namespace) -> int:
             )
         )
     else:
-        _print_table(final_state.get("results") or [])
+        _print_table(
+            final_state.get("results") or [],
+            final_state.get("brand_profile"),
+        )
+        _print_rejected(final_state.get("rejected") or {})
         _print_cost_log(final_state.get("cost_log") or [])
 
     # Warnings stay in the JSON body. Failures also go to stderr, and the

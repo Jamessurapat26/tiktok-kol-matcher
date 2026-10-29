@@ -48,23 +48,30 @@ The object must contain exactly these keys:
 - topic_keywords_en: English search phrases, at most 12 items. Each is a
   short search phrase of at most 3 words, without sentence
   structure or punctuation.
-- competitors: names of competing brands, at most 8 items. Proper names only.
+- competitors: names of competing brands that make or sell their own rival
+  products, at most 8 items. Proper names only. Never list a store, chain,
+  pharmacy, marketplace, or distributor that sells this brand.
+- retailers: stores, chains, pharmacies, marketplaces, or distributors that
+  sell this brand, at most 8 items. Proper names only. Use [] when none are
+  named in the sources.
 - brand_handles: the brand's own social handles, at most 8 items, with or
   without a leading @.
-- target_followers: your best integer estimate of the creator follower count
-  this brand should target. It must be between 10000 and 2000000.
-- tier_label: one of "nano", "micro", "mid", or "macro".
+- tier_label: the creator tier this brand should target, one of "nano",
+  "micro", "mid", or "macro". This is the size of the creators to hire, not
+  the size of the brand's own page. Do not return a follower count.
 - tier_confidence: a number from 0 to 1 for how sure you are of the tier.
 - tier_reason: one short sentence explaining the tier choice.
 
-Tier guidance:
-- SME or small online shop -> micro, about 30,000 followers.
-- Nationwide Thai brand -> mid, about 150,000 followers.
-- Multinational or very large brand -> macro, about 800,000 followers.
+Tier guidance (creator tier to hire):
+- Very small or brand-new shop -> nano.
+- SME or small online shop -> micro.
+- Nationwide Thai brand -> mid.
+- Multinational or very large brand -> macro.
 Use the price tier, the sales channels (online-only, small stores, or
-nationwide convenience stores), whether the brand is local or multinational,
-and the brand page follower count when it is available. Show the tier_label
-and tier_reason in the JSON.
+nationwide convenience stores), and whether the brand is local or
+multinational. The brand page follower count only hints at how big the brand
+is; never copy it as a creator follower count. Show the tier_label and
+tier_reason in the JSON.
 
 Prefer the primary sources over guesses. If Facebook text is missing, still
 return the best brief you can from the website.
@@ -99,11 +106,13 @@ Shape: {"creators": [{"handle": "...", "judge": 0.0, "audience": 0.0,
 "audience_confidence": 0.0, "reason": "...", "risky": false}]}
 
 Rubric:
-- judge is 0 to 1: category match, tone match, and no risky content. 1 means the
-  creator clearly covers the brand's category in a fitting tone with no risky
-  content. 0 means unrelated or clearly unsuitable. The brand's own account,
-  other shops, and competing brands are low fits however closely their products
-  match.
+- judge is 0 to 1: score content fit to the brand using category match, tone
+  match, and brand safety (no risky content). 1 means the creator clearly covers
+  the brand's category in a fitting tone with no risky content. 0 means unrelated
+  or clearly unsuitable. A creator not mentioning the brand is normal and must
+  NOT lower the judge score; brand mentions are not required. The brand's own
+  account, other shops, and competing brands are low fits however closely their
+  products match.
 - audience is 0 to 1: does the creator's content, captions, and bio suggest an
   audience that matches target_audience? Use text/content/bio ONLY. Never infer
   age or gender from faces, appearance, or photos.
@@ -112,8 +121,9 @@ Rubric:
 - risky is true when the creator's content shows gambling, casino, or similar
   unsafe content.
 - reason is one short sentence. Only say a creator posts about the brand when a
-  brand name appears in their text. Copy every handle from the input unchanged.
-  Include each creator you judge exactly once.
+  brand name appears in their text; never claim that without that evidence. This
+  rule only governs the reason wording, not the judge score. Copy every handle
+  from the input unchanged. Include each creator you judge exactly once.
 """
 
 JSON_RETRY_USER = (
@@ -193,6 +203,10 @@ def _brand_summary(brand: BrandProfile) -> str:
             f"topic_keywords_th: {', '.join(brand.topic_keywords_th)}",
             f"topic_keywords_en: {', '.join(brand.topic_keywords_en)}",
             f"competitors: {', '.join(brand.competitors)}",
+            (
+                "retailers (sell the brand; not competitors): "
+                f"{', '.join(brand.retailers)}"
+            ),
             f"tier: {brand.tier_label} (target {brand.target_followers} followers)",
             f"tier_reason: {brand.tier_reason}",
         ]

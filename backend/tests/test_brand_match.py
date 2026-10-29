@@ -138,10 +138,33 @@ def test_judge_messages_include_the_brand_and_one_card_per_creator():
 
 
 def test_judge_system_requires_text_only_audience_evidence():
-    assert "Use text/content/bio ONLY" in JUDGE_SYSTEM
-    assert "Never infer" in JUDGE_SYSTEM
-    assert "brand's own account" in JUDGE_SYSTEM
-    assert "risky" in JUDGE_SYSTEM
+    prompt = " ".join(JUDGE_SYSTEM.split())
+
+    assert "Use text/content/bio ONLY" in prompt
+    assert "Never infer" in prompt
+    assert "brand's own account" in prompt
+    assert "risky" in prompt
+
+
+def test_judge_system_scores_content_fit_without_requiring_brand_mentions():
+    prompt = " ".join(JUDGE_SYSTEM.split())
+
+    assert "category match, tone match, and brand safety" in prompt
+    assert (
+        "not mentioning the brand is normal and must NOT lower the judge score"
+        in prompt
+    )
+    assert "brand mentions are not required" in prompt
+
+
+def test_judge_system_limits_the_brand_mention_rule_to_reason_wording():
+    prompt = " ".join(JUDGE_SYSTEM.split())
+
+    assert (
+        "Only say a creator posts about the brand when a brand name appears"
+        in prompt
+    )
+    assert "rule only governs the reason wording, not the judge score" in prompt
 
 
 def test_judge_messages_are_empty_for_no_creators():

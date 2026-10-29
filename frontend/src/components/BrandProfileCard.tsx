@@ -86,6 +86,11 @@ export function BrandProfileCard({ websiteUrl, profile, unavailable }: Props) {
             <Item label="Competitors" wide>
               <Keywords words={profile.competitors} />
             </Item>
+            {profile.retailers && profile.retailers.length > 0 && (
+              <Item label="Retailers" wide>
+                <Keywords words={profile.retailers} />
+              </Item>
+            )}
           </dl>
         ) : unavailable ? (
           <p className="text-body-sm text-muted-foreground">

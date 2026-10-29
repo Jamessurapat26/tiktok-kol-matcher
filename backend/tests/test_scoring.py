@@ -28,6 +28,7 @@ from app.scoring import (
     score_pool,
     tier_fit,
     tier_of,
+    video_matches_brief,
 )
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -53,6 +54,31 @@ def _brief(**overrides) -> BrandProfile:
         "tier_label": "micro",
         "tier_confidence": 0.7,
         "tier_reason": "A small online shop.",
+    }
+    data.update(overrides)
+    return BrandProfile.model_validate(data)
+
+
+def _skincare_brief(**overrides) -> BrandProfile:
+    data = {
+        "category": "Health & Beauty",
+        "key_products": ["Moisturizer Cream"],
+        "price_tier": "mid",
+        "target_audience": TargetAudience(
+            gender="any",
+            age_range="18-34",
+            interests=["skincare", "beauty"],
+        ),
+        "tone": "friendly",
+        "topic_keywords_th": ["มอยส์เจอไรเซอร์"],
+        "topic_keywords_en": ["moisturizer"],
+        "competitors": ["OtherBrand"],
+        "brand_handles": ["@ExampleBrand"],
+        "brand_names": ["ExampleBrand"],
+        "target_followers": 50_000,
+        "tier_label": "micro",
+        "tier_confidence": 0.7,
+        "tier_reason": "An example skincare brand.",
     }
     data.update(overrides)
     return BrandProfile.model_validate(data)
@@ -156,7 +182,81 @@ def test_on_topic_share_uses_normalized_caption_terms():
     )
 
     assert on_topic_share(kol, brief, DEFAULT_CONFIG) == pytest.approx(0.5)
-    assert on_topic_share(_kol("empty"), brief, DEFAULT_CONFIG) == 0.0
+    assert on_topic_share(_kol("empty", bio=""), brief, DEFAULT_CONFIG) == 0.0
+
+
+def test_skincare_creator_with_generic_thai_captions_scores_high():
+    brief = _skincare_brief()
+    kol = _kol(
+        "beauty.reviewer",
+        bio="รีวิวของใช้ในชีวิตประจำวัน",
+        videos=[
+            _video(caption="ผิวแห้งมาก ต้องทาครีมทุกคืน #รีวิวสกินแคร์"),
+            _video(caption="เซรั่มตัวใหม่ใช้แล้วผิวดีขึ้น #skincare"),
+            _video(caption="ทาผิวหน้าก่อนนอน ครีมเนื้อบางเบา #รีวิวบิวตี้"),
+            _video(caption="รีวิวสกินแคร์ที่ใช้จริง #ผิวสวย"),
+            _video(caption="ครีมกันแดดเนื้อบางเบา #skincare"),
+        ],
+    )
+
+    assert on_topic_share(kol, brief, DEFAULT_CONFIG) >= 0.6
+
+
+def test_unrelated_food_and_gaming_creators_stay_low():
+    brief = _skincare_brief()
+    food = _kol(
+        "food.reviewer",
+        bio="ตะลุยกินทั่วกรุงเทพ",
+        videos=[
+            _video(caption="ข้าวผัดอร่อยมาก #foodie"),
+            _video(caption="ร้านก๋วยเตี๋ยวมาใหม่ #อร่อยบอกต่อ"),
+            _video(caption="เมนูหมูกระทะ #food"),
+            _video(caption="ส้มตำรสจัดจ้าน #streetfood"),
+            _video(caption="คาเฟ่ลับย่านเจริญกรุง #cafe"),
+        ],
+    )
+    gaming = _kol(
+        "gaming.clips",
+        bio="เล่นเกมทุกคืน",
+        videos=[
+            _video(caption="เล่นเกมทั้งคืน #gaming"),
+            _video(caption="เปิดกล่องเกมใหม่ #gamer"),
+            _video(caption="คอมเมนต์ใครชนะ #esports"),
+            _video(caption="สตรีมเมอร์สายฮา #streamer"),
+            _video(caption="จัดโต๊ะคอมใหม่ #setup"),
+        ],
+    )
+
+    for kol in (food, gaming):
+        assert on_topic_share(kol, brief, DEFAULT_CONFIG) <= 0.2
+
+
+def test_matching_bio_gives_a_small_on_topic_floor():
+    brief = _skincare_brief()
+    off_topic_videos = [_video(caption="ข้าวผัดอร่อยมาก #foodie") for _ in range(3)]
+    no_bio_match = _kol("off.topic", bio="ตะลุยกินทั่วกรุงเทพ", videos=off_topic_videos)
+    bio_match = _kol(
+        "bio.match",
+        bio="Skincare and beauty reviewer",
+        videos=off_topic_videos,
+    )
+
+    assert on_topic_share(no_bio_match, brief, DEFAULT_CONFIG) == 0.0
+    assert on_topic_share(bio_match, brief, DEFAULT_CONFIG) == pytest.approx(
+        DEFAULT_CONFIG.on_topic_bio_floor
+    )
+    raised = MatchingConfig(on_topic_bio_floor=0.4)
+    assert on_topic_share(bio_match, brief, raised) == pytest.approx(0.4)
+
+
+def test_video_matches_brief_uses_the_expanded_lexicon_terms():
+    brief = _skincare_brief()
+
+    assert video_matches_brief(
+        _video(caption="เซรั่มใหม่ #รีวิวสกินแคร์"),
+        brief,
+    )
+    assert not video_matches_brief(_video(caption="ข้าวผัดอร่อยมาก #foodie"), brief)
 
 
 def test_percentile_ranks_use_mid_ranks():
@@ -484,3 +584,24 @@ def test_mmr_asks_for_similarity_rows_of_selected_items_only():
     selected = mmr_select([0.9, 0.8, 0.7, 0.6, 0.5, 0.4], sim, 3, 0.7)
 
     assert rows <= set(selected)
+
+
+def test_retailer_mentions_are_not_competitor_mentions():
+    brief = _brief(retailers=["ExampleMart"])
+    kol = _kol(
+        "retail.haul",
+        videos=[_video(days_ago=3, caption="#ad haul from ExampleMart")],
+    )
+
+    flags = flags_for(
+        kol,
+        brief,
+        _brand_aliases(brief),
+        _competitor_aliases(brief),
+        0.1,
+        DEFAULT_CONFIG,
+        NOW,
+    )
+
+    assert "mentions_competitor" not in flags
+    assert "competitor_sponsored" not in flags

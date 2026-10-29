@@ -140,7 +140,6 @@ class MockBrandAnalyzer:
             ],
             competitors=["OtherLens", "FocusGear"],
             brand_handles=["@ExampleBrand", "examplebrand"],
-            target_followers=30_000,
             tier_label="micro",
             tier_confidence=0.7,
             tier_reason=tier_reason,

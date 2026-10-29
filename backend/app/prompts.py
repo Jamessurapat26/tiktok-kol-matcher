@@ -34,30 +34,41 @@ The object must contain exactly these keys:
 - brand_names: the brand's own proper names and common aliases or
   abbreviations as written in social posts, in Latin and Thai script, at
   most 8 items. Proper names only, never generic words like the category.
-- products: the brand's own core product lines or categories, at most 8 items.
-  Each item is a short noun phrase of at most 4 words.
+- key_products: the brand's own core product lines or categories, at most 8
+  items. Each item is a short noun phrase of at most 4 words.
   Prefer the primary sources over posts.
-- target_audience: object with age_min (integer or null), age_max (integer or
-  null), gender ("male", "female", or "any"), interests (at most 8 short
-  phrases of at most 3 words each), and location
+- price_tier: one of "budget", "mid", "premium", or "luxury".
+- target_audience: object with gender ("male", "female", or "any"),
+  age_range (a short string such as "18-34" or "any"), and interests
+  (at most 8 short phrases of at most 3 words each)
 - tone: how the brand speaks
-- content_style: the kind of social content that fits the brand
-- keywords_th: Thai search phrases in Thai script, at most 12 items.
+- topic_keywords_th: Thai search phrases in Thai script, at most 12 items.
   Each is a short search phrase of at most 3 words, written
   without sentence structure, without verbs with clauses, and without
   punctuation.
-- keywords_en: English search phrases, at most 12 items. Each is a
+- topic_keywords_en: English search phrases, at most 12 items. Each is a
   short search phrase of at most 3 words, without sentence
   structure or punctuation.
-- hashtags: at most 10 hashtags. Each starts with # and has no
-  spaces.
-- preferred_tiers: list using only "nano", "micro", "macro", and "mega"
-- reasoning: one or two sentences on how you read the sources
+- competitors: names of competing brands, at most 8 items. Proper names only.
+- brand_handles: the brand's own social handles, at most 8 items, with or
+  without a leading @.
+- target_followers: your best integer estimate of the creator follower count
+  this brand should target. It must be between 10000 and 2000000.
+- tier_label: one of "nano", "micro", "mid", or "macro".
+- tier_confidence: a number from 0 to 1 for how sure you are of the tier.
+- tier_reason: one short sentence explaining the tier choice.
 
-Give a best-estimate age_min and age_max from the brand type and audience cues.
-Use null for an age bound only when there is truly no signal. Prefer the
-primary sources over guesses. If Facebook text is missing, say so in reasoning
-and still return the profile.
+Tier guidance:
+- SME or small online shop -> micro, about 30,000 followers.
+- Nationwide Thai brand -> mid, about 150,000 followers.
+- Multinational or very large brand -> macro, about 800,000 followers.
+Use the price tier, the sales channels (online-only, small stores, or
+nationwide convenience stores), whether the brand is local or multinational,
+and the brand page follower count when it is available. Show the tier_label
+and tier_reason in the JSON.
+
+Prefer the primary sources over guesses. If Facebook text is missing, still
+return the best brief you can from the website.
 """
 
 # Each query becomes one paid Apify actor run, so the live analyzer enforces
@@ -71,11 +82,13 @@ trace. Do not wrap it in markdown.
 
 Shape: {{"queries": ["...", "..."]}}
 
-Each query is a short TikTok search string. Mix Thai (Thai script) and
-English. Do not repeat any query from the previous list, even with different
-casing or extra spaces. Round 1 is broad product and audience searches. Later
-rounds expand into hashtags, adjacent topics, and creator-style searches that
-were not used yet. Return between 6 and {MAX_QUERIES} queries.
+Each query is a short TikTok search string built from the brand's topic
+keywords or competitor names. Mix Thai (Thai script) and English. Never use
+the brand's own name, brand names, or brand handles in a query. Do not repeat
+any query from the previous list, even with different casing or extra spaces.
+Round 1 is broad topic and competitor searches. Later rounds expand into
+adjacent topics and creator-style searches that were not used yet. Return
+between 6 and {MAX_QUERIES} queries.
 """
 
 RERANK_SYSTEM = """\
@@ -190,18 +203,18 @@ def _brand_summary(brand: BrandProfile) -> str:
         [
             f"category: {brand.category}",
             f"brand_names: {', '.join(brand.brand_names)}",
-            f"products: {', '.join(brand.products)}",
+            f"key_products: {', '.join(brand.key_products)}",
+            f"price_tier: {brand.price_tier}",
             f"tone: {brand.tone}",
-            f"content_style: {brand.content_style}",
             (
-                f"audience: {audience.gender}, ages {audience.age_min}-{audience.age_max}, "
-                f"{audience.location}"
+                f"audience: {audience.gender}, ages {audience.age_range}, "
+                f"interests {', '.join(audience.interests)}"
             ),
-            f"interests: {', '.join(audience.interests)}",
-            f"keywords_th: {', '.join(brand.keywords_th)}",
-            f"keywords_en: {', '.join(brand.keywords_en)}",
-            f"hashtags: {' '.join(brand.hashtags)}",
-            f"preferred_tiers: {', '.join(brand.preferred_tiers)}",
+            f"topic_keywords_th: {', '.join(brand.topic_keywords_th)}",
+            f"topic_keywords_en: {', '.join(brand.topic_keywords_en)}",
+            f"competitors: {', '.join(brand.competitors)}",
+            f"tier: {brand.tier_label} (target {brand.target_followers} followers)",
+            f"tier_reason: {brand.tier_reason}",
         ]
     )
 

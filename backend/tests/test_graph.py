@@ -86,7 +86,7 @@ def test_loop_stops_at_max_rounds_even_with_too_few_candidates():
 
     queries = final["search_queries"]
     assert "blue light glasses thailand" in queries  # round 1
-    assert "#ExampleBrand tiktok" in queries  # round 2
+    assert "gaming creator thailand" in queries  # round 2
     normalized = [query.strip().casefold() for query in queries]
     assert len(set(normalized)) == len(normalized)
 
@@ -330,7 +330,7 @@ def test_discover_searches_only_the_latest_round_queries():
     assert set(round_1).isdisjoint(round_2)
     assert "blue light glasses thailand" in round_1
     assert "blue light glasses thailand" not in round_2
-    assert "#ExampleBrand tiktok" in round_2
+    assert "gaming creator thailand" in round_2
     assert round_2 == final["last_queries"]
     assert final["search_queries"] == round_1 + round_2
 

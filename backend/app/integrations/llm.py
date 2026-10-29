@@ -4,7 +4,7 @@ from typing import Literal, Protocol
 from ..models import BrandProfile, FacebookPage, KolProfile, ScoreBreakdown, TargetAudience
 
 _TOKEN_RE = re.compile(r"[\w\u0E00-\u0E7F]+")
-_TIER_ORDER: tuple[str, ...] = ("nano", "micro", "macro", "mega")
+_TIER_ORDER: tuple[str, ...] = ("nano", "micro", "mid", "macro")
 # Engagement rates at or above this fraction score 1.0. 0.15 keeps a 9% rate
 # and a 14% rate from both saturating, which a 0.08 ceiling used to do.
 ENGAGEMENT_CEILING = 0.15
@@ -23,10 +23,10 @@ def _kol_topics(kol: KolProfile) -> set[str]:
 
 
 def _tier_for(followers: int) -> str:
-    if followers >= 1_000_000:
-        return "mega"
-    if followers >= 100_000:
+    if followers >= 500_000:
         return "macro"
+    if followers >= 100_000:
+        return "mid"
     if followers >= 10_000:
         return "micro"
     return "nano"
@@ -95,10 +95,9 @@ def heuristic_score(
     brand_tokens = _tokens(
         " ".join(
             [
-                *brand.keywords_en,
-                *brand.keywords_th,
-                *brand.hashtags,
-                *brand.products,
+                *brand.topic_keywords_en,
+                *brand.topic_keywords_th,
+                *brand.key_products,
                 brand.category,
             ]
         )
@@ -127,15 +126,11 @@ def heuristic_score(
         confidence = "low"
 
     tier = _tier_for(kol.followers)
-    if not brand.preferred_tiers:
-        tier_fit = 0.5
-    elif tier in brand.preferred_tiers:
+    preferred = brand.tier_label
+    if tier == preferred:
         tier_fit = 1.0
     else:
-        distance = min(
-            abs(_TIER_ORDER.index(tier) - _TIER_ORDER.index(preferred))
-            for preferred in brand.preferred_tiers
-        )
+        distance = abs(_TIER_ORDER.index(tier) - _TIER_ORDER.index(preferred))
         tier_fit = 0.5 if distance == 1 else 0.15
 
     scores = ScoreBreakdown(
@@ -178,32 +173,29 @@ class MockBrandAnalyzer:
             sources.append("Facebook page")
 
         if sources:
-            reasoning = (
+            tier_reason = (
                 f"Mock analysis derived from the {' and '.join(sources)}: "
-                "a Bangkok gaming eyewear brand selling blue-light glasses to "
-                "young Thai gamers, students and screen workers."
+                "a small Bangkok online shop, so a micro creator around 30k."
             )
         else:
-            reasoning = "No source content was available; mock brand defaults used."
+            tier_reason = "No source content was available; mock brand defaults used."
 
         return BrandProfile(
             category="gaming eyewear / blue-light glasses",
             brand_names=["ExampleBrand"],
-            products=[
+            key_products=[
                 "blue-light glasses",
                 "gaming glasses",
                 "clip-on blue-light lenses",
             ],
+            price_tier="mid",
             target_audience=TargetAudience(
-                age_min=16,
-                age_max=34,
                 gender="any",
+                age_range="16-34",
                 interests=["gaming", "esports", "tech", "lifestyle", "eyewear"],
-                location="Thailand (Bangkok)",
             ),
             tone="energetic, friendly, gamer-coded",
-            content_style="short-form reviews, gameplay commentary and desk setups",
-            keywords_th=[
+            topic_keywords_th=[
                 "แว่นกันแสงสีฟ้า",
                 "แว่นเกมมิ่ง",
                 "ถนอมสายตา",
@@ -211,7 +203,7 @@ class MockBrandAnalyzer:
                 "เทคโนโลยี",
                 "ไลฟ์สไตล์",
             ],
-            keywords_en=[
+            topic_keywords_en=[
                 "blue light glasses",
                 "gaming glasses",
                 "eyewear",
@@ -221,15 +213,12 @@ class MockBrandAnalyzer:
                 "esports",
                 "lifestyle",
             ],
-            hashtags=[
-                "#ExampleBrand",
-                "#BlueLightGlasses",
-                "#GamingGlasses",
-                "#แว่นกันแสงสีฟ้า",
-                "#เกมเมอร์",
-            ],
-            preferred_tiers=["micro", "macro", "mega"],
-            reasoning=reasoning,
+            competitors=["OtherLens", "FocusGear"],
+            brand_handles=["@ExampleBrand", "examplebrand"],
+            target_followers=30_000,
+            tier_label="micro",
+            tier_confidence=0.7,
+            tier_reason=tier_reason,
         )
 
     def generate_queries(
@@ -239,24 +228,21 @@ class MockBrandAnalyzer:
         round: int,
     ) -> list[str]:
         if round <= 1:
-            # Round 1: broad Thai + English product and audience keywords.
+            # Round 1: broad topic and competitor searches.
             candidates = [
-                *(f"{keyword} thailand" for keyword in brand.keywords_en[:3]),
-                *(f"{keyword} รีวิว" for keyword in brand.keywords_th[:3]),
-                *(
-                    f"{interest} creator thailand"
-                    for interest in brand.target_audience.interests[:2]
-                ),
+                *(f"{keyword} thailand" for keyword in brand.topic_keywords_en[:3]),
+                *(f"{keyword} รีวิว" for keyword in brand.topic_keywords_th[:3]),
+                *(f"{competitor} รีวิว" for competitor in brand.competitors[:2]),
             ]
         else:
-            # Round 2: hashtag-led and adjacent creator searches.
+            # Round 2: adjacent topic and competitor searches.
             candidates = [
-                *(f"{hashtag} tiktok" for hashtag in brand.hashtags[:4]),
                 *(
                     f"{keyword} creator thailand"
-                    for keyword in brand.keywords_en[3:6]
+                    for keyword in brand.topic_keywords_en[3:6]
                 ),
-                *(f"{hashtag} รีวิว" for hashtag in brand.hashtags[3:5]),
+                *(f"{keyword} creator" for keyword in brand.topic_keywords_th[3:6]),
+                *(f"{competitor} tiktok" for competitor in brand.competitors[2:4]),
             ]
 
         previous = {query.strip().casefold() for query in previous_queries}

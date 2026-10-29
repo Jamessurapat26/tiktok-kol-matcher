@@ -60,7 +60,8 @@ def test_brand_prompt_includes_recent_posts_and_website():
     assert "at most 3 words" in system
     assert "at most 4 words" in system
     assert "at most 8 items" in system
-    assert "at most 10 hashtags" in system
+    assert "target_followers" in system
+    assert "SME or small online shop" in system
 
     assert "website: https://example-brand.co.th" in user
     assert "categories: Eyewear Store" in user

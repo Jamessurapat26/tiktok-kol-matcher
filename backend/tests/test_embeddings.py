@@ -213,10 +213,10 @@ def test_brand_and_kol_text_include_the_retrieval_fields():
     brand = MockBrandAnalyzer().analyze_brand("website", None)
     text = brand_query_text(brand)
     assert brand.category in text
-    assert brand.products[0] in text
+    assert brand.key_products[0] in text
     assert brand.target_audience.interests[0] in text
-    assert brand.keywords_en[0] in text
-    assert brand.hashtags[0] in text
+    assert brand.topic_keywords_en[0] in text
+    assert brand.competitors[0] in text
     assert "audience:" in text
 
     kol = KolProfile(

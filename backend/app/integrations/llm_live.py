@@ -36,6 +36,7 @@ import openai
 from openai import OpenAI
 from pydantic import Field, ValidationError
 
+from ..brand_match import normalize_for_match
 from ..brand_tidy import tidy_brand_profile
 from ..models import (
     BrandProfile,
@@ -440,7 +441,11 @@ class LiveBrandAnalyzer:
             QueryBatch,
             accept,
         )
-        fresh = _new_queries(batch.queries, set(previous))
+        fresh = [
+            query
+            for query in _new_queries(batch.queries, set(previous))
+            if not _contains_brand_alias(query, brand)
+        ]
         if not fresh:
             raise LlmOutputError(
                 f"LLM returned no new search queries for round {round}"
@@ -601,11 +606,11 @@ def _has_reasoning(message: Any) -> bool:
 
 _BRAND_LIST_FIELDS = (
     "brand_names",
-    "products",
-    "keywords_th",
-    "keywords_en",
-    "hashtags",
-    "preferred_tiers",
+    "key_products",
+    "topic_keywords_th",
+    "topic_keywords_en",
+    "competitors",
+    "brand_handles",
 )
 
 
@@ -636,6 +641,19 @@ def _coerce_brand_lists(data: dict[str, Any]) -> dict[str, Any]:
             "interests": _as_list(audience["interests"]),
         }
     return out
+
+
+def _contains_brand_alias(query: str, brand: BrandProfile) -> bool:
+    """True when a query repeats the brand's own name or handle."""
+    text = normalize_for_match(query)
+    return any(
+        alias and alias in text
+        for alias in (
+            normalize_for_match(value)
+            for value in (*brand.brand_names, *brand.brand_handles)
+        )
+        if len(alias) >= 3
+    )
 
 
 def _new_queries(queries: list[str], previous: set[str]) -> list[str]:

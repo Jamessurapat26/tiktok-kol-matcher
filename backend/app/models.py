@@ -10,6 +10,8 @@ from pydantic import (
     model_validator,
 )
 
+from .matching_config import DEFAULT_CONFIG
+
 
 class DomainModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -122,31 +124,41 @@ class FacebookPage(DomainModel):
 
 
 class TargetAudience(DomainModel):
-    age_min: int | None
-    age_max: int | None
     gender: Literal["male", "female", "any"]
+    age_range: str
     interests: list[str]
-    location: str
 
 
 class BrandProfile(DomainModel):
-    """Structured brand profile.
+    """Structured brand brief returned by the brand-analysis LLM call.
 
     ``brand_names`` has a default so stored profiles and fixtures written
-    before that field existed stay valid.
+    before that field existed stay valid. ``target_followers`` is boundary
+    validated because the value comes from the model.
     """
 
     category: str
-    brand_names: list[str] = Field(default_factory=list)
-    products: list[str]
+    key_products: list[str]
+    price_tier: Literal["budget", "mid", "premium", "luxury"]
     target_audience: TargetAudience
     tone: str
-    content_style: str
-    keywords_th: list[str]
-    keywords_en: list[str]
-    hashtags: list[str]
-    preferred_tiers: list[Literal["nano", "micro", "macro", "mega"]]
-    reasoning: str
+    topic_keywords_th: list[str]
+    topic_keywords_en: list[str]
+    competitors: list[str]
+    brand_handles: list[str]
+    brand_names: list[str] = Field(default_factory=list)
+    target_followers: int
+    tier_label: Literal["nano", "micro", "mid", "macro"]
+    tier_confidence: float = Field(ge=0, le=1)
+    tier_reason: str
+
+    @field_validator("target_followers")
+    @classmethod
+    def _clamp_target_followers(cls, value: int) -> int:
+        return min(
+            max(value, DEFAULT_CONFIG.target_followers_min),
+            DEFAULT_CONFIG.target_followers_max,
+        )
 
 
 def normalize_handle(handle: str) -> str:

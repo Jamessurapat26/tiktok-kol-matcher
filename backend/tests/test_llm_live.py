@@ -55,7 +55,6 @@ from app.models import (
     KolProfile,
     MatchRequest,
     MatchWeights,
-    TargetAudience,
 )
 from app.nodes import make_nodes
 from app.state import MatchState
@@ -80,21 +79,23 @@ _KEY_ENVS = (
 
 _BRAND_JSON = {
     "category": "blue-light glasses",
-    "products": ["blue-light glasses"],
+    "key_products": ["blue-light glasses"],
+    "price_tier": "mid",
     "target_audience": {
-        "age_min": 18,
-        "age_max": 30,
         "gender": "any",
+        "age_range": "18-30",
         "interests": ["gaming"],
-        "location": "Thailand",
     },
     "tone": "friendly",
-    "content_style": "short reviews",
-    "keywords_th": ["แว่น"],
-    "keywords_en": ["blue light glasses"],
-    "hashtags": ["#glasses"],
-    "preferred_tiers": ["micro"],
-    "reasoning": "The site sells glasses.",
+    "topic_keywords_th": ["แว่น"],
+    "topic_keywords_en": ["blue light glasses"],
+    "competitors": ["OtherLens"],
+    "brand_handles": ["@ExampleBrand"],
+    "brand_names": ["ExampleBrand"],
+    "target_followers": 30_000,
+    "tier_label": "micro",
+    "tier_confidence": 0.7,
+    "tier_reason": "A small online shop.",
 }
 
 
@@ -397,7 +398,7 @@ def test_success_parses_fenced_json_and_sends_configured_request():
         analyzer.close()
 
     assert profile.category == "blue-light glasses"
-    assert profile.keywords_th == ["แว่น"]
+    assert profile.topic_keywords_th == ["แว่น"]
     assert len(queue.requests) == 1
     request = queue.requests[0]
     body = _body(request)
@@ -425,7 +426,7 @@ def test_none_content_is_retried_once_then_succeeds():
     finally:
         analyzer.close()
 
-    assert profile.products == ["blue-light glasses"]
+    assert profile.key_products == ["blue-light glasses"]
     assert len(queue.requests) == 2
 
 
@@ -1133,10 +1134,10 @@ def test_smoke_script_exits_2_without_a_key(monkeypatch):
 def test_brand_list_fields_given_as_strings_are_split():
     messy = {
         **_BRAND_JSON,
-        "hashtags": "#glasses #gaming",
-        "keywords_en": "blue light glasses, gaming glasses",
-        "products": "clip-on lenses; gaming glasses\nreading glasses",
-        "preferred_tiers": "micro",
+        "competitors": "OtherLens, FocusGear",
+        "brand_handles": "@ExampleBrand, examplebrand",
+        "topic_keywords_en": "blue light glasses, gaming glasses",
+        "key_products": "clip-on lenses; gaming glasses\nreading glasses",
         "target_audience": {**_BRAND_JSON["target_audience"], "interests": "gaming, study"},
     }
     queue = _Queue([(200, _completion(json.dumps(messy)))])
@@ -1146,10 +1147,14 @@ def test_brand_list_fields_given_as_strings_are_split():
     finally:
         analyzer.close()
 
-    assert profile.hashtags == ["#glasses", "#gaming"]
-    assert profile.keywords_en == ["blue light glasses", "gaming glasses"]
-    assert profile.products == ["clip-on lenses", "gaming glasses", "reading glasses"]
-    assert profile.preferred_tiers == ["micro"]
+    assert profile.competitors == ["OtherLens", "FocusGear"]
+    assert profile.brand_handles == ["@ExampleBrand", "examplebrand"]
+    assert profile.topic_keywords_en == ["blue light glasses", "gaming glasses"]
+    assert profile.key_products == [
+        "clip-on lenses",
+        "gaming glasses",
+        "reading glasses",
+    ]
     assert profile.target_audience.interests == ["gaming", "study"]
     assert len(queue.requests) == 1
 
@@ -1157,27 +1162,25 @@ def test_brand_list_fields_given_as_strings_are_split():
 def test_analyze_brand_tidies_a_polluted_profile():
     polluted = {
         **_BRAND_JSON,
-        "products": [
+        "key_products": [
             "blue-light glasses",
             "free cotton towel from the latest giveaway post",
             "towel",
         ],
-        "keywords_th": [
+        "topic_keywords_th": [
             "แว่นตา",
             (
                 "แว่นตากันแสงสีฟ้าสำหรับเกมเมอร์ที่ต้องนั่งหน้าจอคอมพิวเตอร์"
                 "เป็นเวลานานทุกวันโดยไม่พักสายตา"
             ),
         ],
-        "keywords_en": [
+        "topic_keywords_en": [
             "blue light glasses",
             "what to look for when buying blue light glasses",
         ],
-        "hashtags": ["#Blue Light", "##Glasses", "x" * 40],
+        "competitors": ["OtherLens", "a competitor name that is far too long"],
         "target_audience": {
             **_BRAND_JSON["target_audience"],
-            "age_min": 75,
-            "age_max": 18,
             "interests": ["gaming", "too many words in one interest"],
         },
     }
@@ -1186,11 +1189,9 @@ def test_analyze_brand_tidies_a_polluted_profile():
 
     profile = analyzer.analyze_brand("A shop sells blue-light glasses.", _page())
 
-    assert profile.products == ["blue-light glasses", "towel"]
-    assert profile.keywords_th == ["แว่นตา"]
-    assert profile.keywords_en == ["blue light glasses"]
-    assert profile.hashtags == ["#BlueLight", "#Glasses"]
-    assert profile.target_audience.age_min == 18
-    assert profile.target_audience.age_max == 75
+    assert profile.key_products == ["blue-light glasses", "towel"]
+    assert profile.topic_keywords_th == ["แว่นตา"]
+    assert profile.topic_keywords_en == ["blue light glasses"]
+    assert profile.competitors == ["OtherLens"]
     assert profile.target_audience.interests == ["gaming"]
     assert len(chat.messages) == 1

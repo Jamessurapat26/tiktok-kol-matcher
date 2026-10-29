@@ -164,33 +164,33 @@ class MockEmbedder:
 def brand_query_text(brand: BrandProfile) -> str:
     """Build the brand retrieval query.
 
-    Uses category, products, audience, keywords, and hashtags. Tone and
-    content style are left out so the query stays on what the creator covers.
+    Uses category, key products, audience, topic keywords, and competitors.
+    Tone and tier are left out so the query stays on what the creator covers.
     """
     audience = brand.target_audience
-    if audience.age_min is None and audience.age_max is None:
-        ages = "unspecified"
-    else:
-        low = "" if audience.age_min is None else str(audience.age_min)
-        high = "" if audience.age_max is None else str(audience.age_max)
-        ages = f"{low}-{high}"
-    products = ", ".join(item.strip() for item in brand.products if item.strip())
-    interests = ", ".join(item.strip() for item in audience.interests if item.strip())
+    products = ", ".join(
+        item.strip() for item in brand.key_products if item.strip()
+    )
+    interests = ", ".join(
+        item.strip() for item in audience.interests if item.strip()
+    )
     keywords = ", ".join(
         item.strip()
-        for item in [*brand.keywords_th, *brand.keywords_en]
+        for item in [*brand.topic_keywords_th, *brand.topic_keywords_en]
         if item.strip()
     )
-    hashtags = " ".join(item.strip() for item in brand.hashtags if item.strip())
+    competitors = ", ".join(
+        item.strip() for item in brand.competitors if item.strip()
+    )
     lines = [
         brand.category.strip(),
         f"products: {products}" if products else "",
         (
-            f"audience: {audience.gender}, ages {ages}, "
-            f"{audience.location.strip()}, interests {interests}"
+            f"audience: {audience.gender}, ages {audience.age_range}, "
+            f"interests {interests}"
         ),
         f"keywords: {keywords}" if keywords else "",
-        f"hashtags: {hashtags}" if hashtags else "",
+        f"competitors: {competitors}" if competitors else "",
     ]
     return "\n".join(line for line in lines if line.strip())
 

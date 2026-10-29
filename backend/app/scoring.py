@@ -24,11 +24,13 @@ from .models import (
     VideoStats,
     normalize_handle,
 )
+from .topic_lexicon import expand_terms
 
 # English hashtags must end at a tag boundary, so "#adidas" and "#adventure"
 # are not "#ad". The Thai markers are substring matches exactly as the design
 # lists them, because Thai tags run straight into the next word.
 _SPONSOR_TAG_RE = re.compile(r"#(?:ad|sponsored)(?![a-z0-9_])")
+_HASHTAG_RE = re.compile(r"#[^\s#]+")
 _THAI_SPONSOR_MARKERS = (
     "#โฆษณา",
     "#รีวิว",
@@ -84,10 +86,23 @@ def recent_videos(kol: KolProfile, cfg: MatchingConfig) -> list[VideoStats]:
     return (dated + undated)[: cfg.recent_videos]
 
 
-def _normalized_terms(values: Iterable[str]) -> list[str]:
+def _topic_terms(brief: BrandProfile) -> list[str]:
+    """Return normalized brief terms plus lexicon terms for its categories.
+
+    The brief's own terms come first. A category is only widened when the
+    brief's category, key products, or topic keywords mention a lexicon
+    trigger, so an unrelated brief is not expanded.
+    """
+    category_parts = brief.category.replace("/", ",").split(",")
+    explicit = [
+        *brief.topic_keywords_th,
+        *brief.topic_keywords_en,
+        *brief.key_products,
+        *category_parts,
+    ]
     terms: list[str] = []
     seen: set[str] = set()
-    for value in values:
+    for value in (*explicit, *expand_terms(explicit)):
         term = normalize_for_match(str(value))
         if len(term) < 2 or term in seen:
             continue
@@ -96,24 +111,27 @@ def _normalized_terms(values: Iterable[str]) -> list[str]:
     return terms
 
 
-def _topic_terms(brief: BrandProfile) -> list[str]:
-    category_parts = brief.category.replace("/", ",").split(",")
-    return _normalized_terms(
-        (
-            *brief.topic_keywords_th,
-            *brief.topic_keywords_en,
-            *brief.key_products,
-            *category_parts,
-        )
-    )
+def _video_text(video: VideoStats) -> str:
+    """Return the normalized caption plus its hashtags.
+
+    TikTok captions already contain their hashtags. Extracting the tags again
+    keeps the match explicit and future-proof if a source ever returns tags
+    separately from the caption body.
+    """
+    hashtags = " ".join(_HASHTAG_RE.findall(video.caption))
+    return normalize_for_match(f"{video.caption} {hashtags}")
 
 
 def video_matches_brief(video: VideoStats, brief: BrandProfile) -> bool:
-    """True when one video's caption names a brief topic term."""
-    return any(
-        term in normalize_for_match(video.caption)
-        for term in _topic_terms(brief)
-    )
+    """True when one video's caption or hashtags names a brief topic term."""
+    text = _video_text(video)
+    return any(term in text for term in _topic_terms(brief))
+
+
+def _bio_matches(kol: KolProfile, terms: Iterable[str]) -> bool:
+    """True when the creator bio names any expanded brief topic term."""
+    bio = normalize_for_match(kol.bio or "")
+    return bool(bio) and any(term in bio for term in terms)
 
 
 def on_topic_share(
@@ -121,19 +139,25 @@ def on_topic_share(
     brief: BrandProfile,
     cfg: MatchingConfig,
 ) -> float:
-    """Share of recent videos whose caption names a brief topic term."""
-    videos = recent_videos(kol, cfg)
-    if not videos:
-        return 0.0
+    """Share of recent videos that name an expanded brief topic term.
+
+    Brief terms are widened with the built-in category lexicon. A bio mention
+    is partial evidence when the recent videos are thin or use unrelated
+    wording, so the result is ``max(video share, cfg.on_topic_bio_floor)``.
+    """
     terms = _topic_terms(brief)
     if not terms:
         return 0.0
-    hits = sum(
-        1
-        for video in videos
-        if any(term in normalize_for_match(video.caption) for term in terms)
-    )
-    return hits / len(videos)
+
+    videos = recent_videos(kol, cfg)
+    video_share = 0.0
+    if videos:
+        texts = [_video_text(video) for video in videos]
+        hits = sum(1 for text in texts if any(term in text for term in terms))
+        video_share = hits / len(videos)
+
+    bio_floor = cfg.on_topic_bio_floor if _bio_matches(kol, terms) else 0.0
+    return max(video_share, bio_floor)
 
 
 def percentile_ranks(values: list[float]) -> list[float]:

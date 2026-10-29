@@ -25,6 +25,9 @@ class MatchingConfig:
     fit_w_judge: float = 0.3
     mention_bonus: float = 0.05
 
+    # Partial on-topic credit when the bio matches but recent videos do not.
+    on_topic_bio_floor: float = 0.3
+
     # Quality = E + T + A_eff.
     quality_w_e: float = 0.45
     quality_w_t: float = 0.30
@@ -94,6 +97,7 @@ class MatchingConfig:
             "mmr_lambda",
             "f_conf_unjudged",
             "f_conf_judged",
+            "on_topic_bio_floor",
         ):
             value = getattr(self, name)
             if not math.isfinite(value) or not 0.0 <= value <= 1.0:

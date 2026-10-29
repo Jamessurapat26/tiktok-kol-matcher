@@ -12,7 +12,7 @@ survivor on four signals:
 
 | Score | Meaning | How it is computed |
 | --- | --- | --- |
-| F | Fit | `0.4·sim + 0.3·on_topic + 0.3·judge`, plus a `0.05` mention bonus (F capped at 1). `sim` is the brief-to-caption embedding cosine as a pool percentile, `on_topic` the share of recent videos that name a topic keyword, and `judge` the LLM rubric score. |
+| F | Fit | `0.4·sim + 0.3·on_topic + 0.3·judge`, plus a `0.05` mention bonus (F capped at 1). `sim` is the brief-to-caption embedding cosine as a pool percentile, `on_topic` the share of recent videos that name an expanded brief topic term (with a small bio fallback), and `judge` the LLM rubric score. |
 | E | Engagement quality | Median per-video `(likes + comments + shares) / views`, shrunk toward the same-tier median (`k = 3`), then ranked within the follower tier. `E = 0.8·ER percentile + 0.2·reach percentile`, where reach is median views divided by followers. |
 | T | Tier fit | `exp(−\|log10(followers) − log10(target_followers)\| / σ)` with `σ = 0.5 + 0.5·(1 − tier_confidence)`. |
 | A_eff | Audience fit (estimate) | The judge's text-based audience estimate `A`, shrunk toward neutral by its confidence `c`: `A_eff = c·A + (1 − c)·0.5`. Before judging, `A_eff = 0.5`. |
@@ -325,7 +325,14 @@ MMR     = argmax λ·Final − (1 − λ)·max_similarity_to_selected, λ = 0.7
 
 **F — fit.** `sim` is the cosine between the brief and the creator's recent
 captions, converted to a percentile within the candidate pool. `on_topic` is
-the share of up to 10 recent videos whose caption contains a brief topic term.
+the share of up to 10 recent videos whose caption or hashtags contains a brief
+topic term. Brief terms are widened offline with the built-in category lexicon
+in `backend/app/topic_lexicon.py`: when the brief's category, products, or
+topic keywords mention a common category (skincare/beauty, makeup, haircare,
+food, beverage, fashion, fitness, tech/gadget, home, baby/mom, pet, travel, or
+finance), matching Thai and English terms for that category are added. A
+matching creator bio supplies partial credit, so `on_topic = max(video share,
+cfg.on_topic_bio_floor)`; the floor is `0.3` by default.
 `judge` is the LLM rubric score. Before the judge stage, `judge` is the `sim`
 percentile, so the first pass and the final pass use the same formula.
 
@@ -517,9 +524,10 @@ and the web reader checks resolved addresses before a direct fetch.
   `store`, `official`, `news`, `media`, and `tv` inside handle segments and the
   nickname, so a legitimate creator with `official` or `tv` in the name can be
   dropped.
-- **`on_topic` is keyword-based.** It counts a video only when a brief topic
-  term appears in the caption, so a relevant video described in different
-  words is missed, and a passing mention counts as a hit.
+- **`on_topic` is keyword-based.** Terms are expanded from a small built-in
+  category lexicon with a bio fallback, but a relevant video described in
+  unseen words can still be missed, and a passing mention still counts as a
+  hit. Adding a new niche means adding its terms to `topic_lexicon.py`.
 - **The Apify budget is an estimate.** It is computed from item counts and
   per-item rates measured on this account, not from Apify's billing. If Apify's
   prices rise, real spend can pass the budget until the rates are updated.

@@ -381,6 +381,8 @@ def make_nodes(
                 )
             except ApifyBudgetExceeded:
                 # Keep this profile and the rest un-enriched instead of failing.
+                # The guard refused the run, so it is not billed.
+                attempted -= 1
                 enriched.append(kol)
                 budget_reached = True
                 skipped += 1

@@ -67,8 +67,8 @@ def test_human_output_prints_table_and_progress(capsys):
     assert "[ 1]" in captured.err
     assert "scrape_" in captured.err
     # Merged unique totals, not the raw row count from the node update.
-    assert "discovered=22 (+22 new)" in captured.err
-    assert "discovered=36 (+14 new)" in captured.err
+    assert "discovered=25 (+25 new)" in captured.err
+    assert "discovered=48 (+23 new)" in captured.err
     assert "discovered+" not in captured.err
     assert "@" not in captured.out
 

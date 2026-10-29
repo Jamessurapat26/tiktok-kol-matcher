@@ -1,17 +1,14 @@
-import hashlib
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
 from ..models import KolProfile, normalize_handle, outranks
+from .tiktok_videos import video_from_days_ago
 
 _KOL_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "kols.json"
-
-
-def _handle_seed(handle: str) -> int:
-    """Stable integer derived from a handle (never Python's salted hash)."""
-    digest = hashlib.sha256(normalize_handle(handle).encode("utf-8")).hexdigest()
-    return int(digest[:8], 16)
+_SUMMARY_CHARS = 400
+_WEEK_SECONDS = 7 * 24 * 60 * 60
 
 
 class KolEnricher(Protocol):
@@ -43,23 +40,51 @@ class MockKolEnricher:
 
     def enrich(self, kol: KolProfile) -> dict[str, Any]:
         raw = self._by_handle.get(normalize_handle(kol.handle), {})
-        seed = _handle_seed(kol.handle)
+        raw_videos = [
+            video
+            for video in raw.get("profile_videos", [])
+            if isinstance(video, dict)
+        ]
+        if not raw_videos:
+            return {}
 
-        fixture_rate = raw.get("engagement_rate")
-        if (
-            isinstance(fixture_rate, (int, float))
-            and 0 <= float(fixture_rate) <= 1
-        ):
-            engagement_rate = round(float(fixture_rate), 4)
-        else:
-            engagement_rate = round(0.01 + (seed % 90) / 1000, 4)
-
+        now = datetime.now(UTC)
+        videos = [video_from_days_ago(video, now) for video in raw_videos]
         update: dict[str, Any] = {
-            "median_engagement_rate": engagement_rate,
-            "posts_per_week": round(1.0 + (seed % 50) / 10, 1),
+            "videos": videos,
+            "stats_source": "profile",
         }
-        topics = [str(topic) for topic in raw.get("topics", []) if str(topic)]
-        if topics:
-            update["content_summary"] = "Topics: " + ", ".join(topics)
-
+        per_week = _posts_per_week(videos)
+        if per_week is not None:
+            update["posts_per_week"] = per_week
+        summary = _content_summary(videos)
+        if summary:
+            update["content_summary"] = summary
         return update
+
+
+def _posts_per_week(videos: list[dict[str, Any]]) -> float | None:
+    """``(n - 1) / weeks`` across the fixture's dated profile videos."""
+    stamps = [
+        datetime.fromisoformat(str(video["posted_at"])).timestamp()
+        for video in videos
+        if video.get("posted_at")
+    ]
+    if len(stamps) < 2:
+        return None
+    span = max(stamps) - min(stamps)
+    if span <= 0:
+        return None
+    return round((len(stamps) - 1) / (span / _WEEK_SECONDS), 2)
+
+
+def _content_summary(videos: list[dict[str, Any]]) -> str | None:
+    captions = [
+        str(video["caption"]).strip()
+        for video in videos
+        if str(video.get("caption") or "").strip()
+    ]
+    if not captions:
+        return None
+    summary = "Recent posts: " + " | ".join(captions[:3])
+    return summary[:_SUMMARY_CHARS].rstrip()

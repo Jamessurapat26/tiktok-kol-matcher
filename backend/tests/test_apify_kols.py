@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -17,6 +18,7 @@ from app.integrations import ApifyConfigError, build_integrations
 from app.integrations.apify import ApifyAuthError, ApifyError
 from app.integrations.embeddings import MockEmbedder
 from app.integrations.facebook import MockFacebookScraper
+from app.integrations.kol_enricher import MockKolEnricher
 from app.integrations.kol_enricher_live import (
     ApifyKolEnricher,
     content_summary,
@@ -25,9 +27,11 @@ from app.integrations.kol_enricher_live import (
     enrich_from_items,
     posts_per_week,
 )
+from app.integrations.kol_search import MockKolSearch
 from app.integrations.kol_search_live import (
     ApifyKolSearch,
     classify_query,
+    map_search_item,
     map_search_items,
 )
 from app.integrations.llm import MockBrandAnalyzer
@@ -110,6 +114,74 @@ def test_search_fixture_maps_authors_and_keeps_bad_rows():
     assert "text_language" not in shaiie
 
     assert [row["errorCode"] for row in errors] == ["MISSING_AUTHOR", "PROFILE_PRIVATE"]
+
+
+def test_search_fixture_keeps_per_video_stats_and_concatenates_per_author():
+    rows = map_search_items(_search_sample())
+
+    greta = next(row for row in rows if row.get("handle") == "gretalynnhihi")
+    assert [video["url"] for video in greta["videos"]] == [
+        "https://www.tiktok.com/@gretalynnhihi/video/7543693751290481942",
+        "https://www.tiktok.com/@gretalynnhihi/video/7543693751290481999",
+    ]
+    first, second = greta["videos"]
+    assert (first["views"], first["likes"], first["comments"], first["shares"]) == (
+        145900,
+        23400,
+        46,
+        145,
+    )
+    assert first["caption"] == "ootd #foruyou #outfit"
+    assert second["caption"] == "second look #outfit"
+    assert datetime.fromisoformat(first["posted_at"]) == datetime(
+        2025, 8, 28, 17, 44, 35, tzinfo=UTC
+    )
+    assert datetime.fromisoformat(first["posted_at"]).tzinfo is not None
+
+    shaiie = next(row for row in rows if row.get("handle") == "shaiie_foeva")
+    assert len(shaiie["videos"]) == 1
+    assert shaiie["videos"][0]["caption"] == ""
+
+
+def test_map_search_item_builds_video_url_and_defaults_missing_counts():
+    row = map_search_item(
+        {
+            "id": 7543693751290481999,
+            "text": "  late night  gaming\n#eyewear ",
+            "createTimeISO": "2025-08-28T16:53:20.000Z",
+            "authorMeta": {"name": "demo_user", "fans": 10},
+        }
+    )
+
+    video = row["videos"][0]
+    assert video["url"] == (
+        "https://www.tiktok.com/@demo_user/video/7543693751290481999"
+    )
+    assert (video["views"], video["likes"], video["comments"], video["shares"]) == (
+        0,
+        0,
+        0,
+        0,
+    )
+    assert video["caption"] == "late night gaming #eyewear"
+    assert datetime.fromisoformat(video["posted_at"]).tzinfo is not None
+
+
+def test_map_search_items_dedupes_videos_by_url():
+    item = {
+        "id": "1234567890123456789",
+        "text": "same video",
+        "createTime": 1_756_403_075,
+        "webVideoUrl": "https://www.tiktok.com/@repeat/video/1234567890123456789",
+        "authorMeta": {"name": "repeat", "fans": 100},
+        "diggCount": 10,
+        "commentCount": 1,
+        "shareCount": 1,
+        "playCount": 100,
+    }
+
+    row = map_search_items([item, item])[0]
+    assert len(row["videos"]) == 1
 
 
 def test_search_captions_are_kept_joined_and_capped():
@@ -369,6 +441,14 @@ def test_profile_fixture_engagement_median_cadence_and_summary():
     assert "#eyewear" in update["content_summary"]
     assert "Hashtags: #gadgets, #eyewear" in update["content_summary"]
     assert "programmable" not in update["content_summary"]
+    assert update["stats_source"] == "profile"
+    assert len(update["videos"]) == 3
+    assert update["videos"][0]["url"] == (
+        "https://www.tiktok.com/@apifytech/video/7353646097262202201"
+    )
+    assert update["videos"][0]["caption"] == "desk setup tour #gadgets"
+    assert update["videos"][0]["views"] == 1000
+    assert datetime.fromisoformat(update["videos"][0]["posted_at"]).tzinfo is not None
 
 
 def test_engagement_rate_uses_views_then_followers_and_caps_the_median():
@@ -482,6 +562,8 @@ def test_enricher_request_and_cache(tmp_path):
     assert calls["n"] == 1
     assert second == first
     assert first["median_engagement_rate"] == 0.14
+    assert first["stats_source"] == "profile"
+    assert first["videos"]
     assert "แว่นกันแสง" in first["content_summary"]
     raw = next(tmp_path.glob("*.json")).read_text(encoding="utf-8")
     assert "แว่นกันแสง" in raw
@@ -489,6 +571,8 @@ def test_enricher_request_and_cache(tmp_path):
     assert cached["handle"] == "apifytech"
     assert cached["fetched_at"] == 1_000.0
     assert cached["update"]["posts_per_week"] == 1.0
+    assert cached["update"]["stats_source"] == "profile"
+    assert cached["update"]["videos"]
 
 
 def test_enricher_cache_expiry_and_corrupt_file(tmp_path):
@@ -654,6 +738,81 @@ def test_default_apify_cache_dir(monkeypatch, tmp_path):
 
     monkeypatch.setenv("KOL_CACHE_DIR", str(tmp_path))
     assert default_apify_cache_dir() == tmp_path / "apify"
+
+
+def test_mock_search_converts_days_ago_to_recent_utc_posted_at():
+    fixtures = [
+        {
+            "handle": "demo_creator",
+            "url": "https://www.tiktok.com/@demo_creator",
+            "nickname": "Demo",
+            "followers": 1000,
+            "bio": "demo",
+            "source": "apify",
+            "text_language": "th",
+            "location_created": "TH",
+            "query_group": 1,
+            "videos": [
+                {
+                    "url": "https://www.tiktok.com/@demo_creator/video/1234567890123456789",
+                    "views": 100,
+                    "likes": 10,
+                    "comments": 1,
+                    "shares": 2,
+                    "days_ago": 3,
+                    "caption": "demo #gaming",
+                }
+            ],
+        }
+    ]
+
+    rows = MockKolSearch(fixtures).search(["demo"], round=1)
+
+    video = rows[0]["videos"][0]
+    assert "days_ago" not in video
+    posted = datetime.fromisoformat(video["posted_at"])
+    assert posted.tzinfo is not None
+    assert 2 <= (datetime.now(UTC) - posted).total_seconds() / 86400 <= 4
+    assert MockKolSearch(fixtures).search(["demo"], round=2) == []
+
+
+def test_mock_enricher_returns_profile_videos_and_stats_source():
+    fixtures = [
+        {
+            "handle": "demo_creator",
+            "source": "apify",
+            "profile_videos": [
+                {
+                    "url": "https://www.tiktok.com/@demo_creator/video/1",
+                    "views": 100,
+                    "likes": 5,
+                    "comments": 1,
+                    "shares": 1,
+                    "days_ago": 2,
+                    "caption": "first profile caption #gaming",
+                },
+                {
+                    "url": "https://www.tiktok.com/@demo_creator/video/2",
+                    "views": 200,
+                    "likes": 20,
+                    "comments": 2,
+                    "shares": 2,
+                    "days_ago": 16,
+                    "caption": "second profile caption #eyewear",
+                },
+            ],
+        }
+    ]
+    kol = _kol("demo_creator")
+
+    update = MockKolEnricher(fixtures).enrich(kol)
+
+    assert update["stats_source"] == "profile"
+    assert len(update["videos"]) == 2
+    assert update["posts_per_week"] == 0.5
+    assert update["content_summary"].startswith("Recent posts:")
+    assert "first profile caption" in update["content_summary"]
+    assert "median_engagement_rate" not in update
 
 
 def test_smoke_script_exits_2_without_a_token(monkeypatch):

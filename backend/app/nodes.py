@@ -57,10 +57,11 @@ def _guarded(name: str, *, stage_on_error: bool = True) -> Callable[[Node], Node
 def _kol_from_fixture(raw: dict) -> KolProfile:
     """Convert an Apify-style raw record into a KolProfile.
 
-    Fixture-only fields (topics, query_group, engagement_rate) are deliberately
-    dropped here; enrichment re-reads the fixture through its own integration.
-    Actor error items (``errorCode``) and mapper rejects (``error``) are raised
-    so the discover loop skips and records that row.
+    Per-video stats are kept so scoring can use search data. Fixture-only
+    fields (query_group) are deliberately dropped here; enrichment re-reads the
+    fixture through its own integration. Actor error items (``errorCode``) and
+    mapper rejects (``error``) are raised so the discover loop skips and records
+    that row.
     """
     error_code = raw.get("errorCode")
     error_detail = raw.get("error")
@@ -77,6 +78,8 @@ def _kol_from_fixture(raw: dict) -> KolProfile:
         language=raw.get("text_language"),
         region=raw.get("location_created"),
         content_summary=raw.get("content_summary"),
+        videos=raw.get("videos") or [],
+        stats_source=raw.get("stats_source") or "search",
         source=raw["source"],
     )
 

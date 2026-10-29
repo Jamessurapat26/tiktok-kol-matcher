@@ -401,12 +401,21 @@ def test_invalid_enrichment_keeps_the_original_kol():
 
 
 def test_higher_engagement_ranks_first_when_handles_would_not():
+    class _RateEnricher:
+        def enrich(self, kol):
+            rates = {"aaa_low": 0.09, "zzz_high": 0.14}
+            return {"median_engagement_rate": rates[kol.handle]}
+
     fixtures = [
-        make_fixture("aaa_low", 1, followers=50_000, engagement_rate=0.09),
-        make_fixture("zzz_high", 1, followers=50_000, engagement_rate=0.14),
+        make_fixture("aaa_low", 1, followers=50_000),
+        make_fixture("zzz_high", 1, followers=50_000),
     ]
-    final = build_graph(
+    integrations = replace(
         mock_integrations(kol_fixtures=fixtures),
+        enricher=_RateEnricher(),
+    )
+    final = build_graph(
+        integrations,
         min_candidates=1,
     ).invoke(initial_state(make_request()))
 
@@ -431,18 +440,25 @@ def test_no_thai_kols_is_fatal():
 
 
 def test_enricher_prefers_higher_priority_fixture_and_keeps_ties():
-    apify = {
-        "handle": "@Creator",
-        "source": "apify",
-        "engagement_rate": 0.11,
-        "topics": ["from-apify"],
-    }
-    seed = {
-        "handle": "creator",
-        "source": "seed",
-        "engagement_rate": 0.02,
-        "topics": ["from-seed"],
-    }
+    def fixture(handle: str, source: str, caption: str) -> dict:
+        return {
+            "handle": handle,
+            "source": source,
+            "profile_videos": [
+                {
+                    "url": f"https://www.tiktok.com/@creator/video/{source}",
+                    "views": 100,
+                    "likes": 10,
+                    "comments": 1,
+                    "shares": 1,
+                    "days_ago": 2,
+                    "caption": caption,
+                }
+            ],
+        }
+
+    apify = fixture("@Creator", "apify", "from apify #gaming")
+    seed = fixture("creator", "seed", "from seed #eyewear")
     kol = KolProfile(
         handle="creator",
         url="https://www.tiktok.com/@creator",
@@ -451,23 +467,14 @@ def test_enricher_prefers_higher_priority_fixture_and_keeps_ties():
 
     for fixtures in ([apify, seed], [seed, apify]):
         update = MockKolEnricher(fixtures).enrich(kol)
-        assert update["median_engagement_rate"] == 0.11
-        assert "from-apify" in update["content_summary"]
+        assert update["stats_source"] == "profile"
+        assert update["videos"][0]["url"].endswith("/apify")
+        assert "from apify" in update["content_summary"]
 
-    earlier = {
-        "handle": "creator",
-        "source": "seed",
-        "engagement_rate": 0.03,
-        "topics": ["earlier"],
-    }
-    later = {
-        "handle": "CREATOR",
-        "source": "seed",
-        "engagement_rate": 0.09,
-        "topics": ["later"],
-    }
+    earlier = fixture("creator", "seed", "earlier #gaming")
+    later = fixture("CREATOR", "seed", "later #eyewear")
     update = MockKolEnricher([earlier, later]).enrich(kol)
-    assert update["median_engagement_rate"] == 0.03
+    assert update["videos"][0]["url"].endswith("/seed")
     assert "earlier" in update["content_summary"]
 
 

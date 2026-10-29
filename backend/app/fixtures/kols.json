@@ -1,482 +1,827 @@
 [
-  {
-    "handle": "@GameNongPhi",
-    "url": "https://www.tiktok.com/@GameNongPhi",
-    "nickname": "น้องพี่เกม",
-    "followers": 850000,
-    "bio": "เกมเมอร์สายฮา รีวิวเกมและอุปกรณ์เล่นเกมทุกสัปดาห์",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["gaming", "esports", "tech"],
-    "query_group": 1
-  },
-  {
-    "handle": "BankZaGaming",
-    "url": "https://www.tiktok.com/@BankZaGaming",
-    "nickname": "แบงค์ซ่าเกมมิ่ง",
-    "followers": 1250000,
-    "bio": "สตรีมเมอร์เกมมือถือและอีสปอร์ต พร้อมรีวิวอุปกรณ์เกมมิ่ง",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["gaming", "esports"],
-    "query_group": 2
-  },
-  {
-    "handle": "PloyReview",
-    "url": "https://www.tiktok.com/@PloyReview",
-    "nickname": "พลอยรีวิว",
-    "followers": 320000,
-    "bio": "รีวิวแกดเจ็ตและของใช้ในชีวิตประจำวันแบบจริงใจ",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["tech", "gadgets", "lifestyle"],
-    "query_group": 1
-  },
-  {
-    "handle": "@TechTang",
-    "url": "https://www.tiktok.com/@TechTang",
-    "nickname": "เทคแตง",
-    "followers": 96000,
-    "bio": "สายเทคโนโลยี อธิบายของยากให้เข้าใจง่ายในหนึ่งนาที",
-    "source": "seed",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["tech", "gadgets"],
-    "query_group": 1
-  },
-  {
-    "handle": "MintScreen",
-    "url": "https://www.tiktok.com/@MintScreen",
-    "nickname": "มิ้นท์สกรีน",
-    "followers": 42000,
-    "bio": "เล่นเกมและรีวิวอุปกรณ์ถนอมสายตาสำหรับเกมเมอร์",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["gaming", "tech", "eyewear"],
-    "query_group": 1
-  },
-  {
-    "handle": "OffTheDesk",
-    "url": "https://www.tiktok.com/@OffTheDesk",
-    "nickname": "ออฟเดอะเดสก์",
-    "followers": 15000,
-    "bio": "ไอเดียแต่งโต๊ะทำงานและอุปกรณ์สำหรับคนทำงานหน้าจอ",
-    "source": "cache",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["lifestyle", "tech", "workspace"],
-    "query_group": 1
-  },
-  {
-    "handle": "FahFashion",
-    "url": "https://www.tiktok.com/@FahFashion",
-    "nickname": "ฟ้าสไตล์",
-    "followers": 3000000,
-    "bio": "แฟชั่นและไลฟ์สไตล์ประจำวันของสาวกรุงเทพฯ",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["fashion", "beauty", "lifestyle"],
-    "query_group": 1
-  },
-  {
-    "handle": "BeautyByKwang",
-    "url": "https://www.tiktok.com/@BeautyByKwang",
-    "nickname": "บิวตี้บีบี",
-    "followers": 780000,
-    "bio": "บิวตี้สกินแคร์และเมคอัพสำหรับผิวเมืองร้อน",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["beauty", "skincare"],
-    "query_group": 1
-  },
-  {
-    "handle": "@KinRaoKin",
-    "url": "https://www.tiktok.com/@KinRaoKin",
-    "nickname": "กินเรากิน",
-    "followers": 540000,
-    "bio": "พากินร้านเด็ดในกรุงเทพฯ และรีวิวเมนูยอดนิยม",
-    "source": "seed",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["food", "lifestyle"],
-    "query_group": 1
-  },
-  {
-    "handle": "JayFoodStory",
-    "url": "https://www.tiktok.com/@JayFoodStory",
-    "nickname": "เจย์ฟู้ดสตอรี่",
-    "followers": 230000,
-    "bio": "เล่าเรื่องอาหารจานโปรดและสูตรทำง่าย ๆ ที่บ้าน",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["food"],
-    "query_group": 1
-  },
-  {
-    "handle": "NightOwlPlays",
-    "url": "https://www.tiktok.com/@NightOwlPlays",
-    "nickname": "ไนต์โอวล์",
-    "followers": 168000,
-    "bio": "ไลฟ์เกมตอนดึกและคอมเมนต์แบบมันส์ ๆ",
-    "source": "cache",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["gaming", "streaming"],
-    "query_group": 1
-  },
-  {
-    "handle": "AimAnime",
-    "url": "https://www.tiktok.com/@AimAnime",
-    "nickname": "เอมอนิเมะ",
-    "followers": 640000,
-    "bio": "อนิเมะ เกม และไลฟ์สไตล์สายโอตาคุ",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["anime", "gaming", "lifestyle"],
-    "query_group": 1
-  },
-  {
-    "handle": "FilmGameCast",
-    "url": "https://www.tiktok.com/@FilmGameCast",
-    "nickname": "ฟิล์มเกมแคสต์",
-    "followers": 72000,
-    "bio": "แคสต์เกมและวิเคราะห์การแข่งขันอีสปอร์ต",
-    "source": "seed",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["gaming", "esports"],
-    "query_group": 2
-  },
-  {
-    "handle": "PangFitLife",
-    "url": "https://www.tiktok.com/@PangFitLife",
-    "nickname": "แพงฟิตไลฟ์",
-    "followers": 185000,
-    "bio": "ออกกำลังกายง่าย ๆ และไลฟ์สไตล์สุขภาพดี",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["fitness", "lifestyle"],
-    "query_group": 1
-  },
-  {
-    "handle": "@OhmPhoto",
-    "url": "https://www.tiktok.com/@OhmPhoto",
-    "nickname": "โอมโฟโต้",
-    "followers": 28000,
-    "bio": "เทคนิคถ่ายภาพและรีวิวอุปกรณ์กล้องราคาจับต้องได้",
-    "source": "cache",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["photography", "tech", "lifestyle"],
-    "query_group": 1
-  },
-  {
-    "handle": "CreateWithNam",
-    "url": "https://www.tiktok.com/@CreateWithNam",
-    "nickname": "เนมครีเอต",
-    "followers": 12000,
-    "bio": "ไอเดีย DIY และงานครีเอตง่าย ๆ สำหรับทุกคน",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["lifestyle", "diy"],
-    "query_group": 1
-  },
-  {
-    "handle": "TenTenTech",
-    "url": "https://www.tiktok.com/@TenTenTech",
-    "nickname": "เทนเทนเทค",
-    "followers": 410000,
-    "bio": "รีวิวแกดเจ็ตและเทคโนโลยีใหม่แบบกระชับ",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["tech", "gadgets"],
-    "query_group": 1
-  },
-  {
-    "handle": "@tententech",
-    "url": "https://www.tiktok.com/@tententech",
-    "nickname": "เทนเทนเทค",
-    "followers": 390000,
-    "bio": "รีวิวแกดเจ็ตและเทคโนโลยีใหม่แบบกระชับ",
-    "source": "cache",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["tech", "gadgets"],
-    "query_group": 2
-  },
-  {
-    "handle": "MookMakeup",
-    "url": "https://www.tiktok.com/@MookMakeup",
-    "nickname": "มุกเมคอัพ",
-    "followers": 1800000,
-    "bio": "เมคอัพลุคเกาหลีและเทคนิคแต่งหน้าสำหรับมือใหม่",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["beauty", "makeup"],
-    "query_group": 1
-  },
-  {
-    "handle": "mookmakeup",
-    "url": "https://www.tiktok.com/@mookmakeup",
-    "nickname": "มุกเมคอัพ",
-    "followers": 1750000,
-    "bio": "เมคอัพลุคเกาหลีและเทคนิคแต่งหน้าสำหรับมือใหม่",
-    "source": "seed",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["beauty", "makeup"],
-    "query_group": 2
-  },
-  {
-    "handle": "BeerBikeLife",
-    "url": "https://www.tiktok.com/@BeerBikeLife",
-    "nickname": "เบียร์ไบค์ไลฟ์",
-    "followers": 88000,
-    "bio": "ไลฟ์สไตล์คนรักมอเตอร์ไซค์และทริปเที่ยวใกล้กรุงเทพฯ",
-    "source": "seed",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["lifestyle", "automotive"],
-    "query_group": 1
-  },
-  {
-    "handle": "@FolkFoodie",
-    "url": "https://www.tiktok.com/@FolkFoodie",
-    "nickname": "โฟล์คฟู้ดดี้",
-    "followers": 46000,
-    "bio": "ตามหาร้านอาหารอร่อยและคาเฟ่บรรยากาศดี",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["food", "lifestyle"],
-    "query_group": 1
-  },
-  {
-    "handle": "NanaDailyVlog",
-    "url": "https://www.tiktok.com/@NanaDailyVlog",
-    "nickname": "นาน่าวันเดลี่",
-    "followers": 31000,
-    "bio": "วิดีโอวันสบาย ๆ กับเรื่องเล่าในเมือง",
-    "source": "cache",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["lifestyle", "vlog"],
-    "query_group": 2
-  },
-  {
-    "handle": "GraphGearGuy",
-    "url": "https://www.tiktok.com/@GraphGearGuy",
-    "nickname": "กราฟเกียร์กาย",
-    "followers": 23000,
-    "bio": "รีวิวเกมมิ่งเกียร์และอุปกรณ์จัดโต๊ะเล่นเกม",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["gaming", "tech", "gadgets"],
-    "query_group": 2
-  },
-  {
-    "handle": "PetePixels",
-    "url": "https://www.tiktok.com/@PetePixels",
-    "nickname": "พีทพิกเซล",
-    "followers": 7200,
-    "bio": "รีวิวจอและอุปกรณ์ทำงานสำหรับครีเอเตอร์",
-    "source": "seed",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["tech", "photography"],
-    "query_group": 2
-  },
-  {
-    "handle": "@PetePixels",
-    "url": "https://www.tiktok.com/@PetePixels",
-    "nickname": "พีทพิกเซล",
-    "followers": 6800,
-    "bio": "รีวิวจอและอุปกรณ์ทำงานสำหรับครีเอเตอร์",
-    "source": "apify",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["tech", "photography"],
-    "query_group": 2
-  },
-  {
-    "handle": "SiriStyleDiary",
-    "url": "https://www.tiktok.com/@SiriStyleDiary",
-    "nickname": "สิริสไตล์ไดอารี่",
-    "followers": 4300,
-    "bio": "ไดอารี่แฟชั่นและของใช้เล็ก ๆ ที่ชอบในแต่ละวัน",
-    "source": "cache",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["fashion", "lifestyle"],
-    "query_group": 2
-  },
-  {
-    "handle": "TonTinyTech",
-    "url": "https://www.tiktok.com/@TonTinyTech",
-    "nickname": "ต้นタイニーテック",
-    "followers": 3600,
-    "bio": "รีวิว Gadget จิ๋ว ๆ ราคาเบา ๆ ที่น่าใช้",
-    "source": "seed",
-    "text_language": "th",
-    "location_created": "TH",
-    "topics": ["tech", "gadgets"],
-    "query_group": 2
-  },
-  {
-    "handle": "@GadgetGary",
-    "url": "https://www.tiktok.com/@GadgetGary",
-    "nickname": "Gadget Gary",
-    "followers": 680000,
-    "bio": "Hands-on tech reviews, desk setups and everyday gadgets.",
-    "source": "apify",
-    "text_language": "en",
-    "location_created": "US",
-    "topics": ["tech", "gadgets"],
-    "query_group": 1
-  },
-  {
-    "handle": "ScreenQueenLena",
-    "url": "https://www.tiktok.com/@ScreenQueenLena",
-    "nickname": "Lena",
-    "followers": 320000,
-    "bio": "Gaming streams, monitor reviews and screen-time wellness.",
-    "source": "apify",
-    "text_language": "en",
-    "location_created": "GB",
-    "topics": ["gaming", "tech", "eyewear"],
-    "query_group": 1
-  },
-  {
-    "handle": "SeoulBeautyJin",
-    "url": "https://www.tiktok.com/@SeoulBeautyJin",
-    "nickname": "Jin",
-    "followers": 950000,
-    "bio": "K-beauty routines, skincare tips and product reviews.",
-    "source": "seed",
-    "text_language": "ko",
-    "location_created": "KR",
-    "topics": ["beauty", "skincare"],
-    "query_group": 1
-  },
-  {
-    "handle": "TokyoTechTaro",
-    "url": "https://www.tiktok.com/@TokyoTechTaro",
-    "nickname": "Taro",
-    "followers": 210000,
-    "bio": "Tokyo-based gadget reviews and productivity tech.",
-    "source": "cache",
-    "text_language": "ja",
-    "location_created": "JP",
-    "topics": ["tech", "gadgets"],
-    "query_group": 1
-  },
-  {
-    "handle": "ManilaFoodMia",
-    "url": "https://www.tiktok.com/@ManilaFoodMia",
-    "nickname": "Mia",
-    "followers": 145000,
-    "bio": "Filipino food spots, home cooking and cafe hunts.",
-    "source": "apify",
-    "text_language": "en",
-    "location_created": "PH",
-    "topics": ["food", "lifestyle"],
-    "query_group": 2
-  },
-  {
-    "handle": "@LanGamingVN",
-    "url": "https://www.tiktok.com/@LanGamingVN",
-    "nickname": "Lan",
-    "followers": 760000,
-    "bio": "Mobile gaming, esports highlights and gear reviews.",
-    "source": "apify",
-    "text_language": "vi",
-    "location_created": "VN",
-    "topics": ["gaming", "esports"],
-    "query_group": 2
-  },
-  {
-    "handle": "JakartaBeautySari",
-    "url": "https://www.tiktok.com/@JakartaBeautySari",
-    "nickname": "Sari",
-    "followers": 1100000,
-    "bio": "Makeup tutorials and beauty hauls for tropical skin.",
-    "source": "seed",
-    "text_language": "id",
-    "location_created": "ID",
-    "topics": ["beauty", "makeup"],
-    "query_group": 2
-  },
-  {
-    "handle": "KLFashionAina",
-    "url": "https://www.tiktok.com/@KLFashionAina",
-    "nickname": "Aina",
-    "followers": 240000,
-    "bio": "Everyday fashion, modest styling and city lifestyle.",
-    "source": "cache",
-    "text_language": "en",
-    "location_created": "MY",
-    "topics": ["fashion", "lifestyle"],
-    "query_group": 2
-  },
-  {
-    "handle": "gadgetgary",
-    "url": "https://www.tiktok.com/@gadgetgary",
-    "nickname": "Gadget Gary",
-    "followers": 665000,
-    "bio": "Hands-on tech reviews, desk setups and everyday gadgets.",
-    "source": "seed",
-    "text_language": "en",
-    "location_created": "US",
-    "topics": ["tech", "gadgets"],
-    "query_group": 2
-  },
-  {
-    "handle": "SydneyVloggerJack",
-    "url": "https://www.tiktok.com/@SydneyVloggerJack",
-    "nickname": "Jack",
-    "followers": 53000,
-    "bio": "Sydney lifestyle vlogs, coffee walks and weekend trips.",
-    "source": "apify",
-    "text_language": "en",
-    "location_created": "AU",
-    "topics": ["lifestyle", "vlog"],
-    "query_group": 2
-  },
-  {
-    "handle": "TaipeiPhotoNeil",
-    "url": "https://www.tiktok.com/@TaipeiPhotoNeil",
-    "nickname": "Neil",
-    "followers": 19000,
-    "bio": "Street photography, camera gear and editing workflows.",
-    "source": "cache",
-    "text_language": "zh",
-    "location_created": "TW",
-    "topics": ["photography", "tech"],
-    "query_group": 2
-  },
-  {
-    "handle": "MumbaiTechRavi",
-    "url": "https://www.tiktok.com/@MumbaiTechRavi",
-    "nickname": "Ravi",
-    "followers": 8800,
-    "bio": "Budget tech, mobile gaming and smart buying tips.",
-    "source": "seed",
-    "text_language": "hi",
-    "location_created": "IN",
-    "topics": ["tech", "gaming"],
-    "query_group": 2
-  }
+  {"handle": "gameuncle.th", "url": "https://www.tiktok.com/@gameuncle.th", "nickname": "ลุงเกมรีวิว", "followers": 185000, "bio": "รีวิวเกียร์เกมมิ่งและแว่นถนอมสายตา ทุกอาทิตย์", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7482829030440811594", "views": 107905, "likes": 3044, "comments": 177, "shares": 225, "days_ago": 17, "caption": "ลองจริง: ทำความสะอาดห้องครั้งใหญ่ ขอบคุณที่ดูจนจบ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7430707780419966472", "views": 181353, "likes": 8614, "comments": 473, "shares": 1013, "days_ago": 21, "caption": "EP.37 เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7370605365231947526", "views": 93166, "likes": 3313, "comments": 248, "shares": 249, "days_ago": 25, "caption": "ตอบคอมเมนต์: ตื่นเช้าไปวิ่งสวนลุม กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7381955224784996620", "views": 126142, "likes": 4450, "comments": 246, "shares": 643, "days_ago": 34, "caption": "EP.40 ซื้อต้นไม้ใหม่มาแต่งห้อง #vlog"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7482829030440811594", "views": 107905, "likes": 3044, "comments": 177, "shares": 225, "days_ago": 17, "caption": "ลองจริง: ทำความสะอาดห้องครั้งใหญ่ ขอบคุณที่ดูจนจบ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7385135144570288206", "views": 42124, "likes": 2490, "comments": 191, "shares": 137, "days_ago": 19, "caption": "มาแล้ว! ใส่แว่นเกมมิ่ง รุ่น Auroraแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7442010642253227793", "views": 18292, "likes": 1149, "comments": 74, "shares": 47, "days_ago": 20, "caption": "Day 15: แว่นกรองแสง รุ่น Shadeกับการสตรีมเกมทั้งคืน คิดว่าไง คอมเมนต์เลย #eyewear #gaminggear"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7430707780419966472", "views": 181353, "likes": 8614, "comments": 473, "shares": 1013, "days_ago": 21, "caption": "EP.37 เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7370605365231947526", "views": 93166, "likes": 3313, "comments": 248, "shares": 249, "days_ago": 25, "caption": "ตอบคอมเมนต์: ตื่นเช้าไปวิ่งสวนลุม กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7430379565520451324", "views": 87851, "likes": 4234, "comments": 235, "shares": 362, "days_ago": 29, "caption": "ตอบคอมเมนต์: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Shade คลิปหน้ามีต่อ #เกมเมอร์ #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7381955224784996620", "views": 126142, "likes": 4450, "comments": 246, "shares": 643, "days_ago": 34, "caption": "EP.40 ซื้อต้นไม้ใหม่มาแต่งห้อง #vlog"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7457969253104553658", "views": 42640, "likes": 2341, "comments": 189, "shares": 234, "days_ago": 41, "caption": "EP.46 คลิปออนเลนส์กันแสงสีฟ้า ทรง Volt สำหรับคนใส่แว่นสายตา จริงใจไม่อวย #ถนอมสายตา #gaminggear"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7481270717841017053", "views": 57702, "likes": 3251, "comments": 91, "shares": 611, "days_ago": 42, "caption": "ลองจริง: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า คิดว่าไง คอมเมนต์เลย #gaming #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@gameuncle.th/video/7306024657475414603", "views": 47102, "likes": 1356, "comments": 43, "shares": 133, "days_ago": 43, "caption": "EP.59 แว่นกรองแสง ทรง Haloกับการสตรีมเกมทั้งคืน จริงใจไม่อวย #gaminggear #ถนอมสายตา"}
+    ]},
+  {"handle": "ploygaming", "url": "https://www.tiktok.com/@ploygaming", "nickname": "พลอยเกมมิ่ง", "followers": 68000, "bio": "สาวเกมเมอร์ สตรีมทุกคืน ชอบของแต่งโต๊ะ", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@ploygaming/video/7460286638039604946", "views": 46115, "likes": 2731, "comments": 93, "shares": 314, "days_ago": 14, "caption": "ตอบคอมเมนต์: เลนส์กรองแสงสีฟ้า รุ่น Pixel เทียบกับเลนส์ธรรมดา คลิปหน้ามีต่อ #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7370850919677739410", "views": 55682, "likes": 3982, "comments": 193, "shares": 156, "days_ago": 33, "caption": "Day 16: แว่นกรองแสง ทรง Prismกับการสตรีมเกมทั้งคืน ใครเคยลองบ้าง #gaming #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7449796414217856034", "views": 66974, "likes": 4660, "comments": 322, "shares": 342, "days_ago": 39, "caption": "Day 25: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา ทรง Halo ขอบคุณที่ดูจนจบ #gaminggear #eyewear"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7441562417014088652", "views": 63267, "likes": 3446, "comments": 82, "shares": 556, "days_ago": 44, "caption": "สรุปให้: ลองชาไข่มุกร้านใหม่แถวบ้าน คลิปหน้ามีต่อ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7461958185950386087", "views": 47667, "likes": 2090, "comments": 110, "shares": 292, "days_ago": 62, "caption": "ลองจริง: ตัวละครใหม่โกงเกินไปไหม ใครเคยลองบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7432216806777969756", "views": 54627, "likes": 2584, "comments": 172, "shares": 275, "days_ago": 68, "caption": "Day 57: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Aurora คิดว่าไง คอมเมนต์เลย #eyewear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7469384991760413160", "views": 51950, "likes": 3872, "comments": 229, "shares": 436, "days_ago": 75, "caption": "พาดู: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา รุ่น Nova #desksetup #เกมเมอร์"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@ploygaming/video/7460286638039604946", "views": 46115, "likes": 2731, "comments": 93, "shares": 314, "days_ago": 14, "caption": "ตอบคอมเมนต์: เลนส์กรองแสงสีฟ้า รุ่น Pixel เทียบกับเลนส์ธรรมดา คลิปหน้ามีต่อ #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7370850919677739410", "views": 55682, "likes": 3982, "comments": 193, "shares": 156, "days_ago": 33, "caption": "Day 16: แว่นกรองแสง ทรง Prismกับการสตรีมเกมทั้งคืน ใครเคยลองบ้าง #gaming #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7449796414217856034", "views": 66974, "likes": 4660, "comments": 322, "shares": 342, "days_ago": 39, "caption": "Day 25: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา ทรง Halo ขอบคุณที่ดูจนจบ #gaminggear #eyewear"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7363389238410325190", "views": 31883, "likes": 4400, "comments": 208, "shares": 345, "days_ago": 43, "caption": "มาแล้ว! ลองชาไข่มุกร้านใหม่แถวบ้าน จริงใจไม่อวย #vlog"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7441562417014088652", "views": 63267, "likes": 3446, "comments": 82, "shares": 556, "days_ago": 44, "caption": "สรุปให้: ลองชาไข่มุกร้านใหม่แถวบ้าน คลิปหน้ามีต่อ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7367047098907047583", "views": 15301, "likes": 496, "comments": 21, "shares": 65, "days_ago": 52, "caption": "พาดู: เกมอินดี้ที่ต้องลองเดือนนี้ #gamer"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7461958185950386087", "views": 47667, "likes": 2090, "comments": 110, "shares": 292, "days_ago": 62, "caption": "ลองจริง: ตัวละครใหม่โกงเกินไปไหม ใครเคยลองบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7432216806777969756", "views": 54627, "likes": 2584, "comments": 172, "shares": 275, "days_ago": 68, "caption": "Day 57: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Aurora คิดว่าไง คอมเมนต์เลย #eyewear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@ploygaming/video/7469384991760413160", "views": 51950, "likes": 3872, "comments": 229, "shares": 436, "days_ago": 75, "caption": "พาดู: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา รุ่น Nova #desksetup #เกมเมอร์"}
+    ]},
+  {"handle": "devmonkeyplays", "url": "https://www.tiktok.com/@devmonkeyplays", "nickname": "Dev Monkey", "followers": 42000, "bio": "โปรแกรมเมอร์ที่เล่นเกมหลังเลิกงาน", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7428444629907509083", "views": 26603, "likes": 1576, "comments": 102, "shares": 89, "days_ago": 7, "caption": "EP.19 รีวิวแว่นเกมมิ่ง รุ่น Lumen น้ำหนักเบา ใส่กับหูฟังได้ไหม คลิปหน้ามีต่อ #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7345178232523232027", "views": 24395, "likes": 1410, "comments": 77, "shares": 125, "days_ago": 19, "caption": "EP.19 ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า รุ่น Lumen จริงใจไม่อวย #gaming #eyewear"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7428453366350700030", "views": 42748, "likes": 5097, "comments": 348, "shares": 575, "days_ago": 23, "caption": "พาดู: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7374898270928175832", "views": 16174, "likes": 1436, "comments": 73, "shares": 143, "days_ago": 27, "caption": "ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง ขอบคุณที่ดูจนจบ #officelife"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7366543706991106338", "views": 18666, "likes": 929, "comments": 48, "shares": 126, "days_ago": 30, "caption": "EP.50 ลิสต์งานวันจันทร์แบบไม่เครียด #officelife"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7417270930905545319", "views": 20932, "likes": 1127, "comments": 78, "shares": 151, "days_ago": 35, "caption": "สรุปให้: ใส่แว่นเกมมิ่ง รุ่น Lumenแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว ขอบคุณที่ดูจนจบ #แว่นเกมมิ่ง #gaminggear"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7428444629907509083", "views": 26603, "likes": 1576, "comments": 102, "shares": 89, "days_ago": 7, "caption": "EP.19 รีวิวแว่นเกมมิ่ง รุ่น Lumen น้ำหนักเบา ใส่กับหูฟังได้ไหม คลิปหน้ามีต่อ #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7406786669199550520", "views": 15880, "likes": 1254, "comments": 94, "shares": 27, "days_ago": 12, "caption": "Day 35: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Halo ชุดเริ่มต้นเกมเมอร์งบน้อย ใครเคยลองบ้าง #gaming #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7345178232523232027", "views": 24395, "likes": 1410, "comments": 77, "shares": 125, "days_ago": 19, "caption": "EP.19 ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า รุ่น Lumen จริงใจไม่อวย #gaming #eyewear"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7455005458360853844", "views": 9860, "likes": 658, "comments": 20, "shares": 116, "days_ago": 20, "caption": "ตอบคอมเมนต์: แว่นกันแสงสีฟ้า ทรง Shadeใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คลิปหน้ามีต่อ #eyewear #gaming"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7428453366350700030", "views": 42748, "likes": 5097, "comments": 348, "shares": 575, "days_ago": 23, "caption": "พาดู: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7401214329500133384", "views": 11099, "likes": 829, "comments": 40, "shares": 137, "days_ago": 24, "caption": "สรุปให้: แว่นกันแสงสีฟ้า ทรง Orbitใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม จริงใจไม่อวย #bluelightglasses #gaming"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7374898270928175832", "views": 16174, "likes": 1436, "comments": 73, "shares": 143, "days_ago": 27, "caption": "ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง ขอบคุณที่ดูจนจบ #officelife"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7366543706991106338", "views": 18666, "likes": 929, "comments": 48, "shares": 126, "days_ago": 30, "caption": "EP.50 ลิสต์งานวันจันทร์แบบไม่เครียด #officelife"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7309704861793244067", "views": 14871, "likes": 956, "comments": 34, "shares": 156, "days_ago": 34, "caption": "สรุปให้: ไอเดียของขวัญให้เพื่อนร่วมงาน คลิปหน้ามีต่อ #wfh"},
+      {"url": "https://www.tiktok.com/@devmonkeyplays/video/7417270930905545319", "views": 20932, "likes": 1127, "comments": 78, "shares": 151, "days_ago": 35, "caption": "สรุปให้: ใส่แว่นเกมมิ่ง รุ่น Lumenแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว ขอบคุณที่ดูจนจบ #แว่นเกมมิ่ง #gaminggear"}
+    ]},
+  {"handle": "eyewearjun", "url": "https://www.tiktok.com/@eyewearjun", "nickname": "จุนแว่นตา", "followers": 23000, "bio": "รีวิวแว่นตาทุกแบบ ตั้งแต่แว่นสายตาถึงแว่นเกม", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7418142952665345471", "views": 20984, "likes": 2252, "comments": 169, "shares": 225, "days_ago": 20, "caption": "ลองจริง: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Prism คลิปหน้ามีต่อ #แว่นกันแสงสีฟ้า #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7365300139019482099", "views": 65679, "likes": 3451, "comments": 214, "shares": 341, "days_ago": 33, "caption": "เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา จริงใจไม่อวย #gaming #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7314821841030861488", "views": 23154, "likes": 961, "comments": 46, "shares": 140, "days_ago": 34, "caption": "ตอบคอมเมนต์: แว่นกรองแสง ทรง Voltกับการสตรีมเกมทั้งคืน ขอบคุณที่ดูจนจบ #eyewear #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7410280369499051112", "views": 23866, "likes": 1335, "comments": 86, "shares": 104, "days_ago": 35, "caption": "ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง กดติดตามไว้นะ #gaming #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7316251927513385248", "views": 32146, "likes": 1037, "comments": 81, "shares": 97, "days_ago": 40, "caption": "แว่นกรองแสง รุ่น Prismกับการสตรีมเกมทั้งคืน จริงใจไม่อวย #แว่นเกมมิ่ง #desksetup"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7418142952665345471", "views": 20984, "likes": 2252, "comments": 169, "shares": 225, "days_ago": 20, "caption": "ลองจริง: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Prism คลิปหน้ามีต่อ #แว่นกันแสงสีฟ้า #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7440268571587395124", "views": 14031, "likes": 852, "comments": 61, "shares": 50, "days_ago": 21, "caption": "สรุปให้: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Volt กดติดตามไว้นะ #แว่นเกมมิ่ง #gaminggear"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7353506440600765485", "views": 11546, "likes": 636, "comments": 20, "shares": 53, "days_ago": 23, "caption": "EP.20 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง รุ่น Neo คลิปหน้ามีต่อ #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7365300139019482099", "views": 65679, "likes": 3451, "comments": 214, "shares": 341, "days_ago": 33, "caption": "เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา จริงใจไม่อวย #gaming #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7314821841030861488", "views": 23154, "likes": 961, "comments": 46, "shares": 140, "days_ago": 34, "caption": "ตอบคอมเมนต์: แว่นกรองแสง ทรง Voltกับการสตรีมเกมทั้งคืน ขอบคุณที่ดูจนจบ #eyewear #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7410280369499051112", "views": 23866, "likes": 1335, "comments": 86, "shares": 104, "days_ago": 35, "caption": "ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง กดติดตามไว้นะ #gaming #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7316251927513385248", "views": 32146, "likes": 1037, "comments": 81, "shares": 97, "days_ago": 40, "caption": "แว่นกรองแสง รุ่น Prismกับการสตรีมเกมทั้งคืน จริงใจไม่อวย #แว่นเกมมิ่ง #desksetup"},
+      {"url": "https://www.tiktok.com/@eyewearjun/video/7322082956082178015", "views": 16830, "likes": 958, "comments": 47, "shares": 120, "days_ago": 41, "caption": "มาแล้ว! แว่นกรองแสงกับการสตรีมเกมทั้งคืน ขอบคุณที่ดูจนจบ #ถนอมสายตา #เกมเมอร์"}
+    ]},
+  {"handle": "screenmate.nok", "url": "https://www.tiktok.com/@screenmate.nok", "nickname": "นกหน้าจอ", "followers": 8500, "bio": "มนุษย์หน้าจอ ทำงานกราฟิก + เล่นเกม", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7316919088677341572", "views": 31650, "likes": 1965, "comments": 98, "shares": 210, "days_ago": 12, "caption": "ตอบคอมเมนต์: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Aurora ชุดเริ่มต้นเกมเมอร์งบน้อย ใครเคยลองบ้าง #ถนอมสายตา #eyewear"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7367370578336620386", "views": 28672, "likes": 1889, "comments": 129, "shares": 66, "days_ago": 15, "caption": "สรุปให้: ใส่แว่นเกมมิ่งแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย #ถนอมสายตา #gaming"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7386980883791271705", "views": 11200, "likes": 671, "comments": 19, "shares": 57, "days_ago": 20, "caption": "ตอบคอมเมนต์: รีวิวแว่นเกมมิ่ง ทรง Nova น้ำหนักเบา ใส่กับหูฟังได้ไหม คลิปหน้ามีต่อ #bluelightglasses #gaminggear"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7310865590864784113", "views": 13672, "likes": 1051, "comments": 49, "shares": 168, "days_ago": 22, "caption": "มาแล้ว! จัดโต๊ะทำงานมินิมอลที่บ้าน คิดว่าไง คอมเมนต์เลย #officelife"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7456532365742284829", "views": 15287, "likes": 1181, "comments": 64, "shares": 110, "days_ago": 23, "caption": "Day 17: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Nova กดติดตามไว้นะ #ถนอมสายตา #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7398006082923719259", "views": 20373, "likes": 2548, "comments": 125, "shares": 140, "days_ago": 28, "caption": "สรุปให้: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ใครเคยลองบ้าง #gaminggear #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7496280201945476875", "views": 11204, "likes": 1177, "comments": 72, "shares": 103, "days_ago": 45, "caption": "ตอบคอมเมนต์: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Aurora ชุดเริ่มต้นเกมเมอร์งบน้อย จริงใจไม่อวย #แว่นกันแสงสีฟ้า #ถนอมสายตา"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7327113333266005431", "views": 4618, "likes": 286, "comments": 11, "shares": 35, "days_ago": 11, "caption": "EP.44 เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Neo คลิปหน้ามีต่อ #gaminggear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7316919088677341572", "views": 31650, "likes": 1965, "comments": 98, "shares": 210, "days_ago": 12, "caption": "ตอบคอมเมนต์: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Aurora ชุดเริ่มต้นเกมเมอร์งบน้อย ใครเคยลองบ้าง #ถนอมสายตา #eyewear"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7437492087669180897", "views": 6717, "likes": 518, "comments": 42, "shares": 49, "days_ago": 13, "caption": "มาแล้ว! จัดโต๊ะทำงานมินิมอลที่บ้าน จริงใจไม่อวย #wfh"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7367370578336620386", "views": 28672, "likes": 1889, "comments": 129, "shares": 66, "days_ago": 15, "caption": "สรุปให้: ใส่แว่นเกมมิ่งแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย #ถนอมสายตา #gaming"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7386980883791271705", "views": 11200, "likes": 671, "comments": 19, "shares": 57, "days_ago": 20, "caption": "ตอบคอมเมนต์: รีวิวแว่นเกมมิ่ง ทรง Nova น้ำหนักเบา ใส่กับหูฟังได้ไหม คลิปหน้ามีต่อ #bluelightglasses #gaminggear"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7385908117344706171", "views": 9570, "likes": 1392, "comments": 94, "shares": 95, "days_ago": 21, "caption": "สรุปให้: ไต่แรงค์ Arena Legends จนเช้า กดติดตามไว้นะ #เกม"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7310865590864784113", "views": 13672, "likes": 1051, "comments": 49, "shares": 168, "days_ago": 22, "caption": "มาแล้ว! จัดโต๊ะทำงานมินิมอลที่บ้าน คิดว่าไง คอมเมนต์เลย #officelife"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7456532365742284829", "views": 15287, "likes": 1181, "comments": 64, "shares": 110, "days_ago": 23, "caption": "Day 17: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Nova กดติดตามไว้นะ #ถนอมสายตา #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7398006082923719259", "views": 20373, "likes": 2548, "comments": 125, "shares": 140, "days_ago": 28, "caption": "สรุปให้: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ใครเคยลองบ้าง #gaminggear #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@screenmate.nok/video/7496280201945476875", "views": 11204, "likes": 1177, "comments": 72, "shares": 103, "days_ago": 45, "caption": "ตอบคอมเมนต์: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Aurora ชุดเริ่มต้นเกมเมอร์งบน้อย จริงใจไม่อวย #แว่นกันแสงสีฟ้า #ถนอมสายตา"}
+    ]},
+  {"handle": "minimintmonitor", "url": "https://www.tiktok.com/@minimintmonitor", "nickname": "มินท์มอนิเตอร์", "followers": 31000, "bio": "รีวิวจอคอมและอุปกรณ์ต่อพ่วง", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7486239000601400831", "views": 15272, "likes": 917, "comments": 50, "shares": 143, "days_ago": 14, "caption": "Day 46: ใส่แว่นเกมมิ่ง ทรง Prismแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คลิปหน้ามีต่อ #แว่นเกมมิ่ง #desksetup"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7318922647579936469", "views": 33737, "likes": 1001, "comments": 62, "shares": 73, "days_ago": 20, "caption": "Day 22: ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง ใครเคยลองบ้าง #officelife"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7405965054055300261", "views": 9378, "likes": 354, "comments": 23, "shares": 23, "days_ago": 30, "caption": "สรุปให้: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Aurora กดติดตามไว้นะ #bluelightglasses #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7305411611641556624", "views": 14874, "likes": 428, "comments": 27, "shares": 22, "days_ago": 31, "caption": "EP.27 รีวิวแว่นเกมมิ่ง ทรง Orbit น้ำหนักเบา ใส่กับหูฟังได้ไหม ขอบคุณที่ดูจนจบ #gaminggear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7427156809718333632", "views": 13860, "likes": 553, "comments": 34, "shares": 63, "days_ago": 35, "caption": "ตอบคอมเมนต์: แว่นกันแสงสีฟ้า รุ่น Prismใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คลิปหน้ามีต่อ #bluelightglasses #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7462012916431256636", "views": 10804, "likes": 475, "comments": 13, "shares": 68, "days_ago": 36, "caption": "พาดู: ลองแว่นเกมมิ่งกับจอ 165Hz คลิปหน้ามีต่อ #desksetup #gaminggear"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7304429846088508902", "views": 8884, "likes": 462, "comments": 10, "shares": 47, "days_ago": 37, "caption": "จัดโต๊ะทำงานมินิมอลที่บ้าน คลิปหน้ามีต่อ #officelife"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7486239000601400831", "views": 15272, "likes": 917, "comments": 50, "shares": 143, "days_ago": 14, "caption": "Day 46: ใส่แว่นเกมมิ่ง ทรง Prismแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คลิปหน้ามีต่อ #แว่นเกมมิ่ง #desksetup"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7318922647579936469", "views": 33737, "likes": 1001, "comments": 62, "shares": 73, "days_ago": 20, "caption": "Day 22: ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง ใครเคยลองบ้าง #officelife"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7332772897730055945", "views": 6526, "likes": 297, "comments": 14, "shares": 17, "days_ago": 21, "caption": "Day 1: รีวิวแว่นเกมมิ่ง น้ำหนักเบา ใส่กับหูฟังได้ไหม ขอบคุณที่ดูจนจบ #แว่นกันแสงสีฟ้า #gaming"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7405965054055300261", "views": 9378, "likes": 354, "comments": 23, "shares": 23, "days_ago": 30, "caption": "สรุปให้: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Aurora กดติดตามไว้นะ #bluelightglasses #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7305411611641556624", "views": 14874, "likes": 428, "comments": 27, "shares": 22, "days_ago": 31, "caption": "EP.27 รีวิวแว่นเกมมิ่ง ทรง Orbit น้ำหนักเบา ใส่กับหูฟังได้ไหม ขอบคุณที่ดูจนจบ #gaminggear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7427156809718333632", "views": 13860, "likes": 553, "comments": 34, "shares": 63, "days_ago": 35, "caption": "ตอบคอมเมนต์: แว่นกันแสงสีฟ้า รุ่น Prismใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คลิปหน้ามีต่อ #bluelightglasses #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7462012916431256636", "views": 10804, "likes": 475, "comments": 13, "shares": 68, "days_ago": 36, "caption": "พาดู: ลองแว่นเกมมิ่งกับจอ 165Hz คลิปหน้ามีต่อ #desksetup #gaminggear"},
+      {"url": "https://www.tiktok.com/@minimintmonitor/video/7304429846088508902", "views": 8884, "likes": 462, "comments": 10, "shares": 47, "days_ago": 37, "caption": "จัดโต๊ะทำงานมินิมอลที่บ้าน คลิปหน้ามีต่อ #officelife"}
+    ]},
+  {"handle": "framechecker", "url": "https://www.tiktok.com/@framechecker", "nickname": "Frame Checker", "followers": 120000, "bio": "ทดสอบแว่น เลนส์ และกรอบ แบบละเอียด", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@framechecker/video/7364462898492533738", "views": 59756, "likes": 1240, "comments": 47, "shares": 104, "days_ago": 9, "caption": "ลองจริง: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Pixel จริงใจไม่อวย #แว่นเกมมิ่ง #gaming"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7322195517884392663", "views": 41191, "likes": 2139, "comments": 123, "shares": 254, "days_ago": 25, "caption": "ลองจริง: ลองแว่นเกมมิ่งกับจอ 165Hz คลิปหน้ามีต่อ #ถนอมสายตา #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7357250943844204391", "views": 37554, "likes": 1624, "comments": 70, "shares": 126, "days_ago": 26, "caption": "ตอบคอมเมนต์: ทำความสะอาดห้องครั้งใหญ่ ใครเคยลองบ้าง #vlog"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@framechecker/video/7364462898492533738", "views": 59756, "likes": 1240, "comments": 47, "shares": 104, "days_ago": 9, "caption": "ลองจริง: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Pixel จริงใจไม่อวย #แว่นเกมมิ่ง #gaming"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7475969756575195044", "views": 18387, "likes": 552, "comments": 31, "shares": 42, "days_ago": 15, "caption": "ลองจริง: ใส่แว่นเกมมิ่ง ทรง Novaแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คลิปหน้ามีต่อ #แว่นกันแสงสีฟ้า #desksetup"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7436627426529443357", "views": 23628, "likes": 613, "comments": 34, "shares": 51, "days_ago": 20, "caption": "EP.26 จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา รุ่น Lumen ขอบคุณที่ดูจนจบ #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7436761912486377842", "views": 11118, "likes": 365, "comments": 9, "shares": 32, "days_ago": 22, "caption": "Day 14: เลนส์กรองแสงสีฟ้า รุ่น Neo เทียบกับเลนส์ธรรมดา ใครเคยลองบ้าง #ถนอมสายตา #gaming"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7448868517334596292", "views": 35368, "likes": 1099, "comments": 25, "shares": 88, "days_ago": 24, "caption": "มาแล้ว! ใส่แว่นเกมมิ่ง ทรง Shadeแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว ใครเคยลองบ้าง #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7322195517884392663", "views": 41191, "likes": 2139, "comments": 123, "shares": 254, "days_ago": 25, "caption": "ลองจริง: ลองแว่นเกมมิ่งกับจอ 165Hz คลิปหน้ามีต่อ #ถนอมสายตา #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7357250943844204391", "views": 37554, "likes": 1624, "comments": 70, "shares": 126, "days_ago": 26, "caption": "ตอบคอมเมนต์: ทำความสะอาดห้องครั้งใหญ่ ใครเคยลองบ้าง #vlog"},
+      {"url": "https://www.tiktok.com/@framechecker/video/7489271603717337662", "views": 22842, "likes": 894, "comments": 43, "shares": 44, "days_ago": 32, "caption": "พาดู: เลนส์กรองแสงสีฟ้า ทรง Pixel เทียบกับเลนส์ธรรมดา #แว่นกันแสงสีฟ้า #desksetup"}
+    ]},
+  {"handle": "gadgetbear", "url": "https://www.tiktok.com/@gadgetbear", "nickname": "หมีแกดเจ็ต", "followers": 95000, "bio": "แกดเจ็ตไอที ราคาจับต้องได้", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7475166132225311252", "views": 132958, "likes": 7139, "comments": 447, "shares": 561, "days_ago": 5, "caption": "สรุปให้: ทำความสะอาดห้องครั้งใหญ่ ใครเคยลองบ้าง #vlog"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7449842249819670890", "views": 63571, "likes": 2688, "comments": 84, "shares": 321, "days_ago": 8, "caption": "พาดู: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง รุ่น Prism ใครเคยลองบ้าง #desksetup #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7387336883702149963", "views": 48997, "likes": 1946, "comments": 56, "shares": 222, "days_ago": 11, "caption": "มาแล้ว! จัดสายไฟใต้โต๊ะ 10 นาทีเสร็จ ใครเคยลองบ้าง #wfh"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7481776533022826551", "views": 53394, "likes": 3408, "comments": 247, "shares": 328, "days_ago": 15, "caption": "Day 40: คลิปออนเลนส์กันแสงสีฟ้า ทรง Neo สำหรับคนใส่แว่นสายตา คิดว่าไง คอมเมนต์เลย #desksetup #gaminggear"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7371817862166500096", "views": 65490, "likes": 2670, "comments": 94, "shares": 277, "days_ago": 17, "caption": "พาแม่ไปกินข้าววันเกิด คลิปหน้ามีต่อ #vlog"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7475166132225311252", "views": 132958, "likes": 7139, "comments": 447, "shares": 561, "days_ago": 5, "caption": "สรุปให้: ทำความสะอาดห้องครั้งใหญ่ ใครเคยลองบ้าง #vlog"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7416825702007636802", "views": 43340, "likes": 1901, "comments": 96, "shares": 205, "days_ago": 7, "caption": "มาแล้ว! ซื้อต้นไม้ใหม่มาแต่งห้อง กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7449842249819670890", "views": 63571, "likes": 2688, "comments": 84, "shares": 321, "days_ago": 8, "caption": "พาดู: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง รุ่น Prism ใครเคยลองบ้าง #desksetup #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7309394962624012284", "views": 31758, "likes": 1073, "comments": 72, "shares": 46, "days_ago": 10, "caption": "ตอบคอมเมนต์: จัดสายไฟใต้โต๊ะ 10 นาทีเสร็จ คิดว่าไง คอมเมนต์เลย #wfh"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7387336883702149963", "views": 48997, "likes": 1946, "comments": 56, "shares": 222, "days_ago": 11, "caption": "มาแล้ว! จัดสายไฟใต้โต๊ะ 10 นาทีเสร็จ ใครเคยลองบ้าง #wfh"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7481776533022826551", "views": 53394, "likes": 3408, "comments": 247, "shares": 328, "days_ago": 15, "caption": "Day 40: คลิปออนเลนส์กันแสงสีฟ้า ทรง Neo สำหรับคนใส่แว่นสายตา คิดว่าไง คอมเมนต์เลย #desksetup #gaminggear"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7371817862166500096", "views": 65490, "likes": 2670, "comments": 94, "shares": 277, "days_ago": 17, "caption": "พาแม่ไปกินข้าววันเกิด คลิปหน้ามีต่อ #vlog"},
+      {"url": "https://www.tiktok.com/@gadgetbear/video/7381941386092304384", "views": 25073, "likes": 628, "comments": 24, "shares": 108, "days_ago": 21, "caption": "มาแล้ว! พาแม่ไปกินข้าววันเกิด คลิปหน้ามีต่อ #vlog"}
+    ]},
+  {"handle": "specgeek.th", "url": "https://www.tiktok.com/@specgeek.th", "nickname": "สเปกกี๊ก", "followers": 29000, "bio": "เจาะสเปกอุปกรณ์เกมมิ่ง", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7312499622662040747", "views": 37257, "likes": 2279, "comments": 162, "shares": 182, "days_ago": 14, "caption": "เกมอินดี้ที่ต้องลองเดือนนี้ คลิปหน้ามีต่อ #gamer"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7443341223870087799", "views": 36781, "likes": 2419, "comments": 102, "shares": 421, "days_ago": 38, "caption": "มาแล้ว! ลองแว่นเกมมิ่ง รุ่น Voltกับจอ 165Hz กดติดตามไว้นะ #ถนอมสายตา #eyewear"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7347258754151624384", "views": 38066, "likes": 2345, "comments": 167, "shares": 347, "days_ago": 56, "caption": "มาแล้ว! เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป #เกม"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7330129954297599956", "views": 41668, "likes": 1813, "comments": 92, "shares": 151, "days_ago": 57, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Neo #bluelightglasses #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7327338609266922881", "views": 40236, "likes": 4098, "comments": 94, "shares": 398, "days_ago": 58, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Prism ใครเคยลองบ้าง #ถนอมสายตา #eyewear"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7312499622662040747", "views": 37257, "likes": 2279, "comments": 162, "shares": 182, "days_ago": 14, "caption": "เกมอินดี้ที่ต้องลองเดือนนี้ คลิปหน้ามีต่อ #gamer"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7444350659270305833", "views": 8376, "likes": 562, "comments": 32, "shares": 28, "days_ago": 22, "caption": "มาแล้ว! ลองแว่นเกมมิ่ง ทรง Neoกับจอ 165Hz ใครเคยลองบ้าง #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7427621677308952711", "views": 25517, "likes": 2315, "comments": 177, "shares": 124, "days_ago": 34, "caption": "มาแล้ว! แว่นกรองแสง รุ่น Lumenกับการสตรีมเกมทั้งคืน #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7443341223870087799", "views": 36781, "likes": 2419, "comments": 102, "shares": 421, "days_ago": 38, "caption": "มาแล้ว! ลองแว่นเกมมิ่ง รุ่น Voltกับจอ 165Hz กดติดตามไว้นะ #ถนอมสายตา #eyewear"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7321506905500441172", "views": 8219, "likes": 600, "comments": 24, "shares": 45, "days_ago": 55, "caption": "ลองจริง: ตัวละครใหม่โกงเกินไปไหม ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7347258754151624384", "views": 38066, "likes": 2345, "comments": 167, "shares": 347, "days_ago": 56, "caption": "มาแล้ว! เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป #เกม"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7330129954297599956", "views": 41668, "likes": 1813, "comments": 92, "shares": 151, "days_ago": 57, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Neo #bluelightglasses #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@specgeek.th/video/7327338609266922881", "views": 40236, "likes": 4098, "comments": 94, "shares": 398, "days_ago": 58, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Prism ใครเคยลองบ้าง #ถนอมสายตา #eyewear"}
+    ]},
+  {"handle": "nightqueuegamer", "url": "https://www.tiktok.com/@nightqueuegamer", "nickname": "เกมเมอร์กะดึก", "followers": 160000, "bio": "เล่นเกมตีสาม คุยเรื่องเกมเรื่อยเปื่อย", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7417988514859046523", "views": 21667, "likes": 611, "comments": 17, "shares": 114, "days_ago": 13, "caption": "สรุปให้: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คลิปหน้ามีต่อ #เกม"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7341644441563576152", "views": 71188, "likes": 4034, "comments": 218, "shares": 490, "days_ago": 15, "caption": "รีวิวแว่นเกมมิ่ง น้ำหนักเบา ใส่กับหูฟังได้ไหม ขอบคุณที่ดูจนจบ #gaming #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7310863921216282455", "views": 35543, "likes": 2350, "comments": 83, "shares": 349, "days_ago": 20, "caption": "มาแล้ว! อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง จริงใจไม่อวย #gamer"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7484444068210740126", "views": 48815, "likes": 2208, "comments": 102, "shares": 230, "days_ago": 21, "caption": "ลองจริง: เกมอินดี้ที่ต้องลองเดือนนี้ #gamer"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7436076709496311762", "views": 28003, "likes": 837, "comments": 43, "shares": 99, "days_ago": 24, "caption": "ลองจริง: เกมอินดี้ที่ต้องลองเดือนนี้ คิดว่าไง คอมเมนต์เลย #เกม"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7369440170183716733", "views": 20427, "likes": 771, "comments": 32, "shares": 110, "days_ago": 25, "caption": "ใส่แว่นเกมมิ่ง รุ่น Orbitแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย #แว่นกันแสงสีฟ้า #gaminggear"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7451460024272784998", "views": 51061, "likes": 1989, "comments": 126, "shares": 71, "days_ago": 27, "caption": "Day 44: ตื่นเช้าไปวิ่งสวนลุม ใครเคยลองบ้าง #ชีวิตประจำวัน"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7417988514859046523", "views": 21667, "likes": 611, "comments": 17, "shares": 114, "days_ago": 13, "caption": "สรุปให้: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คลิปหน้ามีต่อ #เกม"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7341644441563576152", "views": 71188, "likes": 4034, "comments": 218, "shares": 490, "days_ago": 15, "caption": "รีวิวแว่นเกมมิ่ง น้ำหนักเบา ใส่กับหูฟังได้ไหม ขอบคุณที่ดูจนจบ #gaming #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7310863921216282455", "views": 35543, "likes": 2350, "comments": 83, "shares": 349, "days_ago": 20, "caption": "มาแล้ว! อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง จริงใจไม่อวย #gamer"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7484444068210740126", "views": 48815, "likes": 2208, "comments": 102, "shares": 230, "days_ago": 21, "caption": "ลองจริง: เกมอินดี้ที่ต้องลองเดือนนี้ #gamer"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7436076709496311762", "views": 28003, "likes": 837, "comments": 43, "shares": 99, "days_ago": 24, "caption": "ลองจริง: เกมอินดี้ที่ต้องลองเดือนนี้ คิดว่าไง คอมเมนต์เลย #เกม"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7369440170183716733", "views": 20427, "likes": 771, "comments": 32, "shares": 110, "days_ago": 25, "caption": "ใส่แว่นเกมมิ่ง รุ่น Orbitแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย #แว่นกันแสงสีฟ้า #gaminggear"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7456415007498452818", "views": 16353, "likes": 564, "comments": 16, "shares": 67, "days_ago": 26, "caption": "Day 55: เลนส์กรองแสงสีฟ้า รุ่น Lumen เทียบกับเลนส์ธรรมดา ใครเคยลองบ้าง #desksetup #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@nightqueuegamer/video/7451460024272784998", "views": 51061, "likes": 1989, "comments": 126, "shares": 71, "days_ago": 27, "caption": "Day 44: ตื่นเช้าไปวิ่งสวนลุม ใครเคยลองบ้าง #ชีวิตประจำวัน"}
+    ]},
+  {"handle": "framefinder.bkk", "url": "https://www.tiktok.com/@framefinder.bkk", "nickname": "หาแว่นกรุงเทพ", "followers": 47000, "bio": "พาตะลุยร้านแว่นและรีวิวเลนส์", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7479340258158613022", "views": 58914, "likes": 3093, "comments": 225, "shares": 252, "days_ago": 2, "caption": "ลองจริง: รีวิวแว่นเกมมิ่ง น้ำหนักเบา ใส่กับหูฟังได้ไหม กดติดตามไว้นะ #desksetup #eyewear"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7464263787229781749", "views": 33025, "likes": 1915, "comments": 107, "shares": 68, "days_ago": 5, "caption": "EP.32 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Aurora ชุดเริ่มต้นเกมเมอร์งบน้อย คิดว่าไง คอมเมนต์เลย #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7325786571153553843", "views": 48366, "likes": 1606, "comments": 103, "shares": 217, "days_ago": 6, "caption": "Day 51: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Nova ขอบคุณที่ดูจนจบ #แว่นเกมมิ่ง #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7434724490506380511", "views": 79589, "likes": 3862, "comments": 164, "shares": 347, "days_ago": 16, "caption": "มาแล้ว! วันหยุดพาแมวไปหาหมอ คิดว่าไง คอมเมนต์เลย #vlog"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7479340258158613022", "views": 58914, "likes": 3093, "comments": 225, "shares": 252, "days_ago": 2, "caption": "ลองจริง: รีวิวแว่นเกมมิ่ง น้ำหนักเบา ใส่กับหูฟังได้ไหม กดติดตามไว้นะ #desksetup #eyewear"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7464263787229781749", "views": 33025, "likes": 1915, "comments": 107, "shares": 68, "days_ago": 5, "caption": "EP.32 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Aurora ชุดเริ่มต้นเกมเมอร์งบน้อย คิดว่าไง คอมเมนต์เลย #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7325786571153553843", "views": 48366, "likes": 1606, "comments": 103, "shares": 217, "days_ago": 6, "caption": "Day 51: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Nova ขอบคุณที่ดูจนจบ #แว่นเกมมิ่ง #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7414684262638777117", "views": 17351, "likes": 701, "comments": 45, "shares": 73, "days_ago": 7, "caption": "ตอบคอมเมนต์: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า รุ่น Prism จริงใจไม่อวย #ถนอมสายตา #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7367404616349757398", "views": 23859, "likes": 1539, "comments": 69, "shares": 235, "days_ago": 9, "caption": "พาดู: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา รุ่น Halo จริงใจไม่อวย #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7397512828830001162", "views": 11225, "likes": 737, "comments": 22, "shares": 50, "days_ago": 10, "caption": "มาแล้ว! ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ใครเคยลองบ้าง #desksetup #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7434724490506380511", "views": 79589, "likes": 3862, "comments": 164, "shares": 347, "days_ago": 16, "caption": "มาแล้ว! วันหยุดพาแมวไปหาหมอ คิดว่าไง คอมเมนต์เลย #vlog"},
+      {"url": "https://www.tiktok.com/@framefinder.bkk/video/7368783162204904376", "views": 17489, "likes": 895, "comments": 25, "shares": 106, "days_ago": 17, "caption": "พาดู: ที่พักริมแม่น้ำ อยุธยา คลิปหน้ามีต่อ #travel"}
+    ]},
+  {"handle": "blueblockbro", "url": "https://www.tiktok.com/@blueblockbro", "nickname": "บลูบล็อกบรอ", "followers": 3400, "bio": "ใส่แว่นกันแสงตั้งแต่ตื่นจนนอน", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7466137506239862156", "views": 14509, "likes": 1537, "comments": 84, "shares": 66, "days_ago": 9, "caption": "Day 31: แว่นกรองแสง รุ่น Shadeกับการสตรีมเกมทั้งคืน กดติดตามไว้นะ #ถนอมสายตา #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7394321885483287033", "views": 10372, "likes": 1137, "comments": 66, "shares": 62, "days_ago": 10, "caption": "สรุปให้: ทำความสะอาดห้องครั้งใหญ่ คลิปหน้ามีต่อ #vlog"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7464892142953840558", "views": 21567, "likes": 1563, "comments": 110, "shares": 97, "days_ago": 11, "caption": "ใส่แว่นเกมมิ่งแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คลิปหน้ามีต่อ #แว่นเกมมิ่ง #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7385271877090769946", "views": 6983, "likes": 309, "comments": 10, "shares": 50, "days_ago": 23, "caption": "ตอบคอมเมนต์: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Shade ขอบคุณที่ดูจนจบ #gaminggear #desksetup"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7458710756350307273", "views": 6301, "likes": 1068, "comments": 58, "shares": 136, "days_ago": 24, "caption": "Day 13: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา #bluelightglasses #แว่นกันแสงสีฟ้า"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7349320437396913313", "views": 5323, "likes": 455, "comments": 27, "shares": 14, "days_ago": 8, "caption": "EP.5 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Aurora ชุดเริ่มต้นเกมเมอร์งบน้อย ขอบคุณที่ดูจนจบ #เกมเมอร์ #eyewear"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7466137506239862156", "views": 14509, "likes": 1537, "comments": 84, "shares": 66, "days_ago": 9, "caption": "Day 31: แว่นกรองแสง รุ่น Shadeกับการสตรีมเกมทั้งคืน กดติดตามไว้นะ #ถนอมสายตา #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7394321885483287033", "views": 10372, "likes": 1137, "comments": 66, "shares": 62, "days_ago": 10, "caption": "สรุปให้: ทำความสะอาดห้องครั้งใหญ่ คลิปหน้ามีต่อ #vlog"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7464892142953840558", "views": 21567, "likes": 1563, "comments": 110, "shares": 97, "days_ago": 11, "caption": "ใส่แว่นเกมมิ่งแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คลิปหน้ามีต่อ #แว่นเกมมิ่ง #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7319351884241850240", "views": 6109, "likes": 691, "comments": 58, "shares": 87, "days_ago": 16, "caption": "ลองจริง: แว่นกรองแสง รุ่น Auroraกับการสตรีมเกมทั้งคืน กดติดตามไว้นะ #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7477591701404029092", "views": 5027, "likes": 356, "comments": 17, "shares": 57, "days_ago": 19, "caption": "พาดู: คลิปออนเลนส์กันแสงสีฟ้า รุ่น Shade สำหรับคนใส่แว่นสายตา คิดว่าไง คอมเมนต์เลย #bluelightglasses #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7385271877090769946", "views": 6983, "likes": 309, "comments": 10, "shares": 50, "days_ago": 23, "caption": "ตอบคอมเมนต์: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Shade ขอบคุณที่ดูจนจบ #gaminggear #desksetup"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7458710756350307273", "views": 6301, "likes": 1068, "comments": 58, "shares": 136, "days_ago": 24, "caption": "Day 13: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@blueblockbro/video/7417857759843103082", "views": 5327, "likes": 566, "comments": 36, "shares": 18, "days_ago": 30, "caption": "Day 20: ทำความสะอาดห้องครั้งใหญ่ จริงใจไม่อวย #vlog"}
+    ]},
+  {"handle": "nonggame.review", "url": "https://www.tiktok.com/@nonggame.review", "nickname": "น้องเกมรีวิว", "followers": 82000, "bio": "รีวิวเกมมือถือและอุปกรณ์เสริม", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7493499111604957843", "views": 48493, "likes": 2789, "comments": 111, "shares": 164, "days_ago": 8, "caption": "ตอบคอมเมนต์: ไต่แรงค์ Arena Legends จนเช้า ขอบคุณที่ดูจนจบ #เกม"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7467816080564827182", "views": 40414, "likes": 2976, "comments": 124, "shares": 184, "days_ago": 17, "caption": "Day 12: ตัวละครใหม่โกงเกินไปไหม ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7331786564074889378", "views": 76913, "likes": 6318, "comments": 480, "shares": 484, "days_ago": 19, "caption": "สรุปให้: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7373753970184599551", "views": 91483, "likes": 5343, "comments": 251, "shares": 217, "days_ago": 22, "caption": "พาดู: สอนคอมโบตัวใหม่แบบละเอียด คลิปหน้ามีต่อ #gamer"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7493499111604957843", "views": 48493, "likes": 2789, "comments": 111, "shares": 164, "days_ago": 8, "caption": "ตอบคอมเมนต์: ไต่แรงค์ Arena Legends จนเช้า ขอบคุณที่ดูจนจบ #เกม"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7373401464902156152", "views": 19353, "likes": 1504, "comments": 121, "shares": 202, "days_ago": 13, "caption": "สรุปให้: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Pixel ใครเคยลองบ้าง #แว่นเกมมิ่ง #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7302185690394589718", "views": 28080, "likes": 2214, "comments": 140, "shares": 137, "days_ago": 15, "caption": "ตอบคอมเมนต์: แว่นกันแสงสีฟ้า รุ่น Shadeใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม ใครเคยลองบ้าง #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7467816080564827182", "views": 40414, "likes": 2976, "comments": 124, "shares": 184, "days_ago": 17, "caption": "Day 12: ตัวละครใหม่โกงเกินไปไหม ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7355918844568094869", "views": 37133, "likes": 2677, "comments": 145, "shares": 394, "days_ago": 18, "caption": "EP.11 เลนส์กรองแสงสีฟ้า รุ่น Shade เทียบกับเลนส์ธรรมดา คิดว่าไง คอมเมนต์เลย #eyewear #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7331786564074889378", "views": 76913, "likes": 6318, "comments": 480, "shares": 484, "days_ago": 19, "caption": "สรุปให้: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7373753970184599551", "views": 91483, "likes": 5343, "comments": 251, "shares": 217, "days_ago": 22, "caption": "พาดู: สอนคอมโบตัวใหม่แบบละเอียด คลิปหน้ามีต่อ #gamer"},
+      {"url": "https://www.tiktok.com/@nonggame.review/video/7323227968121710776", "views": 19288, "likes": 906, "comments": 40, "shares": 108, "days_ago": 32, "caption": "EP.54 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ใครเคยลองบ้าง #bluelightglasses #แว่นเกมมิ่ง"}
+    ]},
+  {"handle": "retroarcade.kid", "url": "https://www.tiktok.com/@retroarcade.kid", "nickname": "เด็กตู้เกม", "followers": 4500, "bio": "สะสมเกมเก่า เล่นเกมใหม่", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7418850243343815102", "views": 16369, "likes": 1348, "comments": 60, "shares": 124, "days_ago": 5, "caption": "ลองชาไข่มุกร้านใหม่แถวบ้าน จริงใจไม่อวย #vlog"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7388952684376025719", "views": 24061, "likes": 2460, "comments": 145, "shares": 285, "days_ago": 12, "caption": "Day 38: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง จริงใจไม่อวย #gaming #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7379362998718086694", "views": 15633, "likes": 843, "comments": 56, "shares": 109, "days_ago": 19, "caption": "พาดู: ตื่นเช้าไปวิ่งสวนลุม กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7316221128403425145", "views": 12754, "likes": 777, "comments": 37, "shares": 60, "days_ago": 20, "caption": "แว่นกันแสงสีฟ้า ทรง Haloใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม ขอบคุณที่ดูจนจบ #แว่นเกมมิ่ง #ถนอมสายตา"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7456378152761424000", "views": 9181, "likes": 506, "comments": 22, "shares": 84, "days_ago": 4, "caption": "พาดู: ลองแว่นเกมมิ่ง ทรง Voltกับจอ 165Hz จริงใจไม่อวย #gaming #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7418850243343815102", "views": 16369, "likes": 1348, "comments": 60, "shares": 124, "days_ago": 5, "caption": "ลองชาไข่มุกร้านใหม่แถวบ้าน จริงใจไม่อวย #vlog"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7388952684376025719", "views": 24061, "likes": 2460, "comments": 145, "shares": 285, "days_ago": 12, "caption": "Day 38: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง จริงใจไม่อวย #gaming #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7379362998718086694", "views": 15633, "likes": 843, "comments": 56, "shares": 109, "days_ago": 19, "caption": "พาดู: ตื่นเช้าไปวิ่งสวนลุม กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7316221128403425145", "views": 12754, "likes": 777, "comments": 37, "shares": 60, "days_ago": 20, "caption": "แว่นกันแสงสีฟ้า ทรง Haloใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม ขอบคุณที่ดูจนจบ #แว่นเกมมิ่ง #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7420928891623427961", "views": 10705, "likes": 876, "comments": 59, "shares": 133, "days_ago": 21, "caption": "ไต่แรงค์ Arena Legends จนเช้า คลิปหน้ามีต่อ #เกม"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7348716164046229320", "views": 4802, "likes": 268, "comments": 16, "shares": 19, "days_ago": 31, "caption": "สรุปให้: ทำความสะอาดห้องครั้งใหญ่ คิดว่าไง คอมเมนต์เลย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@retroarcade.kid/video/7409343242868889097", "views": 6820, "likes": 566, "comments": 19, "shares": 67, "days_ago": 32, "caption": "พาดู: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง ใครเคยลองบ้าง #gamer"}
+    ]},
+  {"handle": "fpscoach.oat", "url": "https://www.tiktok.com/@fpscoach.oat", "nickname": "โค้ชโอ๊ต FPS", "followers": 36000, "bio": "สอนเล่นเกมยิง ตั้งค่าเมาส์ จอ แว่น", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7468423569006202623", "views": 48135, "likes": 3357, "comments": 112, "shares": 432, "days_ago": 17, "caption": "ตอบคอมเมนต์: รีวิวแว่นเกมมิ่ง รุ่น Volt น้ำหนักเบา ใส่กับหูฟังได้ไหม #gaminggear #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7326318781316695081", "views": 68043, "likes": 4188, "comments": 178, "shares": 340, "days_ago": 23, "caption": "สรุปให้: แว่นกันแสงสีฟ้า รุ่น Lumenใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คลิปหน้ามีต่อ #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7351797876987800565", "views": 44239, "likes": 2618, "comments": 117, "shares": 175, "days_ago": 24, "caption": "ตอบคอมเมนต์: สอนคอมโบตัวใหม่แบบละเอียด คลิปหน้ามีต่อ #เกม"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7386802432291829589", "views": 66329, "likes": 5727, "comments": 183, "shares": 360, "days_ago": 35, "caption": "EP.33 ลองแว่นเกมมิ่ง รุ่น Orbitกับจอ 165Hz กดติดตามไว้นะ #desksetup #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7426688406641749175", "views": 39548, "likes": 3989, "comments": 290, "shares": 274, "days_ago": 36, "caption": "สรุปให้: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป ใครเคยลองบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7427125042953881986", "views": 57053, "likes": 4215, "comments": 131, "shares": 626, "days_ago": 37, "caption": "พาดู: แว่นกันแสงสีฟ้า รุ่น Lumenใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม จริงใจไม่อวย #eyewear #desksetup"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7389012048709969996", "views": 10372, "likes": 689, "comments": 44, "shares": 52, "days_ago": 13, "caption": "สรุปให้: สอนคอมโบตัวใหม่แบบละเอียด คลิปหน้ามีต่อ #เกม"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7468423569006202623", "views": 48135, "likes": 3357, "comments": 112, "shares": 432, "days_ago": 17, "caption": "ตอบคอมเมนต์: รีวิวแว่นเกมมิ่ง รุ่น Volt น้ำหนักเบา ใส่กับหูฟังได้ไหม #gaminggear #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7326318781316695081", "views": 68043, "likes": 4188, "comments": 178, "shares": 340, "days_ago": 23, "caption": "สรุปให้: แว่นกันแสงสีฟ้า รุ่น Lumenใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คลิปหน้ามีต่อ #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7351797876987800565", "views": 44239, "likes": 2618, "comments": 117, "shares": 175, "days_ago": 24, "caption": "ตอบคอมเมนต์: สอนคอมโบตัวใหม่แบบละเอียด คลิปหน้ามีต่อ #เกม"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7341704808117557885", "views": 26425, "likes": 2993, "comments": 92, "shares": 471, "days_ago": 34, "caption": "มาแล้ว! เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7386802432291829589", "views": 66329, "likes": 5727, "comments": 183, "shares": 360, "days_ago": 35, "caption": "EP.33 ลองแว่นเกมมิ่ง รุ่น Orbitกับจอ 165Hz กดติดตามไว้นะ #desksetup #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7426688406641749175", "views": 39548, "likes": 3989, "comments": 290, "shares": 274, "days_ago": 36, "caption": "สรุปให้: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป ใครเคยลองบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7427125042953881986", "views": 57053, "likes": 4215, "comments": 131, "shares": 626, "days_ago": 37, "caption": "พาดู: แว่นกันแสงสีฟ้า รุ่น Lumenใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม จริงใจไม่อวย #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@fpscoach.oat/video/7403675993275169699", "views": 31380, "likes": 1719, "comments": 131, "shares": 116, "days_ago": 38, "caption": "มาแล้ว! ตัวละครใหม่โกงเกินไปไหม ขอบคุณที่ดูจนจบ #เกม"}
+    ]},
+  {"handle": "midnightgrind.tee", "url": "https://www.tiktok.com/@midnightgrind.tee", "nickname": "ทีไต่แรงค์", "followers": 2100, "bio": "ไต่แรงค์ทุกคืน แชร์เกียร์ที่ใช้", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7477212769209318411", "views": 6835, "likes": 542, "comments": 27, "shares": 63, "days_ago": 15, "caption": "ตอบคอมเมนต์: คลิปออนเลนส์กันแสงสีฟ้า ทรง Halo สำหรับคนใส่แว่นสายตา #เกมเมอร์ #desksetup"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7341919066805720467", "views": 5317, "likes": 635, "comments": 27, "shares": 41, "days_ago": 16, "caption": "EP.40 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Pixel กดติดตามไว้นะ #desksetup #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7494531874999731374", "views": 6910, "likes": 468, "comments": 29, "shares": 16, "days_ago": 26, "caption": "ตอบคอมเมนต์: แว่นกรองแสง รุ่น Pixelกับการสตรีมเกมทั้งคืน กดติดตามไว้นะ #bluelightglasses #desksetup"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7345073002393202656", "views": 10781, "likes": 776, "comments": 36, "shares": 65, "days_ago": 30, "caption": "ลองจริง: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คลิปหน้ามีต่อ #แว่นกันแสงสีฟ้า #eyewear"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7419456147868614232", "views": 5112, "likes": 1313, "comments": 85, "shares": 81, "days_ago": 31, "caption": "ตัวละครใหม่โกงเกินไปไหม จริงใจไม่อวย #gamer"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7338351798988931901", "views": 4527, "likes": 436, "comments": 19, "shares": 65, "days_ago": 7, "caption": "รีวิวแว่นเกมมิ่ง รุ่น Halo น้ำหนักเบา ใส่กับหูฟังได้ไหม #bluelightglasses #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7316944958458239771", "views": 3853, "likes": 402, "comments": 29, "shares": 9, "days_ago": 11, "caption": "ไต่แรงค์ Arena Legends จนเช้า ใครเคยลองบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7325394315867506422", "views": 3210, "likes": 310, "comments": 10, "shares": 48, "days_ago": 14, "caption": "พาดู: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คลิปหน้ามีต่อ #desksetup #gaminggear"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7477212769209318411", "views": 6835, "likes": 542, "comments": 27, "shares": 63, "days_ago": 15, "caption": "ตอบคอมเมนต์: คลิปออนเลนส์กันแสงสีฟ้า ทรง Halo สำหรับคนใส่แว่นสายตา #เกมเมอร์ #desksetup"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7341919066805720467", "views": 5317, "likes": 635, "comments": 27, "shares": 41, "days_ago": 16, "caption": "EP.40 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Pixel กดติดตามไว้นะ #desksetup #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7494531874999731374", "views": 6910, "likes": 468, "comments": 29, "shares": 16, "days_ago": 26, "caption": "ตอบคอมเมนต์: แว่นกรองแสง รุ่น Pixelกับการสตรีมเกมทั้งคืน กดติดตามไว้นะ #bluelightglasses #desksetup"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7345073002393202656", "views": 10781, "likes": 776, "comments": 36, "shares": 65, "days_ago": 30, "caption": "ลองจริง: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คลิปหน้ามีต่อ #แว่นกันแสงสีฟ้า #eyewear"},
+      {"url": "https://www.tiktok.com/@midnightgrind.tee/video/7419456147868614232", "views": 5112, "likes": 1313, "comments": 85, "shares": 81, "days_ago": 31, "caption": "ตัวละครใหม่โกงเกินไปไหม จริงใจไม่อวย #gamer"}
+    ]},
+  {"handle": "tactiletech.ning", "url": "https://www.tiktok.com/@tactiletech.ning", "nickname": "หนิงเทค", "followers": 62000, "bio": "คีย์บอร์ด เมาส์ จอ ครบในช่องเดียว", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7352470599535237338", "views": 36836, "likes": 1696, "comments": 64, "shares": 139, "days_ago": 16, "caption": "ไอเดียของขวัญให้เพื่อนร่วมงาน คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7341661977323556853", "views": 25920, "likes": 705, "comments": 40, "shares": 61, "days_ago": 27, "caption": "มาแล้ว! จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คิดว่าไง คอมเมนต์เลย #gaming #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7326756302382366300", "views": 25546, "likes": 1252, "comments": 97, "shares": 168, "days_ago": 31, "caption": "จัดสายไฟใต้โต๊ะ 10 นาทีเสร็จ #wfh"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7352470599535237338", "views": 36836, "likes": 1696, "comments": 64, "shares": 139, "days_ago": 16, "caption": "ไอเดียของขวัญให้เพื่อนร่วมงาน คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7484527670930552294", "views": 17273, "likes": 1266, "comments": 95, "shares": 123, "days_ago": 18, "caption": "ลองจริง: จัดสายไฟใต้โต๊ะ 10 นาทีเสร็จ ใครเคยลองบ้าง #wfh"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7390360608918078347", "views": 22953, "likes": 1101, "comments": 70, "shares": 56, "days_ago": 21, "caption": "ตอบคอมเมนต์: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Aurora จริงใจไม่อวย #ถนอมสายตา #gaminggear"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7438482864270059451", "views": 22617, "likes": 659, "comments": 38, "shares": 32, "days_ago": 22, "caption": "Day 47: แว่นกรองแสง ทรง Pixelกับการสตรีมเกมทั้งคืน คิดว่าไง คอมเมนต์เลย #แว่นกันแสงสีฟ้า #gaminggear"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7486357662643254501", "views": 18431, "likes": 981, "comments": 44, "shares": 112, "days_ago": 26, "caption": "เก้าอี้ทำงานตัวใหม่ นั่งยาวไม่ปวดหลัง #officelife"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7341661977323556853", "views": 25920, "likes": 705, "comments": 40, "shares": 61, "days_ago": 27, "caption": "มาแล้ว! จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คิดว่าไง คอมเมนต์เลย #gaming #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7452602452226721565", "views": 21427, "likes": 1008, "comments": 35, "shares": 138, "days_ago": 29, "caption": "มาแล้ว! แว่นกันแสงสีฟ้า ทรง Voltใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม #gaminggear #gaming"},
+      {"url": "https://www.tiktok.com/@tactiletech.ning/video/7326756302382366300", "views": 25546, "likes": 1252, "comments": 97, "shares": 168, "days_ago": 31, "caption": "จัดสายไฟใต้โต๊ะ 10 นาทีเสร็จ #wfh"}
+    ]},
+  {"handle": "lenslore.th", "url": "https://www.tiktok.com/@lenslore.th", "nickname": "เลนส์เล่าเรื่อง", "followers": 16000, "bio": "ช่างแว่นเล่าเรื่องเลนส์", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7334452125611256436", "views": 24844, "likes": 1558, "comments": 104, "shares": 91, "days_ago": 4, "caption": "สรุปให้: แว่นกันแสงสีฟ้า รุ่น Prismใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม ขอบคุณที่ดูจนจบ #desksetup #eyewear"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7352689638584151819", "views": 27972, "likes": 1182, "comments": 55, "shares": 64, "days_ago": 11, "caption": "มาแล้ว! ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Lumen กดติดตามไว้นะ #bluelightglasses #gaminggear"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7447764442234144392", "views": 13065, "likes": 356, "comments": 13, "shares": 30, "days_ago": 13, "caption": "สรุปให้: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา ทรง Orbit คลิปหน้ามีต่อ #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7439807396761886474", "views": 11116, "likes": 905, "comments": 68, "shares": 26, "days_ago": 24, "caption": "พาดู: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Pixel คิดว่าไง คอมเมนต์เลย #eyewear #gaming"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7483163911495399343", "views": 11592, "likes": 315, "comments": 8, "shares": 47, "days_ago": 26, "caption": "ตอบคอมเมนต์: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย กดติดตามไว้นะ #แว่นเกมมิ่ง #eyewear"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7334452125611256436", "views": 24844, "likes": 1558, "comments": 104, "shares": 91, "days_ago": 4, "caption": "สรุปให้: แว่นกันแสงสีฟ้า รุ่น Prismใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม ขอบคุณที่ดูจนจบ #desksetup #eyewear"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7438693749473537592", "views": 10342, "likes": 601, "comments": 46, "shares": 25, "days_ago": 7, "caption": "มาแล้ว! ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Shade จริงใจไม่อวย #gaming #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7352689638584151819", "views": 27972, "likes": 1182, "comments": 55, "shares": 64, "days_ago": 11, "caption": "มาแล้ว! ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Lumen กดติดตามไว้นะ #bluelightglasses #gaminggear"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7300786460613666788", "views": 3815, "likes": 222, "comments": 13, "shares": 11, "days_ago": 12, "caption": "Day 21: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย จริงใจไม่อวย #desksetup #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7447764442234144392", "views": 13065, "likes": 356, "comments": 13, "shares": 30, "days_ago": 13, "caption": "สรุปให้: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา ทรง Orbit คลิปหน้ามีต่อ #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7363430744070400620", "views": 10045, "likes": 439, "comments": 16, "shares": 73, "days_ago": 23, "caption": "ตอบคอมเมนต์: แว่นกันแสงสีฟ้าใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม กดติดตามไว้นะ #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7439807396761886474", "views": 11116, "likes": 905, "comments": 68, "shares": 26, "days_ago": 24, "caption": "พาดู: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Pixel คิดว่าไง คอมเมนต์เลย #eyewear #gaming"},
+      {"url": "https://www.tiktok.com/@lenslore.th/video/7483163911495399343", "views": 11592, "likes": 315, "comments": 8, "shares": 47, "days_ago": 26, "caption": "ตอบคอมเมนต์: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย กดติดตามไว้นะ #แว่นเกมมิ่ง #eyewear"}
+    ]},
+  {"handle": "pixelpanda.pim", "url": "https://www.tiktok.com/@pixelpanda.pim", "nickname": "พิมแพนด้าพิกเซล", "followers": 440000, "bio": "สตรีมเมอร์สายฮา เกมใหม่ทุกวันศุกร์", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7474027384856164919", "views": 104118, "likes": 5354, "comments": 159, "shares": 624, "days_ago": 10, "caption": "มาแล้ว! ไต่แรงค์ Arena Legends จนเช้า ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7415496386144113053", "views": 143750, "likes": 6997, "comments": 289, "shares": 988, "days_ago": 13, "caption": "ลองจริง: ทำกับข้าวเย็นง่าย ๆ หลังเลิกงาน กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7437268186674124579", "views": 228192, "likes": 5046, "comments": 396, "shares": 682, "days_ago": 27, "caption": "ตอบคอมเมนต์: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คิดว่าไง คอมเมนต์เลย #เกม"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7391015789830510851", "views": 88609, "likes": 4929, "comments": 193, "shares": 240, "days_ago": 41, "caption": "มาแล้ว! เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป คิดว่าไง คอมเมนต์เลย #gamer"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7385742309599017545", "views": 85017, "likes": 3254, "comments": 106, "shares": 257, "days_ago": 8, "caption": "พาดู: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป จริงใจไม่อวย #เกม"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7474027384856164919", "views": 104118, "likes": 5354, "comments": 159, "shares": 624, "days_ago": 10, "caption": "มาแล้ว! ไต่แรงค์ Arena Legends จนเช้า ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7415496386144113053", "views": 143750, "likes": 6997, "comments": 289, "shares": 988, "days_ago": 13, "caption": "ลองจริง: ทำกับข้าวเย็นง่าย ๆ หลังเลิกงาน กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7371739590913858073", "views": 65106, "likes": 2141, "comments": 58, "shares": 338, "days_ago": 16, "caption": "EP.19 ทำความสะอาดห้องครั้งใหญ่ คลิปหน้ามีต่อ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7424146976111949117", "views": 48873, "likes": 2104, "comments": 122, "shares": 148, "days_ago": 26, "caption": "พาดู: เกมอินดี้ที่ต้องลองเดือนนี้ #เกม"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7437268186674124579", "views": 228192, "likes": 5046, "comments": 396, "shares": 682, "days_ago": 27, "caption": "ตอบคอมเมนต์: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คิดว่าไง คอมเมนต์เลย #เกม"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7377752032667355458", "views": 74305, "likes": 1827, "comments": 50, "shares": 323, "days_ago": 28, "caption": "ทำความสะอาดห้องครั้งใหญ่ กดติดตามไว้นะ #vlog"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7346000586268245383", "views": 45427, "likes": 1343, "comments": 53, "shares": 92, "days_ago": 29, "caption": "Day 1: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@pixelpanda.pim/video/7391015789830510851", "views": 88609, "likes": 4929, "comments": 193, "shares": 240, "days_ago": 41, "caption": "มาแล้ว! เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป คิดว่าไง คอมเมนต์เลย #gamer"}
+    ]},
+  {"handle": "arcadequeen.bow", "url": "https://www.tiktok.com/@arcadequeen.bow", "nickname": "โบว์ราชินีเกม", "followers": 720000, "bio": "เกมเมอร์หญิง รีวิวเกียร์และแว่นเกมมิ่ง", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7417654371352105409", "views": 176339, "likes": 4902, "comments": 179, "shares": 363, "days_ago": 14, "caption": "มาแล้ว! กันแดดตัวไหนไม่วอก ใครเคยลองบ้าง #makeup"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7301729367021796319", "views": 151314, "likes": 5141, "comments": 189, "shares": 292, "days_ago": 21, "caption": "สรุปให้: สอนคอมโบตัวใหม่แบบละเอียด คลิปหน้ามีต่อ #gamer"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7301934944249965046", "views": 98633, "likes": 2738, "comments": 206, "shares": 283, "days_ago": 23, "caption": "ตอบคอมเมนต์: รีวิวลิปสีใหม่ ติดทนไหม ใครเคยลองบ้าง #skincare"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7393208052271075391", "views": 151870, "likes": 2602, "comments": 118, "shares": 241, "days_ago": 24, "caption": "EP.57 คลิปออนเลนส์กันแสงสีฟ้า รุ่น Lumen สำหรับคนใส่แว่นสายตา จริงใจไม่อวย #แว่นเกมมิ่ง #gaminggear"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7434021618228429932", "views": 90338, "likes": 2744, "comments": 188, "shares": 255, "days_ago": 29, "caption": "Day 38: สอนคอมโบตัวใหม่แบบละเอียด ขอบคุณที่ดูจนจบ #เกม"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7375193904125106789", "views": 189498, "likes": 3434, "comments": 168, "shares": 147, "days_ago": 31, "caption": "ลองจริง: เลนส์กรองแสงสีฟ้า รุ่น Prism เทียบกับเลนส์ธรรมดา กดติดตามไว้นะ #ถนอมสายตา #bluelightglasses"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7492378299970563004", "views": 59174, "likes": 1477, "comments": 72, "shares": 228, "days_ago": 11, "caption": "มาแล้ว! สกินแคร์ก่อนนอนสำหรับผิวมัน คิดว่าไง คอมเมนต์เลย #makeup"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7417654371352105409", "views": 176339, "likes": 4902, "comments": 179, "shares": 363, "days_ago": 14, "caption": "มาแล้ว! กันแดดตัวไหนไม่วอก ใครเคยลองบ้าง #makeup"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7319970590527680449", "views": 81626, "likes": 2969, "comments": 113, "shares": 219, "days_ago": 15, "caption": "สรุปให้: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ใครเคยลองบ้าง #gaming #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7463104942400893941", "views": 83244, "likes": 3478, "comments": 106, "shares": 364, "days_ago": 20, "caption": "สรุปให้: เกมอินดี้ที่ต้องลองเดือนนี้ จริงใจไม่อวย #เกม"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7301729367021796319", "views": 151314, "likes": 5141, "comments": 189, "shares": 292, "days_ago": 21, "caption": "สรุปให้: สอนคอมโบตัวใหม่แบบละเอียด คลิปหน้ามีต่อ #gamer"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7301934944249965046", "views": 98633, "likes": 2738, "comments": 206, "shares": 283, "days_ago": 23, "caption": "ตอบคอมเมนต์: รีวิวลิปสีใหม่ ติดทนไหม ใครเคยลองบ้าง #skincare"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7393208052271075391", "views": 151870, "likes": 2602, "comments": 118, "shares": 241, "days_ago": 24, "caption": "EP.57 คลิปออนเลนส์กันแสงสีฟ้า รุ่น Lumen สำหรับคนใส่แว่นสายตา จริงใจไม่อวย #แว่นเกมมิ่ง #gaminggear"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7396098529043174732", "views": 67994, "likes": 1667, "comments": 87, "shares": 230, "days_ago": 26, "caption": "สรุปให้: แว่นกรองแสง ทรง Neoกับการสตรีมเกมทั้งคืน กดติดตามไว้นะ #bluelightglasses #desksetup"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7434021618228429932", "views": 90338, "likes": 2744, "comments": 188, "shares": 255, "days_ago": 29, "caption": "Day 38: สอนคอมโบตัวใหม่แบบละเอียด ขอบคุณที่ดูจนจบ #เกม"},
+      {"url": "https://www.tiktok.com/@arcadequeen.bow/video/7375193904125106789", "views": 189498, "likes": 3434, "comments": 168, "shares": 147, "days_ago": 31, "caption": "ลองจริง: เลนส์กรองแสงสีฟ้า รุ่น Prism เทียบกับเลนส์ธรรมดา กดติดตามไว้นะ #ถนอมสายตา #bluelightglasses"}
+    ]},
+  {"handle": "gamingduo.peak", "url": "https://www.tiktok.com/@gamingduo.peak", "nickname": "พีคเกมมิ่งดูโอ", "followers": 44000, "bio": "คู่หูเกมเมอร์ รีวิวแว่นเกมมิ่ง", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7473431220411437382", "views": 72127, "likes": 5722, "comments": 316, "shares": 303, "days_ago": 5, "caption": "EP.11 เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง รุ่น Orbit คลิปหน้ามีต่อ #gaminggear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7471245864227351150", "views": 47162, "likes": 1926, "comments": 66, "shares": 238, "days_ago": 10, "caption": "พาดู: ใส่แว่นเกมมิ่ง รุ่น Haloแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7333012843744915819", "views": 41647, "likes": 1469, "comments": 53, "shares": 184, "days_ago": 18, "caption": "สรุปให้: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา ขอบคุณที่ดูจนจบ #แว่นกันแสงสีฟ้า #แว่นเกมมิ่ง"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7428654931970763687", "views": 14850, "likes": 1115, "comments": 57, "shares": 56, "days_ago": 3, "caption": "ลองจริง: ใส่แว่นเกมมิ่ง รุ่น Pixelแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คลิปหน้ามีต่อ #เกมเมอร์ #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7307145931393907540", "views": 33949, "likes": 4020, "comments": 194, "shares": 185, "days_ago": 4, "caption": "ตอบคอมเมนต์: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า รุ่น Volt คิดว่าไง คอมเมนต์เลย #แว่นเกมมิ่ง #gaming"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7473431220411437382", "views": 72127, "likes": 5722, "comments": 316, "shares": 303, "days_ago": 5, "caption": "EP.11 เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง รุ่น Orbit คลิปหน้ามีต่อ #gaminggear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7351666794412022798", "views": 36698, "likes": 2083, "comments": 150, "shares": 98, "days_ago": 6, "caption": "มาแล้ว! อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คิดว่าไง คอมเมนต์เลย #gamer"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7473893705832582359", "views": 22453, "likes": 1391, "comments": 56, "shares": 99, "days_ago": 8, "caption": "สรุปให้: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คิดว่าไง คอมเมนต์เลย #เกมเมอร์ #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7471245864227351150", "views": 47162, "likes": 1926, "comments": 66, "shares": 238, "days_ago": 10, "caption": "พาดู: ใส่แว่นเกมมิ่ง รุ่น Haloแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7343219787033691836", "views": 26737, "likes": 965, "comments": 76, "shares": 91, "days_ago": 11, "caption": "EP.18 ลองแว่นเกมมิ่งกับจอ 165Hz ใครเคยลองบ้าง #แว่นกันแสงสีฟ้า #desksetup"},
+      {"url": "https://www.tiktok.com/@gamingduo.peak/video/7333012843744915819", "views": 41647, "likes": 1469, "comments": 53, "shares": 184, "days_ago": 18, "caption": "สรุปให้: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา ขอบคุณที่ดูจนจบ #แว่นกันแสงสีฟ้า #แว่นเกมมิ่ง"}
+    ]},
+  {"handle": "gamingduo.peakteam", "url": "https://www.tiktok.com/@gamingduo.peakteam", "nickname": "พีคเกมมิ่งดูโอ ทีม", "followers": 41000, "bio": "คู่หูเกมเมอร์ รีวิวแว่นเกมมิ่ง (ทีม)", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7331809011613343293", "views": 42227, "likes": 1836, "comments": 114, "shares": 89, "days_ago": 4, "caption": "ตอบคอมเมนต์: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า รุ่น Volt คิดว่าไง คอมเมนต์เลย (ทีม) #แว่นเกมมิ่ง #gaming"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7306658129605448052", "views": 61307, "likes": 5375, "comments": 280, "shares": 204, "days_ago": 6, "caption": "มาแล้ว! อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คิดว่าไง คอมเมนต์เลย (ทีม) #gamer"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7420792366508578508", "views": 57645, "likes": 2560, "comments": 169, "shares": 162, "days_ago": 7, "caption": "สรุปให้: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คิดว่าไง คอมเมนต์เลย (ทีม) #เกมเมอร์ #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7323236895224284512", "views": 46781, "likes": 5215, "comments": 340, "shares": 679, "days_ago": 13, "caption": "พาดู: ใส่แว่นเกมมิ่ง รุ่น Haloแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย (ทีม) #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7334979549280306787", "views": 40442, "likes": 2118, "comments": 171, "shares": 192, "days_ago": 22, "caption": "พาดู: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Halo คลิปหน้ามีต่อ #gaming #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7355655803935787808", "views": 40644, "likes": 1512, "comments": 62, "shares": 246, "days_ago": 23, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Neo กดติดตามไว้นะ #gaminggear #eyewear"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7455799947853161334", "views": 29623, "likes": 1628, "comments": 72, "shares": 150, "days_ago": 3, "caption": "ลองจริง: ใส่แว่นเกมมิ่ง รุ่น Pixelแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คลิปหน้ามีต่อ (ทีม) #เกมเมอร์ #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7331809011613343293", "views": 42227, "likes": 1836, "comments": 114, "shares": 89, "days_ago": 4, "caption": "ตอบคอมเมนต์: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า รุ่น Volt คิดว่าไง คอมเมนต์เลย (ทีม) #แว่นเกมมิ่ง #gaming"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7381449595157138518", "views": 34909, "likes": 2066, "comments": 150, "shares": 226, "days_ago": 5, "caption": "EP.11 เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง รุ่น Orbit คลิปหน้ามีต่อ (ทีม) #gaminggear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7306658129605448052", "views": 61307, "likes": 5375, "comments": 280, "shares": 204, "days_ago": 6, "caption": "มาแล้ว! อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คิดว่าไง คอมเมนต์เลย (ทีม) #gamer"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7420792366508578508", "views": 57645, "likes": 2560, "comments": 169, "shares": 162, "days_ago": 7, "caption": "สรุปให้: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คิดว่าไง คอมเมนต์เลย (ทีม) #เกมเมอร์ #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7323236895224284512", "views": 46781, "likes": 5215, "comments": 340, "shares": 679, "days_ago": 13, "caption": "พาดู: ใส่แว่นเกมมิ่ง รุ่น Haloแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว คิดว่าไง คอมเมนต์เลย (ทีม) #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7301048751186382696", "views": 9631, "likes": 748, "comments": 35, "shares": 51, "days_ago": 14, "caption": "EP.18 ลองแว่นเกมมิ่งกับจอ 165Hz ใครเคยลองบ้าง (ทีม) #แว่นกันแสงสีฟ้า #desksetup"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7355840840072286313", "views": 26585, "likes": 1557, "comments": 51, "shares": 98, "days_ago": 18, "caption": "สรุปให้: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา ขอบคุณที่ดูจนจบ (ทีม) #แว่นกันแสงสีฟ้า #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7334979549280306787", "views": 40442, "likes": 2118, "comments": 171, "shares": 192, "days_ago": 22, "caption": "พาดู: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า ทรง Halo คลิปหน้ามีต่อ #gaming #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamingduo.peakteam/video/7355655803935787808", "views": 40644, "likes": 1512, "comments": 62, "shares": 246, "days_ago": 23, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Neo กดติดตามไว้นะ #gaminggear #eyewear"}
+    ]},
+  {"handle": "desklife.ame", "url": "https://www.tiktok.com/@desklife.ame", "nickname": "เอมโต๊ะทำงาน", "followers": 55000, "bio": "ชีวิตออฟฟิศและโต๊ะทำงานสวย ๆ", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7371880341868164421", "views": 41108, "likes": 1555, "comments": 105, "shares": 75, "days_ago": 25, "caption": "ตอบคอมเมนต์: ไอเดียของขวัญให้เพื่อนร่วมงาน ใครเคยลองบ้าง #wfh"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7402259706912602257", "views": 48252, "likes": 2035, "comments": 103, "shares": 96, "days_ago": 34, "caption": "สรุปให้: ไอเดียของขวัญให้เพื่อนร่วมงาน คิดว่าไง คอมเมนต์เลย #wfh"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7383064318336286255", "views": 44286, "likes": 1972, "comments": 86, "shares": 289, "days_ago": 50, "caption": "ลองจริง: แว่นกันแสงสีฟ้า ทรง Voltใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คิดว่าไง คอมเมนต์เลย #gaminggear #eyewear"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7343157524446624408", "views": 42263, "likes": 2057, "comments": 71, "shares": 196, "days_ago": 51, "caption": "EP.47 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย ขอบคุณที่ดูจนจบ #gaminggear #desksetup"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7376816245469840175", "views": 22196, "likes": 1367, "comments": 62, "shares": 171, "days_ago": 18, "caption": "EP.52 ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง จริงใจไม่อวย #officelife"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7371880341868164421", "views": 41108, "likes": 1555, "comments": 105, "shares": 75, "days_ago": 25, "caption": "ตอบคอมเมนต์: ไอเดียของขวัญให้เพื่อนร่วมงาน ใครเคยลองบ้าง #wfh"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7498348441507203495", "views": 17509, "likes": 423, "comments": 21, "shares": 29, "days_ago": 27, "caption": "สรุปให้: ตื่นเช้าไปวิ่งสวนลุม คิดว่าไง คอมเมนต์เลย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7402259706912602257", "views": 48252, "likes": 2035, "comments": 103, "shares": 96, "days_ago": 34, "caption": "สรุปให้: ไอเดียของขวัญให้เพื่อนร่วมงาน คิดว่าไง คอมเมนต์เลย #wfh"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7333851371934577070", "views": 17278, "likes": 738, "comments": 57, "shares": 105, "days_ago": 36, "caption": "ลองจริง: ลิสต์งานวันจันทร์แบบไม่เครียด จริงใจไม่อวย #officelife"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7420818683747641051", "views": 18863, "likes": 832, "comments": 60, "shares": 111, "days_ago": 42, "caption": "ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7379495333542620267", "views": 29588, "likes": 738, "comments": 36, "shares": 49, "days_ago": 49, "caption": "ตอบคอมเมนต์: คลิปออนเลนส์กันแสงสีฟ้า สำหรับคนใส่แว่นสายตา กดติดตามไว้นะ #เกมเมอร์ #gaming"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7383064318336286255", "views": 44286, "likes": 1972, "comments": 86, "shares": 289, "days_ago": 50, "caption": "ลองจริง: แว่นกันแสงสีฟ้า ทรง Voltใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คิดว่าไง คอมเมนต์เลย #gaminggear #eyewear"},
+      {"url": "https://www.tiktok.com/@desklife.ame/video/7343157524446624408", "views": 42263, "likes": 2057, "comments": 71, "shares": 196, "days_ago": 51, "caption": "EP.47 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย ขอบคุณที่ดูจนจบ #gaminggear #desksetup"}
+    ]},
+  {"handle": "officemate.jane", "url": "https://www.tiktok.com/@officemate.jane", "nickname": "เจนเพื่อนออฟฟิศ", "followers": 18000, "bio": "มนุษย์เงินเดือน เล่าเรื่องงาน", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7495473931193094117", "views": 43598, "likes": 2015, "comments": 86, "shares": 320, "days_ago": 3, "caption": "พาดู: ลิสต์งานวันจันทร์แบบไม่เครียด ขอบคุณที่ดูจนจบ #wfh"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7424015930513917057", "views": 14047, "likes": 665, "comments": 32, "shares": 48, "days_ago": 4, "caption": "มาแล้ว! ทำความสะอาดห้องครั้งใหญ่ ขอบคุณที่ดูจนจบ #vlog"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7429668847911205585", "views": 39682, "likes": 1970, "comments": 66, "shares": 355, "days_ago": 10, "caption": "ตอบคอมเมนต์: ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง ขอบคุณที่ดูจนจบ #officelife"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7483412586017307725", "views": 9137, "likes": 575, "comments": 39, "shares": 39, "days_ago": 14, "caption": "EP.30 ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7347223882631439552", "views": 20343, "likes": 656, "comments": 26, "shares": 103, "days_ago": 23, "caption": "EP.34 ฝนตกรถติด กลับบ้านดึกอีกแล้ว คิดว่าไง คอมเมนต์เลย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7447334016978664966", "views": 18294, "likes": 735, "comments": 41, "shares": 101, "days_ago": 26, "caption": "EP.54 ฝนตกรถติด กลับบ้านดึกอีกแล้ว คิดว่าไง คอมเมนต์เลย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7411154315499886642", "views": 18371, "likes": 370, "comments": 28, "shares": 7, "days_ago": 29, "caption": "ลองจริง: พาแม่ไปกินข้าววันเกิด จริงใจไม่อวย #ชีวิตประจำวัน"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7495473931193094117", "views": 43598, "likes": 2015, "comments": 86, "shares": 320, "days_ago": 3, "caption": "พาดู: ลิสต์งานวันจันทร์แบบไม่เครียด ขอบคุณที่ดูจนจบ #wfh"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7424015930513917057", "views": 14047, "likes": 665, "comments": 32, "shares": 48, "days_ago": 4, "caption": "มาแล้ว! ทำความสะอาดห้องครั้งใหญ่ ขอบคุณที่ดูจนจบ #vlog"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7422121026904125658", "views": 4980, "likes": 218, "comments": 7, "shares": 20, "days_ago": 6, "caption": "ลองจริง: ทำกับข้าวเย็นง่าย ๆ หลังเลิกงาน ใครเคยลองบ้าง #vlog"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7429668847911205585", "views": 39682, "likes": 1970, "comments": 66, "shares": 355, "days_ago": 10, "caption": "ตอบคอมเมนต์: ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง ขอบคุณที่ดูจนจบ #officelife"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7483412586017307725", "views": 9137, "likes": 575, "comments": 39, "shares": 39, "days_ago": 14, "caption": "EP.30 ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7347223882631439552", "views": 20343, "likes": 656, "comments": 26, "shares": 103, "days_ago": 23, "caption": "EP.34 ฝนตกรถติด กลับบ้านดึกอีกแล้ว คิดว่าไง คอมเมนต์เลย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7447334016978664966", "views": 18294, "likes": 735, "comments": 41, "shares": 101, "days_ago": 26, "caption": "EP.54 ฝนตกรถติด กลับบ้านดึกอีกแล้ว คิดว่าไง คอมเมนต์เลย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@officemate.jane/video/7411154315499886642", "views": 18371, "likes": 370, "comments": 28, "shares": 7, "days_ago": 29, "caption": "ลองจริง: พาแม่ไปกินข้าววันเกิด จริงใจไม่อวย #ชีวิตประจำวัน"}
+    ]},
+  {"handle": "studentdiary.mook", "url": "https://www.tiktok.com/@studentdiary.mook", "nickname": "มุกไดอารี่", "followers": 6200, "bio": "เด็กวิศวะ ปี 3 ชอบเกม", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7323572755600967156", "views": 24886, "likes": 1868, "comments": 96, "shares": 263, "days_ago": 7, "caption": "EP.38 อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย ขอบคุณที่ดูจนจบ #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7439527773001484352", "views": 16179, "likes": 1626, "comments": 63, "shares": 120, "days_ago": 10, "caption": "ลองจริง: อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย กดติดตามไว้นะ #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7406829025157416920", "views": 56393, "likes": 9348, "comments": 529, "shares": 1054, "days_ago": 11, "caption": "อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7497917647172420795", "views": 19456, "likes": 945, "comments": 72, "shares": 109, "days_ago": 14, "caption": "พาดู: ตารางอ่านหนังสือสัปดาห์นี้ คลิปหน้ามีต่อ #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7455330840359035754", "views": 26038, "likes": 3121, "comments": 167, "shares": 155, "days_ago": 19, "caption": "มาแล้ว! อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7372930758746675141", "views": 49477, "likes": 7586, "comments": 193, "shares": 529, "days_ago": 21, "caption": "ตอบคอมเมนต์: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป คิดว่าไง คอมเมนต์เลย #เกม"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7323572755600967156", "views": 24886, "likes": 1868, "comments": 96, "shares": 263, "days_ago": 7, "caption": "EP.38 อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย ขอบคุณที่ดูจนจบ #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7439527773001484352", "views": 16179, "likes": 1626, "comments": 63, "shares": 120, "days_ago": 10, "caption": "ลองจริง: อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย กดติดตามไว้นะ #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7406829025157416920", "views": 56393, "likes": 9348, "comments": 529, "shares": 1054, "days_ago": 11, "caption": "อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7497917647172420795", "views": 19456, "likes": 945, "comments": 72, "shares": 109, "days_ago": 14, "caption": "พาดู: ตารางอ่านหนังสือสัปดาห์นี้ คลิปหน้ามีต่อ #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7455330840359035754", "views": 26038, "likes": 3121, "comments": 167, "shares": 155, "days_ago": 19, "caption": "มาแล้ว! อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7446041740583202306", "views": 4809, "likes": 376, "comments": 21, "shares": 32, "days_ago": 20, "caption": "EP.53 ลองแว่นเกมมิ่ง ทรง Auroraกับจอ 165Hz กดติดตามไว้นะ #gaming #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7372930758746675141", "views": 49477, "likes": 7586, "comments": 193, "shares": 529, "days_ago": 21, "caption": "ตอบคอมเมนต์: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป คิดว่าไง คอมเมนต์เลย #เกม"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7366854592203351428", "views": 3616, "likes": 477, "comments": 15, "shares": 73, "days_ago": 25, "caption": "พาดู: อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย คิดว่าไง คอมเมนต์เลย #studygram"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7304538240018642354", "views": 8035, "likes": 1207, "comments": 27, "shares": 106, "days_ago": 29, "caption": "EP.11 อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@studentdiary.mook/video/7477300685353957656", "views": 11881, "likes": 1645, "comments": 47, "shares": 97, "days_ago": 35, "caption": "ลองจริง: ไต่แรงค์ Arena Legends จนเช้า กดติดตามไว้นะ #เกม"}
+    ]},
+  {"handle": "studywithpete", "url": "https://www.tiktok.com/@studywithpete", "nickname": "อ่านหนังสือกับพีท", "followers": 5800, "bio": "ชวนอ่านหนังสือ จอทั้งวัน", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@studywithpete/video/7481268312907230912", "views": 18503, "likes": 2536, "comments": 201, "shares": 275, "days_ago": 2, "caption": "คลิปออนเลนส์กันแสงสีฟ้า รุ่น Aurora สำหรับคนใส่แว่นสายตา กดติดตามไว้นะ #desksetup #gaminggear"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7307675405943754726", "views": 14090, "likes": 1796, "comments": 111, "shares": 116, "days_ago": 22, "caption": "มาแล้ว! พรีเซนต์งานกลุ่มรอดแล้ว กดติดตามไว้นะ #studygram"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7446539005719452036", "views": 32007, "likes": 1964, "comments": 111, "shares": 293, "days_ago": 24, "caption": "Day 3: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย จริงใจไม่อวย #eyewear #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7422292429169900738", "views": 20976, "likes": 1569, "comments": 103, "shares": 213, "days_ago": 37, "caption": "EP.9 จดเลคเชอร์ในไอแพดแบบอ่านง่าย คลิปหน้ามีต่อ #เด็กมหาลัย"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7347447115238827187", "views": 13683, "likes": 1191, "comments": 29, "shares": 214, "days_ago": 45, "caption": "มาแล้ว! จดเลคเชอร์ในไอแพดแบบอ่านง่าย จริงใจไม่อวย #studygram"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7401776209050598030", "views": 12912, "likes": 1324, "comments": 46, "shares": 91, "days_ago": 49, "caption": "Day 26: อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย คิดว่าไง คอมเมนต์เลย #เด็กมหาลัย"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@studywithpete/video/7481268312907230912", "views": 18503, "likes": 2536, "comments": 201, "shares": 275, "days_ago": 2, "caption": "คลิปออนเลนส์กันแสงสีฟ้า รุ่น Aurora สำหรับคนใส่แว่นสายตา กดติดตามไว้นะ #desksetup #gaminggear"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7372770823230836138", "views": 12492, "likes": 1246, "comments": 87, "shares": 47, "days_ago": 5, "caption": "พาดู: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Volt ชุดเริ่มต้นเกมเมอร์งบน้อย #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7392095499972507623", "views": 4473, "likes": 558, "comments": 41, "shares": 39, "days_ago": 12, "caption": "มาแล้ว! จดเลคเชอร์ในไอแพดแบบอ่านง่าย ขอบคุณที่ดูจนจบ #studygram"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7307675405943754726", "views": 14090, "likes": 1796, "comments": 111, "shares": 116, "days_ago": 22, "caption": "มาแล้ว! พรีเซนต์งานกลุ่มรอดแล้ว กดติดตามไว้นะ #studygram"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7446539005719452036", "views": 32007, "likes": 1964, "comments": 111, "shares": 293, "days_ago": 24, "caption": "Day 3: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย จริงใจไม่อวย #eyewear #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7404905287948364474", "views": 9631, "likes": 711, "comments": 24, "shares": 87, "days_ago": 29, "caption": "ตอบคอมเมนต์: อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย ขอบคุณที่ดูจนจบ #เด็กมหาลัย"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7471396365039093122", "views": 6573, "likes": 861, "comments": 39, "shares": 72, "days_ago": 32, "caption": "มาแล้ว! อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย ขอบคุณที่ดูจนจบ #studygram"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7422292429169900738", "views": 20976, "likes": 1569, "comments": 103, "shares": 213, "days_ago": 37, "caption": "EP.9 จดเลคเชอร์ในไอแพดแบบอ่านง่าย คลิปหน้ามีต่อ #เด็กมหาลัย"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7347447115238827187", "views": 13683, "likes": 1191, "comments": 29, "shares": 214, "days_ago": 45, "caption": "มาแล้ว! จดเลคเชอร์ในไอแพดแบบอ่านง่าย จริงใจไม่อวย #studygram"},
+      {"url": "https://www.tiktok.com/@studywithpete/video/7401776209050598030", "views": 12912, "likes": 1324, "comments": 46, "shares": 91, "days_ago": 49, "caption": "Day 26: อ่านหนังสือสอบไฟนอล 3 วันสุดท้าย คิดว่าไง คอมเมนต์เลย #เด็กมหาลัย"}
+    ]},
+  {"handle": "deskplantdiy", "url": "https://www.tiktok.com/@deskplantdiy", "nickname": "โต๊ะมีต้นไม้", "followers": 9600, "bio": "แต่งโต๊ะด้วยต้นไม้ DIY", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7452799617039593202", "views": 17658, "likes": 1026, "comments": 36, "shares": 134, "days_ago": 19, "caption": "ตอบคอมเมนต์: ลิสต์งานวันจันทร์แบบไม่เครียด คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7450675375205960543", "views": 11026, "likes": 287, "comments": 21, "shares": 17, "days_ago": 26, "caption": "ตอบคอมเมนต์: ไอเดียของขวัญให้เพื่อนร่วมงาน ขอบคุณที่ดูจนจบ #wfh"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7399994441098112981", "views": 15893, "likes": 725, "comments": 39, "shares": 42, "days_ago": 29, "caption": "สรุปให้: จัดโต๊ะทำงานมินิมอลที่บ้าน ขอบคุณที่ดูจนจบ #wfh"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7321104769204568508", "views": 14564, "likes": 743, "comments": 24, "shares": 115, "days_ago": 31, "caption": "ตื่นเช้าไปวิ่งสวนลุม ขอบคุณที่ดูจนจบ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7434948598059281645", "views": 30819, "likes": 1353, "comments": 90, "shares": 79, "days_ago": 32, "caption": "พาดู: คลิปออนเลนส์กันแสงสีฟ้า สำหรับคนใส่แว่นสายตา ใครเคยลองบ้าง #desksetup #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7403737434376662691", "views": 17489, "likes": 571, "comments": 34, "shares": 32, "days_ago": 41, "caption": "พาดู: ฝนตกรถติด กลับบ้านดึกอีกแล้ว จริงใจไม่อวย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7395690893511193056", "views": 11412, "likes": 557, "comments": 21, "shares": 44, "days_ago": 47, "caption": "ตอบคอมเมนต์: ใส่แว่นเกมมิ่ง ทรง Prismแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว จริงใจไม่อวย #gaminggear #eyewear"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7301095353398834052", "views": 6523, "likes": 358, "comments": 9, "shares": 47, "days_ago": 10, "caption": "ลองจริง: ทำความสะอาดห้องครั้งใหญ่ คิดว่าไง คอมเมนต์เลย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7406336354870813010", "views": 8112, "likes": 245, "comments": 9, "shares": 25, "days_ago": 12, "caption": "สรุปให้: ลองชาไข่มุกร้านใหม่แถวบ้าน คิดว่าไง คอมเมนต์เลย #vlog"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7452799617039593202", "views": 17658, "likes": 1026, "comments": 36, "shares": 134, "days_ago": 19, "caption": "ตอบคอมเมนต์: ลิสต์งานวันจันทร์แบบไม่เครียด คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7450675375205960543", "views": 11026, "likes": 287, "comments": 21, "shares": 17, "days_ago": 26, "caption": "ตอบคอมเมนต์: ไอเดียของขวัญให้เพื่อนร่วมงาน ขอบคุณที่ดูจนจบ #wfh"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7399994441098112981", "views": 15893, "likes": 725, "comments": 39, "shares": 42, "days_ago": 29, "caption": "สรุปให้: จัดโต๊ะทำงานมินิมอลที่บ้าน ขอบคุณที่ดูจนจบ #wfh"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7321104769204568508", "views": 14564, "likes": 743, "comments": 24, "shares": 115, "days_ago": 31, "caption": "ตื่นเช้าไปวิ่งสวนลุม ขอบคุณที่ดูจนจบ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7434948598059281645", "views": 30819, "likes": 1353, "comments": 90, "shares": 79, "days_ago": 32, "caption": "พาดู: คลิปออนเลนส์กันแสงสีฟ้า สำหรับคนใส่แว่นสายตา ใครเคยลองบ้าง #desksetup #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7403737434376662691", "views": 17489, "likes": 571, "comments": 34, "shares": 32, "days_ago": 41, "caption": "พาดู: ฝนตกรถติด กลับบ้านดึกอีกแล้ว จริงใจไม่อวย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@deskplantdiy/video/7395690893511193056", "views": 11412, "likes": 557, "comments": 21, "shares": 44, "days_ago": 47, "caption": "ตอบคอมเมนต์: ใส่แว่นเกมมิ่ง ทรง Prismแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว จริงใจไม่อวย #gaminggear #eyewear"}
+    ]},
+  {"handle": "keyclicksound", "url": "https://www.tiktok.com/@keyclicksound", "nickname": "เสียงคีย์บอร์ด", "followers": 27000, "bio": "ASMR คีย์บอร์ด", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7439039227504580269", "views": 46882, "likes": 2897, "comments": 200, "shares": 219, "days_ago": 20, "caption": "ตอบคอมเมนต์: จัดสายไฟใต้โต๊ะ 10 นาทีเสร็จ คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7390228842939174459", "views": 26508, "likes": 1469, "comments": 45, "shares": 191, "days_ago": 28, "caption": "ไอเดียของขวัญให้เพื่อนร่วมงาน #wfh"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7314422557829573687", "views": 29882, "likes": 1883, "comments": 133, "shares": 66, "days_ago": 29, "caption": "สรุปให้: เก้าอี้ทำงานตัวใหม่ นั่งยาวไม่ปวดหลัง ใครเคยลองบ้าง #officelife"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7410857447356086323", "views": 48704, "likes": 5634, "comments": 411, "shares": 149, "days_ago": 40, "caption": "ตอบคอมเมนต์: ไอเดียของขวัญให้เพื่อนร่วมงาน คลิปหน้ามีต่อ #wfh"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7444527728900873100", "views": 56565, "likes": 2275, "comments": 72, "shares": 330, "days_ago": 44, "caption": "สรุปให้: ลิสต์งานวันจันทร์แบบไม่เครียด กดติดตามไว้นะ #wfh"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7457995538056952792", "views": 38040, "likes": 1597, "comments": 111, "shares": 195, "days_ago": 48, "caption": "ไอเดียของขวัญให้เพื่อนร่วมงาน ใครเคยลองบ้าง #officelife"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7439039227504580269", "views": 46882, "likes": 2897, "comments": 200, "shares": 219, "days_ago": 20, "caption": "ตอบคอมเมนต์: จัดสายไฟใต้โต๊ะ 10 นาทีเสร็จ คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7476415096719223525", "views": 12604, "likes": 667, "comments": 51, "shares": 75, "days_ago": 25, "caption": "EP.34 ลิสต์งานวันจันทร์แบบไม่เครียด ใครเคยลองบ้าง #wfh"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7390228842939174459", "views": 26508, "likes": 1469, "comments": 45, "shares": 191, "days_ago": 28, "caption": "ไอเดียของขวัญให้เพื่อนร่วมงาน #wfh"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7314422557829573687", "views": 29882, "likes": 1883, "comments": 133, "shares": 66, "days_ago": 29, "caption": "สรุปให้: เก้าอี้ทำงานตัวใหม่ นั่งยาวไม่ปวดหลัง ใครเคยลองบ้าง #officelife"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7465413580882732415", "views": 13435, "likes": 723, "comments": 18, "shares": 117, "days_ago": 39, "caption": "พาดู: เก้าอี้ทำงานตัวใหม่ นั่งยาวไม่ปวดหลัง คลิปหน้ามีต่อ #officelife"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7410857447356086323", "views": 48704, "likes": 5634, "comments": 411, "shares": 149, "days_ago": 40, "caption": "ตอบคอมเมนต์: ไอเดียของขวัญให้เพื่อนร่วมงาน คลิปหน้ามีต่อ #wfh"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7444527728900873100", "views": 56565, "likes": 2275, "comments": 72, "shares": 330, "days_ago": 44, "caption": "สรุปให้: ลิสต์งานวันจันทร์แบบไม่เครียด กดติดตามไว้นะ #wfh"},
+      {"url": "https://www.tiktok.com/@keyclicksound/video/7457995538056952792", "views": 38040, "likes": 1597, "comments": 111, "shares": 195, "days_ago": 48, "caption": "ไอเดียของขวัญให้เพื่อนร่วมงาน ใครเคยลองบ้าง #officelife"}
+    ]},
+  {"handle": "esportsfanclub.th", "url": "https://www.tiktok.com/@esportsfanclub.th", "nickname": "แฟนคลับอีสปอร์ต", "followers": 210000, "bio": "เชียร์ทีมไทยทุกรายการ", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7317169299293765412", "views": 94691, "likes": 2798, "comments": 141, "shares": 290, "days_ago": 11, "caption": "Day 46: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ คลิปหน้ามีต่อ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7491269642749811267", "views": 101193, "likes": 3949, "comments": 138, "shares": 640, "days_ago": 15, "caption": "Day 43: วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง คลิปหน้ามีต่อ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7469434317512024759", "views": 183888, "likes": 7874, "comments": 267, "shares": 1350, "days_ago": 37, "caption": "สรุปให้: ตารางแข่งอีสปอร์ตสุดสัปดาห์นี้ คิดว่าไง คอมเมนต์เลย #esports"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7355208603148065970", "views": 140662, "likes": 4554, "comments": 195, "shares": 762, "days_ago": 39, "caption": "สรุปให้: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ คลิปหน้ามีต่อ #อีสปอร์ต"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7464520143369619578", "views": 52373, "likes": 987, "comments": 62, "shares": 138, "days_ago": 8, "caption": "ลองจริง: ใส่แว่นเกมมิ่ง ทรง Shadeแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว จริงใจไม่อวย #eyewear #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7317169299293765412", "views": 94691, "likes": 2798, "comments": 141, "shares": 290, "days_ago": 11, "caption": "Day 46: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ คลิปหน้ามีต่อ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7491269642749811267", "views": 101193, "likes": 3949, "comments": 138, "shares": 640, "days_ago": 15, "caption": "Day 43: วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง คลิปหน้ามีต่อ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7361836641633377154", "views": 30054, "likes": 611, "comments": 20, "shares": 51, "days_ago": 16, "caption": "ลองจริง: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ ขอบคุณที่ดูจนจบ #esports"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7431803858068879794", "views": 31781, "likes": 556, "comments": 22, "shares": 95, "days_ago": 33, "caption": "วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง ขอบคุณที่ดูจนจบ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7469434317512024759", "views": 183888, "likes": 7874, "comments": 267, "shares": 1350, "days_ago": 37, "caption": "สรุปให้: ตารางแข่งอีสปอร์ตสุดสัปดาห์นี้ คิดว่าไง คอมเมนต์เลย #esports"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7358130142419253412", "views": 52836, "likes": 1912, "comments": 125, "shares": 103, "days_ago": 38, "caption": "ตอบคอมเมนต์: รีวิวแว่นเกมมิ่ง ทรง Neo น้ำหนักเบา ใส่กับหูฟังได้ไหม ขอบคุณที่ดูจนจบ #แว่นกันแสงสีฟ้า #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7355208603148065970", "views": 140662, "likes": 4554, "comments": 195, "shares": 762, "days_ago": 39, "caption": "สรุปให้: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ คลิปหน้ามีต่อ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7306127169723037740", "views": 62364, "likes": 1218, "comments": 59, "shares": 195, "days_ago": 50, "caption": "ไฮไลต์แมตช์ Mystic Rift สัปดาห์ที่37 ใครเคยลองบ้าง #esports"},
+      {"url": "https://www.tiktok.com/@esportsfanclub.th/video/7328274643421085461", "views": 84844, "likes": 2654, "comments": 64, "shares": 341, "days_ago": 52, "caption": "ลองจริง: ตารางแข่งอีสปอร์ตสุดสัปดาห์นี้ คลิปหน้ามีต่อ #อีสปอร์ต"}
+    ]},
+  {"handle": "gamecastdaily", "url": "https://www.tiktok.com/@gamecastdaily", "nickname": "เกมแคสต์รายวัน", "followers": 74000, "bio": "พากย์และสรุปแมตช์", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7317852746552168212", "views": 77018, "likes": 6201, "comments": 383, "shares": 267, "days_ago": 10, "caption": "EP.40 ใครจะเป็นแชมป์ลีกฤดูกาลนี้ กดติดตามไว้นะ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7359751747543030268", "views": 62748, "likes": 1572, "comments": 106, "shares": 125, "days_ago": 17, "caption": "ตอบคอมเมนต์: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7384709979641039207", "views": 31986, "likes": 1462, "comments": 99, "shares": 75, "days_ago": 18, "caption": "EP.55 สอนคอมโบตัวใหม่แบบละเอียด #gamer"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7387579278404830007", "views": 89514, "likes": 3480, "comments": 238, "shares": 354, "days_ago": 21, "caption": "มาแล้ว! เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป จริงใจไม่อวย #gamer"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7437318453079195034", "views": 37501, "likes": 1586, "comments": 76, "shares": 93, "days_ago": 24, "caption": "EP.14 วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง กดติดตามไว้นะ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7348647067908903018", "views": 35215, "likes": 1888, "comments": 106, "shares": 148, "days_ago": 29, "caption": "พาดู: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คลิปหน้ามีต่อ #เกม"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7492654084754760552", "views": 18417, "likes": 577, "comments": 27, "shares": 24, "days_ago": 6, "caption": "คลิปออนเลนส์กันแสงสีฟ้า ทรง Nova สำหรับคนใส่แว่นสายตา คลิปหน้ามีต่อ #ถนอมสายตา #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7317852746552168212", "views": 77018, "likes": 6201, "comments": 383, "shares": 267, "days_ago": 10, "caption": "EP.40 ใครจะเป็นแชมป์ลีกฤดูกาลนี้ กดติดตามไว้นะ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7342929238239193766", "views": 29179, "likes": 1398, "comments": 106, "shares": 86, "days_ago": 13, "caption": "ตอบคอมเมนต์: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ คลิปหน้ามีต่อ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7359751747543030268", "views": 62748, "likes": 1572, "comments": 106, "shares": 125, "days_ago": 17, "caption": "ตอบคอมเมนต์: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7384709979641039207", "views": 31986, "likes": 1462, "comments": 99, "shares": 75, "days_ago": 18, "caption": "EP.55 สอนคอมโบตัวใหม่แบบละเอียด #gamer"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7387579278404830007", "views": 89514, "likes": 3480, "comments": 238, "shares": 354, "days_ago": 21, "caption": "มาแล้ว! เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป จริงใจไม่อวย #gamer"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7437318453079195034", "views": 37501, "likes": 1586, "comments": 76, "shares": 93, "days_ago": 24, "caption": "EP.14 วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง กดติดตามไว้นะ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7361843329296240339", "views": 13347, "likes": 650, "comments": 31, "shares": 78, "days_ago": 26, "caption": "มาแล้ว! ลองแว่นเกมมิ่ง รุ่น Auroraกับจอ 165Hz ขอบคุณที่ดูจนจบ #แว่นเกมมิ่ง #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7348647067908903018", "views": 35215, "likes": 1888, "comments": 106, "shares": 148, "days_ago": 29, "caption": "พาดู: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คลิปหน้ามีต่อ #เกม"},
+      {"url": "https://www.tiktok.com/@gamecastdaily/video/7365796422573364494", "views": 26167, "likes": 1215, "comments": 46, "shares": 157, "days_ago": 32, "caption": "มาแล้ว! ไฮไลต์แมตช์ Mystic Rift สัปดาห์ที่5 #อีสปอร์ต"}
+    ]},
+  {"handle": "esportstable.th", "url": "https://www.tiktok.com/@esportstable.th", "nickname": "โต๊ะอีสปอร์ต", "followers": 190000, "bio": "ทอล์กอีสปอร์ตทุกสัปดาห์", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7455548531724706123", "views": 111313, "likes": 4319, "comments": 316, "shares": 479, "days_ago": 21, "caption": "Day 18: วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง จริงใจไม่อวย #esports"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7428623290776669367", "views": 242691, "likes": 5157, "comments": 267, "shares": 533, "days_ago": 22, "caption": "ตอบคอมเมนต์: สรุปผลแมตช์ Arena Legends รอบ54 ขอบคุณที่ดูจนจบ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7308960245450205754", "views": 43366, "likes": 1002, "comments": 53, "shares": 96, "days_ago": 23, "caption": "สรุปให้: ตารางแข่งอีสปอร์ตสุดสัปดาห์นี้ จริงใจไม่อวย #esports"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7411682166007127879", "views": 45138, "likes": 1468, "comments": 54, "shares": 211, "days_ago": 28, "caption": "ไฮไลต์แมตช์ Mystic Rift สัปดาห์ที่3 จริงใจไม่อวย #esports"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7467904261404877810", "views": 55053, "likes": 1373, "comments": 80, "shares": 57, "days_ago": 34, "caption": "พาดู: ตารางแข่งอีสปอร์ตสุดสัปดาห์นี้ ขอบคุณที่ดูจนจบ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7492949915707441660", "views": 76417, "likes": 1843, "comments": 137, "shares": 38, "days_ago": 36, "caption": "ตอบคอมเมนต์: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ จริงใจไม่อวย #esports"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7432263671157891452", "views": 30429, "likes": 973, "comments": 34, "shares": 91, "days_ago": 14, "caption": "ตอบคอมเมนต์: ตารางแข่งอีสปอร์ตสุดสัปดาห์นี้ จริงใจไม่อวย #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7455548531724706123", "views": 111313, "likes": 4319, "comments": 316, "shares": 479, "days_ago": 21, "caption": "Day 18: วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง จริงใจไม่อวย #esports"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7428623290776669367", "views": 242691, "likes": 5157, "comments": 267, "shares": 533, "days_ago": 22, "caption": "ตอบคอมเมนต์: สรุปผลแมตช์ Arena Legends รอบ54 ขอบคุณที่ดูจนจบ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7308960245450205754", "views": 43366, "likes": 1002, "comments": 53, "shares": 96, "days_ago": 23, "caption": "สรุปให้: ตารางแข่งอีสปอร์ตสุดสัปดาห์นี้ จริงใจไม่อวย #esports"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7479359102348422774", "views": 32605, "likes": 702, "comments": 33, "shares": 82, "days_ago": 24, "caption": "EP.28 วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง คิดว่าไง คอมเมนต์เลย #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7411682166007127879", "views": 45138, "likes": 1468, "comments": 54, "shares": 211, "days_ago": 28, "caption": "ไฮไลต์แมตช์ Mystic Rift สัปดาห์ที่3 จริงใจไม่อวย #esports"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7392528288692665428", "views": 43004, "likes": 1462, "comments": 77, "shares": 235, "days_ago": 33, "caption": "ไฮไลต์แมตช์ Mystic Rift สัปดาห์ที่54 ใครเคยลองบ้าง #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7467904261404877810", "views": 55053, "likes": 1373, "comments": 80, "shares": 57, "days_ago": 34, "caption": "พาดู: ตารางแข่งอีสปอร์ตสุดสัปดาห์นี้ ขอบคุณที่ดูจนจบ #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@esportstable.th/video/7492949915707441660", "views": 76417, "likes": 1843, "comments": 137, "shares": 38, "days_ago": 36, "caption": "ตอบคอมเมนต์: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ จริงใจไม่อวย #esports"}
+    ]},
+  {"handle": "theviralgamer", "url": "https://www.tiktok.com/@theviralgamer", "nickname": "เกมเมอร์ไวรัล", "followers": 88000, "bio": "เล่าเรื่องชีวิต บางทีก็เล่นเกม", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7319454333264612416", "views": 10955, "likes": 610, "comments": 42, "shares": 43, "days_ago": 12, "caption": "มาแล้ว! พาแม่ไปกินข้าววันเกิด คิดว่าไง คอมเมนต์เลย #vlog"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7413196536709408478", "views": 24204, "likes": 858, "comments": 43, "shares": 121, "days_ago": 13, "caption": "สรุปให้: ฝนตกรถติด กลับบ้านดึกอีกแล้ว กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7455678730004320077", "views": 792000, "likes": 62726, "comments": 3564, "shares": 4990, "days_ago": 26, "caption": "ตอบคอมเมนต์: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า คลิปหน้ามีต่อ #gaming #gaminggear"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7319454333264612416", "views": 10955, "likes": 610, "comments": 42, "shares": 43, "days_ago": 12, "caption": "มาแล้ว! พาแม่ไปกินข้าววันเกิด คิดว่าไง คอมเมนต์เลย #vlog"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7413196536709408478", "views": 24204, "likes": 858, "comments": 43, "shares": 121, "days_ago": 13, "caption": "สรุปให้: ฝนตกรถติด กลับบ้านดึกอีกแล้ว กดติดตามไว้นะ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7485705862859493539", "views": 42471, "likes": 2091, "comments": 73, "shares": 292, "days_ago": 16, "caption": "ซื้อต้นไม้ใหม่มาแต่งห้อง #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7333072839385224539", "views": 28570, "likes": 1889, "comments": 118, "shares": 264, "days_ago": 17, "caption": "พาแม่ไปกินข้าววันเกิด คิดว่าไง คอมเมนต์เลย #vlog"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7375820278581890940", "views": 19775, "likes": 1184, "comments": 70, "shares": 36, "days_ago": 19, "caption": "สรุปให้: ตื่นเช้าไปวิ่งสวนลุม #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7376105265579724448", "views": 44218, "likes": 2078, "comments": 77, "shares": 135, "days_ago": 25, "caption": "ตอบคอมเมนต์: พาแม่ไปกินข้าววันเกิด จริงใจไม่อวย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7455678730004320077", "views": 792000, "likes": 62726, "comments": 3564, "shares": 4990, "days_ago": 26, "caption": "ตอบคอมเมนต์: ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า คลิปหน้ามีต่อ #gaming #gaminggear"},
+      {"url": "https://www.tiktok.com/@theviralgamer/video/7473036674860981755", "views": 52568, "likes": 1755, "comments": 70, "shares": 280, "days_ago": 27, "caption": "ลองชาไข่มุกร้านใหม่แถวบ้าน คิดว่าไง คอมเมนต์เลย #vlog"}
+    ]},
+  {"handle": "thaifoodtales", "url": "https://www.tiktok.com/@thaifoodtales", "nickname": "เรื่องเล่าอาหารไทย", "followers": 130000, "bio": "ตะลุยกินทั่วไทย", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7446064691088324042", "views": 79741, "likes": 5652, "comments": 422, "shares": 173, "days_ago": 6, "caption": "บุฟเฟต์หมูกระทะเปิดใหม่ คุ้มไหม กดติดตามไว้นะ #foodie"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7371307561892770480", "views": 54103, "likes": 4074, "comments": 141, "shares": 654, "days_ago": 25, "caption": "มาแล้ว! บุฟเฟต์หมูกระทะเปิดใหม่ คุ้มไหม คิดว่าไง คอมเมนต์เลย #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7494866369519575676", "views": 83466, "likes": 7154, "comments": 522, "shares": 439, "days_ago": 26, "caption": "ตอบคอมเมนต์: ส้มตำปูปลาร้ารสจัดจ้าน #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7438788318914237680", "views": 137609, "likes": 10865, "comments": 608, "shares": 983, "days_ago": 29, "caption": "ตอบคอมเมนต์: คาเฟ่ลับย่านเจริญกรุง #foodie"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7446064691088324042", "views": 79741, "likes": 5652, "comments": 422, "shares": 173, "days_ago": 6, "caption": "บุฟเฟต์หมูกระทะเปิดใหม่ คุ้มไหม กดติดตามไว้นะ #foodie"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7450120255583191241", "views": 50056, "likes": 1991, "comments": 48, "shares": 276, "days_ago": 10, "caption": "EP.57 คาเฟ่ลับย่านเจริญกรุง คิดว่าไง คอมเมนต์เลย #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7464903205708272407", "views": 50014, "likes": 4880, "comments": 201, "shares": 407, "days_ago": 13, "caption": "มาแล้ว! ก๋วยเตี๋ยวเรือเจ้าเด็ดย่านอารีย์ กดติดตามไว้นะ #foodie"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7378238455857722208", "views": 41532, "likes": 3396, "comments": 114, "shares": 297, "days_ago": 17, "caption": "สรุปให้: ส้มตำปูปลาร้ารสจัดจ้าน #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7371307561892770480", "views": 54103, "likes": 4074, "comments": 141, "shares": 654, "days_ago": 25, "caption": "มาแล้ว! บุฟเฟต์หมูกระทะเปิดใหม่ คุ้มไหม คิดว่าไง คอมเมนต์เลย #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7494866369519575676", "views": 83466, "likes": 7154, "comments": 522, "shares": 439, "days_ago": 26, "caption": "ตอบคอมเมนต์: ส้มตำปูปลาร้ารสจัดจ้าน #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7438788318914237680", "views": 137609, "likes": 10865, "comments": 608, "shares": 983, "days_ago": 29, "caption": "ตอบคอมเมนต์: คาเฟ่ลับย่านเจริญกรุง #foodie"},
+      {"url": "https://www.tiktok.com/@thaifoodtales/video/7482971412537148065", "views": 53366, "likes": 4098, "comments": 102, "shares": 465, "days_ago": 33, "caption": "ตอบคอมเมนต์: บุฟเฟต์หมูกระทะเปิดใหม่ คุ้มไหม คลิปหน้ามีต่อ #อร่อยบอกต่อ"}
+    ]},
+  {"handle": "foodmap.somsri", "url": "https://www.tiktok.com/@foodmap.somsri", "nickname": "แผนที่ของกินสมศรี", "followers": 21000, "bio": "ของกินอร่อยในกรุงเทพ", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7404703152495704369", "views": 54812, "likes": 5946, "comments": 255, "shares": 564, "days_ago": 7, "caption": "มาแล้ว! ข้าวมันไก่ 40 บาท อร่อยเกินราคา จริงใจไม่อวย #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7466317089082627436", "views": 108319, "likes": 7008, "comments": 424, "shares": 481, "days_ago": 10, "caption": "EP.56 ส้มตำปูปลาร้ารสจัดจ้าน ขอบคุณที่ดูจนจบ #foodie"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7362529575659480350", "views": 38331, "likes": 1902, "comments": 68, "shares": 333, "days_ago": 11, "caption": "มาแล้ว! บุฟเฟต์หมูกระทะเปิดใหม่ คุ้มไหม ขอบคุณที่ดูจนจบ #foodie"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7497010308273570222", "views": 36366, "likes": 2709, "comments": 89, "shares": 149, "days_ago": 16, "caption": "ข้าวมันไก่ 40 บาท อร่อยเกินราคา ใครเคยลองบ้าง #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7421351447936887519", "views": 57303, "likes": 4716, "comments": 291, "shares": 534, "days_ago": 26, "caption": "คาเฟ่ลับย่านเจริญกรุง คลิปหน้ามีต่อ #foodie"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7475581722580126110", "views": 26582, "likes": 2041, "comments": 98, "shares": 85, "days_ago": 6, "caption": "EP.46 ก๋วยเตี๋ยวเรือเจ้าเด็ดย่านอารีย์ #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7404703152495704369", "views": 54812, "likes": 5946, "comments": 255, "shares": 564, "days_ago": 7, "caption": "มาแล้ว! ข้าวมันไก่ 40 บาท อร่อยเกินราคา จริงใจไม่อวย #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7433678469156766855", "views": 9945, "likes": 1058, "comments": 35, "shares": 104, "days_ago": 9, "caption": "มาแล้ว! คาเฟ่ลับย่านเจริญกรุง ใครเคยลองบ้าง #foodie"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7466317089082627436", "views": 108319, "likes": 7008, "comments": 424, "shares": 481, "days_ago": 10, "caption": "EP.56 ส้มตำปูปลาร้ารสจัดจ้าน ขอบคุณที่ดูจนจบ #foodie"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7362529575659480350", "views": 38331, "likes": 1902, "comments": 68, "shares": 333, "days_ago": 11, "caption": "มาแล้ว! บุฟเฟต์หมูกระทะเปิดใหม่ คุ้มไหม ขอบคุณที่ดูจนจบ #foodie"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7497010308273570222", "views": 36366, "likes": 2709, "comments": 89, "shares": 149, "days_ago": 16, "caption": "ข้าวมันไก่ 40 บาท อร่อยเกินราคา ใครเคยลองบ้าง #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7425265721562342932", "views": 15532, "likes": 1135, "comments": 85, "shares": 132, "days_ago": 22, "caption": "สรุปให้: ขนมไทยโบราณตลาดน้ำ คลิปหน้ามีต่อ #foodie"},
+      {"url": "https://www.tiktok.com/@foodmap.somsri/video/7421351447936887519", "views": 57303, "likes": 4716, "comments": 291, "shares": 534, "days_ago": 26, "caption": "คาเฟ่ลับย่านเจริญกรุง คลิปหน้ามีต่อ #foodie"}
+    ]},
+  {"handle": "glamwithfah", "url": "https://www.tiktok.com/@glamwithfah", "nickname": "ฟ้าแกลม", "followers": 2800000, "bio": "บิวตี้บล็อกเกอร์", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7333603680277885666", "views": 26645, "likes": 1283, "comments": 72, "shares": 53, "days_ago": 16, "caption": "ตอบคอมเมนต์: กันแดดตัวไหนไม่วอก ใครเคยลองบ้าง #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7433111514006402944", "views": 33777, "likes": 1084, "comments": 74, "shares": 72, "days_ago": 30, "caption": "มาแล้ว! แต่งหน้าลุคทำงาน 10 นาที จริงใจไม่อวย #skincare"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7414902228337364768", "views": 42809, "likes": 1032, "comments": 78, "shares": 47, "days_ago": 37, "caption": "กันแดดตัวไหนไม่วอก กดติดตามไว้นะ #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7320866324185576703", "views": 44477, "likes": 2967, "comments": 67, "shares": 329, "days_ago": 45, "caption": "ตอบคอมเมนต์: แต่งหน้าลุคทำงาน 10 นาที ขอบคุณที่ดูจนจบ #skincare"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7497792025825463943", "views": 38869, "likes": 1552, "comments": 104, "shares": 212, "days_ago": 51, "caption": "มาแล้ว! กันแดดตัวไหนไม่วอก #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7373047889876319507", "views": 35569, "likes": 2191, "comments": 93, "shares": 113, "days_ago": 60, "caption": "พาดู: ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ ขอบคุณที่ดูจนจบ #skincare"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7333603680277885666", "views": 26645, "likes": 1283, "comments": 72, "shares": 53, "days_ago": 16, "caption": "ตอบคอมเมนต์: กันแดดตัวไหนไม่วอก ใครเคยลองบ้าง #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7467596955214067118", "views": 18597, "likes": 689, "comments": 18, "shares": 96, "days_ago": 19, "caption": "กันแดดตัวไหนไม่วอก คลิปหน้ามีต่อ #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7433111514006402944", "views": 33777, "likes": 1084, "comments": 74, "shares": 72, "days_ago": 30, "caption": "มาแล้ว! แต่งหน้าลุคทำงาน 10 นาที จริงใจไม่อวย #skincare"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7414902228337364768", "views": 42809, "likes": 1032, "comments": 78, "shares": 47, "days_ago": 37, "caption": "กันแดดตัวไหนไม่วอก กดติดตามไว้นะ #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7300276368881869028", "views": 11746, "likes": 713, "comments": 54, "shares": 82, "days_ago": 41, "caption": "ลองจริง: สกินแคร์ก่อนนอนสำหรับผิวมัน คิดว่าไง คอมเมนต์เลย #skincare"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7320866324185576703", "views": 44477, "likes": 2967, "comments": 67, "shares": 329, "days_ago": 45, "caption": "ตอบคอมเมนต์: แต่งหน้าลุคทำงาน 10 นาที ขอบคุณที่ดูจนจบ #skincare"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7349248198345578828", "views": 24943, "likes": 692, "comments": 55, "shares": 79, "days_ago": 47, "caption": "EP.59 ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ กดติดตามไว้นะ #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7497792025825463943", "views": 38869, "likes": 1552, "comments": 104, "shares": 212, "days_ago": 51, "caption": "มาแล้ว! กันแดดตัวไหนไม่วอก #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7339060850472792843", "views": 22946, "likes": 2113, "comments": 165, "shares": 236, "days_ago": 59, "caption": "มาแล้ว! ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ คลิปหน้ามีต่อ #makeup"},
+      {"url": "https://www.tiktok.com/@glamwithfah/video/7373047889876319507", "views": 35569, "likes": 2191, "comments": 93, "shares": 113, "days_ago": 60, "caption": "พาดู: ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ ขอบคุณที่ดูจนจบ #skincare"}
+    ]},
+  {"handle": "beautylab.nan", "url": "https://www.tiktok.com/@beautylab.nan", "nickname": "แนนบิวตี้แล็บ", "followers": 145000, "bio": "ทดลองสกินแคร์ให้ดู", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7410300195408458477", "views": 111467, "likes": 6135, "comments": 328, "shares": 612, "days_ago": 16, "caption": "EP.60 แต่งหน้าลุคทำงาน 10 นาที ขอบคุณที่ดูจนจบ #skincare"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7324818674895711168", "views": 230732, "likes": 8070, "comments": 396, "shares": 1374, "days_ago": 17, "caption": "สกินแคร์ก่อนนอนสำหรับผิวมัน ใครเคยลองบ้าง #makeup"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7392370009624447400", "views": 64831, "likes": 3472, "comments": 155, "shares": 170, "days_ago": 18, "caption": "ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ คิดว่าไง คอมเมนต์เลย #makeup"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7370842113268231172", "views": 76921, "likes": 2651, "comments": 69, "shares": 281, "days_ago": 19, "caption": "ลองจริง: แต่งหน้าลุคทำงาน 10 นาที คลิปหน้ามีต่อ #makeup"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7489300975452252567", "views": 67234, "likes": 2317, "comments": 107, "shares": 378, "days_ago": 41, "caption": "มาแล้ว! ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ คิดว่าไง คอมเมนต์เลย #skincare"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7491564900222760097", "views": 47122, "likes": 2005, "comments": 123, "shares": 125, "days_ago": 45, "caption": "Day 4: สกินแคร์ก่อนนอนสำหรับผิวมัน #makeup"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7410300195408458477", "views": 111467, "likes": 6135, "comments": 328, "shares": 612, "days_ago": 16, "caption": "EP.60 แต่งหน้าลุคทำงาน 10 นาที ขอบคุณที่ดูจนจบ #skincare"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7324818674895711168", "views": 230732, "likes": 8070, "comments": 396, "shares": 1374, "days_ago": 17, "caption": "สกินแคร์ก่อนนอนสำหรับผิวมัน ใครเคยลองบ้าง #makeup"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7392370009624447400", "views": 64831, "likes": 3472, "comments": 155, "shares": 170, "days_ago": 18, "caption": "ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ คิดว่าไง คอมเมนต์เลย #makeup"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7370842113268231172", "views": 76921, "likes": 2651, "comments": 69, "shares": 281, "days_ago": 19, "caption": "ลองจริง: แต่งหน้าลุคทำงาน 10 นาที คลิปหน้ามีต่อ #makeup"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7476859808160215874", "views": 14771, "likes": 375, "comments": 22, "shares": 52, "days_ago": 35, "caption": "สรุปให้: สกินแคร์ก่อนนอนสำหรับผิวมัน ขอบคุณที่ดูจนจบ #makeup"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7474799182525679923", "views": 46881, "likes": 1770, "comments": 60, "shares": 277, "days_ago": 37, "caption": "ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ จริงใจไม่อวย #skincare"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7489300975452252567", "views": 67234, "likes": 2317, "comments": 107, "shares": 378, "days_ago": 41, "caption": "มาแล้ว! ทำผมลอนง่าย ๆ ด้วยเครื่องหนีบ คิดว่าไง คอมเมนต์เลย #skincare"},
+      {"url": "https://www.tiktok.com/@beautylab.nan/video/7491564900222760097", "views": 47122, "likes": 2005, "comments": 123, "shares": 125, "days_ago": 45, "caption": "Day 4: สกินแคร์ก่อนนอนสำหรับผิวมัน #makeup"}
+    ]},
+  {"handle": "wanderwithjin", "url": "https://www.tiktok.com/@wanderwithjin", "nickname": "จินเที่ยวไปเรื่อย", "followers": 39000, "bio": "เที่ยวไทยงบน้อย", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7373108477305977078", "views": 251176, "likes": 22512, "comments": 1596, "shares": 1240, "days_ago": 5, "caption": "พาดู: ทะเลใกล้กรุงเทพ ไปเช้าเย็นกลับ คลิปหน้ามีต่อ #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7413778811014716978", "views": 71115, "likes": 9945, "comments": 252, "shares": 1118, "days_ago": 9, "caption": "สรุปให้: เชียงใหม่หน้าหนาว คาเฟ่วิวดอย ใครเคยลองบ้าง #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7307048249396788936", "views": 111740, "likes": 13424, "comments": 574, "shares": 1286, "days_ago": 19, "caption": "มาแล้ว! ที่พักริมแม่น้ำ อยุธยา #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7401809741838945744", "views": 106663, "likes": 15463, "comments": 759, "shares": 1078, "days_ago": 22, "caption": "เชียงใหม่หน้าหนาว คาเฟ่วิวดอย กดติดตามไว้นะ #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7365754282178040241", "views": 129003, "likes": 12758, "comments": 553, "shares": 1569, "days_ago": 28, "caption": "EP.37 ที่พักริมแม่น้ำ อยุธยา คลิปหน้ามีต่อ #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7314664386486640172", "views": 151713, "likes": 22286, "comments": 864, "shares": 3644, "days_ago": 39, "caption": "สรุปให้: ทะเลใกล้กรุงเทพ ไปเช้าเย็นกลับ ใครเคยลองบ้าง #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7326231033942194305", "views": 201984, "likes": 21703, "comments": 1371, "shares": 2381, "days_ago": 40, "caption": "EP.15 ทะเลใกล้กรุงเทพ ไปเช้าเย็นกลับ คลิปหน้ามีต่อ #เที่ยวไทย"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7342226455960504596", "views": 20207, "likes": 3870, "comments": 243, "shares": 315, "days_ago": 3, "caption": "ที่พักริมแม่น้ำ อยุธยา กดติดตามไว้นะ #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7373108477305977078", "views": 251176, "likes": 22512, "comments": 1596, "shares": 1240, "days_ago": 5, "caption": "พาดู: ทะเลใกล้กรุงเทพ ไปเช้าเย็นกลับ คลิปหน้ามีต่อ #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7490592557865087088", "views": 34801, "likes": 4346, "comments": 130, "shares": 491, "days_ago": 7, "caption": "Day 16: ทะเลใกล้กรุงเทพ ไปเช้าเย็นกลับ #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7413778811014716978", "views": 71115, "likes": 9945, "comments": 252, "shares": 1118, "days_ago": 9, "caption": "สรุปให้: เชียงใหม่หน้าหนาว คาเฟ่วิวดอย ใครเคยลองบ้าง #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7307048249396788936", "views": 111740, "likes": 13424, "comments": 574, "shares": 1286, "days_ago": 19, "caption": "มาแล้ว! ที่พักริมแม่น้ำ อยุธยา #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7401809741838945744", "views": 106663, "likes": 15463, "comments": 759, "shares": 1078, "days_ago": 22, "caption": "เชียงใหม่หน้าหนาว คาเฟ่วิวดอย กดติดตามไว้นะ #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7365754282178040241", "views": 129003, "likes": 12758, "comments": 553, "shares": 1569, "days_ago": 28, "caption": "EP.37 ที่พักริมแม่น้ำ อยุธยา คลิปหน้ามีต่อ #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7314664386486640172", "views": 151713, "likes": 22286, "comments": 864, "shares": 3644, "days_ago": 39, "caption": "สรุปให้: ทะเลใกล้กรุงเทพ ไปเช้าเย็นกลับ ใครเคยลองบ้าง #travel"},
+      {"url": "https://www.tiktok.com/@wanderwithjin/video/7326231033942194305", "views": 201984, "likes": 21703, "comments": 1371, "shares": 2381, "days_ago": 40, "caption": "EP.15 ทะเลใกล้กรุงเทพ ไปเช้าเย็นกลับ คลิปหน้ามีต่อ #เที่ยวไทย"}
+    ]},
+  {"handle": "travelpocket.bam", "url": "https://www.tiktok.com/@travelpocket.bam", "nickname": "แบมเที่ยวพกพา", "followers": 280000, "bio": "แบกเป้เที่ยว", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7431739701918353502", "views": 235186, "likes": 19347, "comments": 1463, "shares": 2284, "days_ago": 3, "caption": "มาแล้ว! นั่งรถไฟไปกาญจนบุรี จริงใจไม่อวย #travel"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7483787570397138001", "views": 128305, "likes": 7731, "comments": 171, "shares": 650, "days_ago": 39, "caption": "มาแล้ว! ขนมไทยโบราณตลาดน้ำ กดติดตามไว้นะ #foodie"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7307617636291610923", "views": 135178, "likes": 7221, "comments": 341, "shares": 1087, "days_ago": 40, "caption": "มาแล้ว! เชียงใหม่หน้าหนาว คาเฟ่วิวดอย #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7407930273335916683", "views": 148720, "likes": 8635, "comments": 235, "shares": 725, "days_ago": 42, "caption": "สรุปให้: คาเฟ่ลับย่านเจริญกรุง จริงใจไม่อวย #อร่อยบอกต่อ"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7431739701918353502", "views": 235186, "likes": 19347, "comments": 1463, "shares": 2284, "days_ago": 3, "caption": "มาแล้ว! นั่งรถไฟไปกาญจนบุรี จริงใจไม่อวย #travel"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7481879445778722100", "views": 106545, "likes": 5234, "comments": 168, "shares": 548, "days_ago": 7, "caption": "สรุปให้: เชียงใหม่หน้าหนาว คาเฟ่วิวดอย #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7402489882291148613", "views": 49747, "likes": 3109, "comments": 247, "shares": 241, "days_ago": 8, "caption": "EP.32 ที่พักริมแม่น้ำ อยุธยา ใครเคยลองบ้าง #travel"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7378761252408906145", "views": 69150, "likes": 3240, "comments": 182, "shares": 186, "days_ago": 28, "caption": "ส้มตำปูปลาร้ารสจัดจ้าน กดติดตามไว้นะ #อร่อยบอกต่อ"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7410748857616229407", "views": 128073, "likes": 6845, "comments": 347, "shares": 334, "days_ago": 34, "caption": "สรุปให้: นั่งรถไฟไปกาญจนบุรี ขอบคุณที่ดูจนจบ #travel"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7478085901072933916", "views": 55406, "likes": 2522, "comments": 177, "shares": 166, "days_ago": 35, "caption": "มาแล้ว! นั่งรถไฟไปกาญจนบุรี ขอบคุณที่ดูจนจบ #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7425573056074508956", "views": 102374, "likes": 8035, "comments": 531, "shares": 413, "days_ago": 38, "caption": "ตอบคอมเมนต์: นั่งรถไฟไปกาญจนบุรี คิดว่าไง คอมเมนต์เลย #travel"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7483787570397138001", "views": 128305, "likes": 7731, "comments": 171, "shares": 650, "days_ago": 39, "caption": "มาแล้ว! ขนมไทยโบราณตลาดน้ำ กดติดตามไว้นะ #foodie"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7307617636291610923", "views": 135178, "likes": 7221, "comments": 341, "shares": 1087, "days_ago": 40, "caption": "มาแล้ว! เชียงใหม่หน้าหนาว คาเฟ่วิวดอย #เที่ยวไทย"},
+      {"url": "https://www.tiktok.com/@travelpocket.bam/video/7407930273335916683", "views": 148720, "likes": 8635, "comments": 235, "shares": 725, "days_ago": 42, "caption": "สรุปให้: คาเฟ่ลับย่านเจริญกรุง จริงใจไม่อวย #อร่อยบอกต่อ"}
+    ]},
+  {"handle": "brandsponsor.mike", "url": "https://www.tiktok.com/@brandsponsor.mike", "nickname": "ไมค์รีวิวของ", "followers": 58000, "bio": "รีวิวของใช้ไอทีแบบจริงใจ", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7466647914203345147", "views": 52011, "likes": 2403, "comments": 78, "shares": 406, "days_ago": 5, "caption": "พาดู: เก้าอี้ทำงานตัวใหม่ นั่งยาวไม่ปวดหลัง ขอบคุณที่ดูจนจบ #wfh"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7365511182196903675", "views": 65760, "likes": 3082, "comments": 103, "shares": 356, "days_ago": 7, "caption": "ใช้แว่น ExampleBrand มาสองเดือน ตาสบายขึ้นตอนเล่นเกมดึก #ถนอมสายตา #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7443174335935225593", "views": 57905, "likes": 2184, "comments": 141, "shares": 313, "days_ago": 16, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง รุ่น Shade คลิปหน้ามีต่อ #bluelightglasses #eyewear"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7426062216747314191", "views": 225637, "likes": 7166, "comments": 308, "shares": 1142, "days_ago": 39, "caption": "พาดู: คลิปออนเลนส์กันแสงสีฟ้า รุ่น Volt สำหรับคนใส่แว่นสายตา คิดว่าไง คอมเมนต์เลย #ถนอมสายตา #eyewear"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7313132182580304725", "views": 47207, "likes": 2267, "comments": 96, "shares": 302, "days_ago": 43, "caption": "Day 22: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Neo ชุดเริ่มต้นเกมเมอร์งบน้อย กดติดตามไว้นะ #gaminggear #ถนอมสายตา"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7466647914203345147", "views": 52011, "likes": 2403, "comments": 78, "shares": 406, "days_ago": 5, "caption": "พาดู: เก้าอี้ทำงานตัวใหม่ นั่งยาวไม่ปวดหลัง ขอบคุณที่ดูจนจบ #wfh"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7365511182196903675", "views": 65760, "likes": 3082, "comments": 103, "shares": 356, "days_ago": 7, "caption": "ใช้แว่น ExampleBrand มาสองเดือน ตาสบายขึ้นตอนเล่นเกมดึก #ถนอมสายตา #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7311248040687521057", "views": 26687, "likes": 1199, "comments": 68, "shares": 147, "days_ago": 11, "caption": "มาแล้ว! จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา #เกมเมอร์ #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7454938618023311562", "views": 37523, "likes": 1974, "comments": 117, "shares": 219, "days_ago": 12, "caption": "พาดู: ฝนตกรถติด กลับบ้านดึกอีกแล้ว คิดว่าไง คอมเมนต์เลย #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7388552226815961846", "views": 26714, "likes": 1362, "comments": 57, "shares": 130, "days_ago": 14, "caption": "พาดู: ฝนตกรถติด กลับบ้านดึกอีกแล้ว ใครเคยลองบ้าง #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7443174335935225593", "views": 57905, "likes": 2184, "comments": 141, "shares": 313, "days_ago": 16, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง รุ่น Shade คลิปหน้ามีต่อ #bluelightglasses #eyewear"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7426062216747314191", "views": 225637, "likes": 7166, "comments": 308, "shares": 1142, "days_ago": 39, "caption": "พาดู: คลิปออนเลนส์กันแสงสีฟ้า รุ่น Volt สำหรับคนใส่แว่นสายตา คิดว่าไง คอมเมนต์เลย #ถนอมสายตา #eyewear"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7313132182580304725", "views": 47207, "likes": 2267, "comments": 96, "shares": 302, "days_ago": 43, "caption": "Day 22: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ทรง Neo ชุดเริ่มต้นเกมเมอร์งบน้อย กดติดตามไว้นะ #gaminggear #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@brandsponsor.mike/video/7419880830416651555", "views": 23753, "likes": 1498, "comments": 43, "shares": 161, "days_ago": 45, "caption": "เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ทรง Lumen คลิปหน้ามีต่อ #แว่นเกมมิ่ง #เกมเมอร์"}
+    ]},
+  {"handle": "adreview.golf", "url": "https://www.tiktok.com/@adreview.golf", "nickname": "กอล์ฟรีวิวโฆษณา", "followers": 33000, "bio": "รีวิวแว่นและไอที รับงานรีวิว", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7453545414405081067", "views": 39065, "likes": 1730, "comments": 90, "shares": 220, "days_ago": 23, "caption": "EP.35 เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ใครเคยลองบ้าง #แว่นกันแสงสีฟ้า #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7365606181711287378", "views": 82401, "likes": 2729, "comments": 168, "shares": 313, "days_ago": 33, "caption": "ลองจริง: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง กดติดตามไว้นะ #แว่นกันแสงสีฟ้า #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7425087414044563793", "views": 69433, "likes": 2632, "comments": 160, "shares": 329, "days_ago": 38, "caption": "แว่นกันแสงสีฟ้า ทรง Novaใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม ใครเคยลองบ้าง #แว่นเกมมิ่ง #bluelightglasses"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7480760104122995905", "views": 21998, "likes": 557, "comments": 16, "shares": 73, "days_ago": 9, "caption": "ได้รับการสนับสนุนจาก OtherLens ลองแว่นรุ่นใหม่เล่นเกมทั้งคืน #ad #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7420335593065113497", "views": 20280, "likes": 1273, "comments": 91, "shares": 75, "days_ago": 14, "caption": "ลองจริง: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย ใครเคยลองบ้าง #gaminggear #gaming"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7453545414405081067", "views": 39065, "likes": 1730, "comments": 90, "shares": 220, "days_ago": 23, "caption": "EP.35 เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ใครเคยลองบ้าง #แว่นกันแสงสีฟ้า #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7365606181711287378", "views": 82401, "likes": 2729, "comments": 168, "shares": 313, "days_ago": 33, "caption": "ลองจริง: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง กดติดตามไว้นะ #แว่นกันแสงสีฟ้า #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7425087414044563793", "views": 69433, "likes": 2632, "comments": 160, "shares": 329, "days_ago": 38, "caption": "แว่นกันแสงสีฟ้า ทรง Novaใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม ใครเคยลองบ้าง #แว่นเกมมิ่ง #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7331004579445807480", "views": 16157, "likes": 757, "comments": 42, "shares": 90, "days_ago": 39, "caption": "พาดู: ไต่แรงค์ Arena Legends จนเช้า #เกม"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7441466058280223020", "views": 37959, "likes": 2388, "comments": 99, "shares": 244, "days_ago": 45, "caption": "สรุปให้: ทำกับข้าวเย็นง่าย ๆ หลังเลิกงาน คลิปหน้ามีต่อ #ชีวิตประจำวัน"},
+      {"url": "https://www.tiktok.com/@adreview.golf/video/7305831163957672828", "views": 18883, "likes": 345, "comments": 27, "shares": 41, "days_ago": 46, "caption": "ตอบคอมเมนต์: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง ขอบคุณที่ดูจนจบ #eyewear #gaming"}
+    ]},
+  {"handle": "examplebrand.th", "url": "https://www.tiktok.com/@examplebrand.th", "nickname": "ExampleBrand Official", "followers": 150000, "bio": "แว่นกันแสงสีฟ้า ExampleBrand ของแท้", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7429537287248610563", "views": 17092, "likes": 208, "comments": 5, "shares": 33, "days_ago": 3, "caption": "ExampleBrand คอลเลกชันใหม่ แว่นกันแสงสีฟ้าสำหรับเกมเมอร์ #ExampleBrand #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7304063441760707609", "views": 12206, "likes": 167, "comments": 7, "shares": 12, "days_ago": 8, "caption": "Day 25: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง คิดว่าไง คอมเมนต์เลย #bluelightglasses #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7447170924266765084", "views": 12712, "likes": 153, "comments": 4, "shares": 26, "days_ago": 15, "caption": "EP.25 ฝนตกรถติด กลับบ้านดึกอีกแล้ว #vlog"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7364904046153741637", "views": 8324, "likes": 63, "comments": 3, "shares": 10, "days_ago": 19, "caption": "EP.27 ฝนตกรถติด กลับบ้านดึกอีกแล้ว ใครเคยลองบ้าง #vlog"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7348518040657839467", "views": 11142, "likes": 187, "comments": 11, "shares": 29, "days_ago": 20, "caption": "Day 19: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา จริงใจไม่อวย #แว่นกันแสงสีฟ้า #desksetup"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7429537287248610563", "views": 17092, "likes": 208, "comments": 5, "shares": 33, "days_ago": 3, "caption": "ExampleBrand คอลเลกชันใหม่ แว่นกันแสงสีฟ้าสำหรับเกมเมอร์ #ExampleBrand #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7396489700027793854", "views": 3368, "likes": 31, "comments": 1, "shares": 2, "days_ago": 5, "caption": "สรุปให้: เลนส์กรองแสงสีฟ้า ทรง Aurora เทียบกับเลนส์ธรรมดา คิดว่าไง คอมเมนต์เลย #ถนอมสายตา #gaminggear"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7456718018416342727", "views": 5943, "likes": 65, "comments": 5, "shares": 6, "days_ago": 6, "caption": "เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Lumen ชุดเริ่มต้นเกมเมอร์งบน้อย จริงใจไม่อวย #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7304063441760707609", "views": 12206, "likes": 167, "comments": 7, "shares": 12, "days_ago": 8, "caption": "Day 25: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง คิดว่าไง คอมเมนต์เลย #bluelightglasses #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7359465940486453618", "views": 6191, "likes": 66, "comments": 2, "shares": 5, "days_ago": 14, "caption": "Day 46: ใส่แว่นเกมมิ่ง รุ่น Novaแข่งแรงค์ คืนนี้ไต่ได้กี่ดาว กดติดตามไว้นะ #แว่นกันแสงสีฟ้า #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7447170924266765084", "views": 12712, "likes": 153, "comments": 4, "shares": 26, "days_ago": 15, "caption": "EP.25 ฝนตกรถติด กลับบ้านดึกอีกแล้ว #vlog"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7337522016740584324", "views": 4960, "likes": 39, "comments": 2, "shares": 4, "days_ago": 17, "caption": "ตอบคอมเมนต์: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา ทรง Nova คิดว่าไง คอมเมนต์เลย #gaming #gaminggear"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7319023791335996437", "views": 6702, "likes": 89, "comments": 5, "shares": 6, "days_ago": 18, "caption": "EP.26 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง รุ่น Lumen คลิปหน้ามีต่อ #bluelightglasses #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7364904046153741637", "views": 8324, "likes": 63, "comments": 3, "shares": 10, "days_ago": 19, "caption": "EP.27 ฝนตกรถติด กลับบ้านดึกอีกแล้ว ใครเคยลองบ้าง #vlog"},
+      {"url": "https://www.tiktok.com/@examplebrand.th/video/7348518040657839467", "views": 11142, "likes": 187, "comments": 11, "shares": 29, "days_ago": 20, "caption": "Day 19: จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา จริงใจไม่อวย #แว่นกันแสงสีฟ้า #desksetup"}
+    ]},
+  {"handle": "otherlens_official", "url": "https://www.tiktok.com/@otherlens_official", "nickname": "OtherLens Thailand", "followers": 320000, "bio": "Official OtherLens Thailand", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7496598806477357208", "views": 8807, "likes": 89, "comments": 6, "shares": 3, "days_ago": 6, "caption": "สรุปให้: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา ใครเคยลองบ้าง #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7312664025064439867", "views": 9771, "likes": 157, "comments": 11, "shares": 17, "days_ago": 7, "caption": "EP.16 แว่นกันแสงสีฟ้า ทรง Haloใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คลิปหน้ามีต่อ #แว่นเกมมิ่ง #gaminggear"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7440329152389770663", "views": 12167, "likes": 181, "comments": 9, "shares": 23, "days_ago": 8, "caption": "ตอบคอมเมนต์: รีวิวแว่นเกมมิ่ง รุ่น Neo น้ำหนักเบา ใส่กับหูฟังได้ไหม จริงใจไม่อวย #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7488292756673761662", "views": 14866, "likes": 243, "comments": 15, "shares": 9, "days_ago": 16, "caption": "Day 15: เลนส์กรองแสงสีฟ้า ทรง Aurora เทียบกับเลนส์ธรรมดา ใครเคยลองบ้าง #แว่นกันแสงสีฟ้า #eyewear"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7486444616824337764", "views": 13390, "likes": 206, "comments": 8, "shares": 35, "days_ago": 21, "caption": "EP.12 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง จริงใจไม่อวย #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7496748673031197226", "views": 10455, "likes": 125, "comments": 5, "shares": 6, "days_ago": 29, "caption": "ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Aurora #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7385969036961005979", "views": 10785, "likes": 158, "comments": 11, "shares": 8, "days_ago": 38, "caption": "EP.8 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Pixel ชุดเริ่มต้นเกมเมอร์งบน้อย ขอบคุณที่ดูจนจบ #เกมเมอร์ #gaming"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7496598806477357208", "views": 8807, "likes": 89, "comments": 6, "shares": 3, "days_ago": 6, "caption": "สรุปให้: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา ใครเคยลองบ้าง #eyewear #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7312664025064439867", "views": 9771, "likes": 157, "comments": 11, "shares": 17, "days_ago": 7, "caption": "EP.16 แว่นกันแสงสีฟ้า ทรง Haloใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม คลิปหน้ามีต่อ #แว่นเกมมิ่ง #gaminggear"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7440329152389770663", "views": 12167, "likes": 181, "comments": 9, "shares": 23, "days_ago": 8, "caption": "ตอบคอมเมนต์: รีวิวแว่นเกมมิ่ง รุ่น Neo น้ำหนักเบา ใส่กับหูฟังได้ไหม จริงใจไม่อวย #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7488292756673761662", "views": 14866, "likes": 243, "comments": 15, "shares": 9, "days_ago": 16, "caption": "Day 15: เลนส์กรองแสงสีฟ้า ทรง Aurora เทียบกับเลนส์ธรรมดา ใครเคยลองบ้าง #แว่นกันแสงสีฟ้า #eyewear"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7486444616824337764", "views": 13390, "likes": 206, "comments": 8, "shares": 35, "days_ago": 21, "caption": "EP.12 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง จริงใจไม่อวย #bluelightglasses #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7384490833246734288", "views": 3772, "likes": 59, "comments": 4, "shares": 2, "days_ago": 23, "caption": "พาดู: แว่นกรองแสง ทรง Haloกับการสตรีมเกมทั้งคืน ขอบคุณที่ดูจนจบ #แว่นเกมมิ่ง #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7378212167026713925", "views": 4568, "likes": 59, "comments": 4, "shares": 9, "days_ago": 24, "caption": "Day 55: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง คลิปหน้ามีต่อ #gaminggear #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7496748673031197226", "views": 10455, "likes": 125, "comments": 5, "shares": 6, "days_ago": 29, "caption": "ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Aurora #eyewear #desksetup"},
+      {"url": "https://www.tiktok.com/@otherlens_official/video/7385969036961005979", "views": 10785, "likes": 158, "comments": 11, "shares": 8, "days_ago": 38, "caption": "EP.8 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Pixel ชุดเริ่มต้นเกมเมอร์งบน้อย ขอบคุณที่ดูจนจบ #เกมเมอร์ #gaming"}
+    ]},
+  {"handle": "gadgetshop_bkk", "url": "https://www.tiktok.com/@gadgetshop_bkk", "nickname": "ร้านแกดเจ็ตบางกอก", "followers": 52000, "bio": "ร้านขายแกดเจ็ต ส่งไว", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 1, "videos": [
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7410095030869004222", "views": 40642, "likes": 731, "comments": 57, "shares": 102, "days_ago": 30, "caption": "Day 2: ลองแว่นเกมมิ่ง ทรง Voltกับจอ 165Hz #desksetup #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7341833424602934694", "views": 17025, "likes": 387, "comments": 10, "shares": 40, "days_ago": 34, "caption": "จัดโต๊ะทำงานมินิมอลที่บ้าน กดติดตามไว้นะ #wfh"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7421416621495171476", "views": 18044, "likes": 405, "comments": 28, "shares": 45, "days_ago": 35, "caption": "EP.9 รีวิวแว่นเกมมิ่ง รุ่น Neo น้ำหนักเบา ใส่กับหูฟังได้ไหม คิดว่าไง คอมเมนต์เลย #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7432254779406493624", "views": 26759, "likes": 450, "comments": 11, "shares": 80, "days_ago": 36, "caption": "ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Volt ใครเคยลองบ้าง #eyewear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7316880173463834023", "views": 26542, "likes": 322, "comments": 16, "shares": 20, "days_ago": 59, "caption": "มาแล้ว! ลิสต์งานวันจันทร์แบบไม่เครียด #officelife"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7300082493107829216", "views": 36202, "likes": 452, "comments": 16, "shares": 73, "days_ago": 77, "caption": "พาดู: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย คิดว่าไง คอมเมนต์เลย #bluelightglasses #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7449142384178382750", "views": 18894, "likes": 321, "comments": 25, "shares": 42, "days_ago": 88, "caption": "EP.32 จัดโต๊ะทำงานมินิมอลที่บ้าน ขอบคุณที่ดูจนจบ #officelife"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7477009923614320551", "views": 16357, "likes": 244, "comments": 7, "shares": 41, "days_ago": 20, "caption": "มาแล้ว! เลนส์กรองแสงสีฟ้า ทรง Shade เทียบกับเลนส์ธรรมดา #bluelightglasses #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7410095030869004222", "views": 40642, "likes": 731, "comments": 57, "shares": 102, "days_ago": 30, "caption": "Day 2: ลองแว่นเกมมิ่ง ทรง Voltกับจอ 165Hz #desksetup #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7341833424602934694", "views": 17025, "likes": 387, "comments": 10, "shares": 40, "days_ago": 34, "caption": "จัดโต๊ะทำงานมินิมอลที่บ้าน กดติดตามไว้นะ #wfh"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7421416621495171476", "views": 18044, "likes": 405, "comments": 28, "shares": 45, "days_ago": 35, "caption": "EP.9 รีวิวแว่นเกมมิ่ง รุ่น Neo น้ำหนักเบา ใส่กับหูฟังได้ไหม คิดว่าไง คอมเมนต์เลย #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7432254779406493624", "views": 26759, "likes": 450, "comments": 11, "shares": 80, "days_ago": 36, "caption": "ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Volt ใครเคยลองบ้าง #eyewear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7316880173463834023", "views": 26542, "likes": 322, "comments": 16, "shares": 20, "days_ago": 59, "caption": "มาแล้ว! ลิสต์งานวันจันทร์แบบไม่เครียด #officelife"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7327677959893670900", "views": 15743, "likes": 308, "comments": 16, "shares": 24, "days_ago": 76, "caption": "สรุปให้: เลนส์กรองแสงสีฟ้า ทรง Aurora เทียบกับเลนส์ธรรมดา คลิปหน้ามีต่อ #เกมเมอร์ #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7300082493107829216", "views": 36202, "likes": 452, "comments": 16, "shares": 73, "days_ago": 77, "caption": "พาดู: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย คิดว่าไง คอมเมนต์เลย #bluelightglasses #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gadgetshop_bkk/video/7449142384178382750", "views": 18894, "likes": 321, "comments": 25, "shares": 42, "days_ago": 88, "caption": "EP.32 จัดโต๊ะทำงานมินิมอลที่บ้าน ขอบคุณที่ดูจนจบ #officelife"}
+    ]},
+  {"handle": "gamernews.th", "url": "https://www.tiktok.com/@gamernews.th", "nickname": "ข่าวเกมเมอร์", "followers": 1100000, "bio": "สำนักข่าวเกมและไอที", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7407521694605619483", "views": 138141, "likes": 1048, "comments": 45, "shares": 136, "days_ago": 15, "caption": "Day 20: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง รุ่น Halo กดติดตามไว้นะ #gaming #gaminggear"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7325263189119241209", "views": 102938, "likes": 1048, "comments": 59, "shares": 164, "days_ago": 18, "caption": "ใครจะเป็นแชมป์ลีกฤดูกาลนี้ ขอบคุณที่ดูจนจบ #esports"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7318289224759212211", "views": 146154, "likes": 2877, "comments": 204, "shares": 183, "days_ago": 20, "caption": "EP.19 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย #desksetup #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7337155706526921904", "views": 70899, "likes": 1282, "comments": 54, "shares": 154, "days_ago": 25, "caption": "ตอบคอมเมนต์: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ คิดว่าไง คอมเมนต์เลย #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7365205059434077516", "views": 108438, "likes": 1212, "comments": 44, "shares": 90, "days_ago": 26, "caption": "สรุปให้: สรุปผลแมตช์ Arena Legends รอบ18 ใครเคยลองบ้าง #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7460861355951375291", "views": 62195, "likes": 688, "comments": 16, "shares": 121, "days_ago": 28, "caption": "ตอบคอมเมนต์: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา กดติดตามไว้นะ #eyewear #gaming"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7423602672106914150", "views": 58547, "likes": 1130, "comments": 40, "shares": 145, "days_ago": 43, "caption": "มาแล้ว! วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง ใครเคยลองบ้าง #อีสปอร์ต"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7407521694605619483", "views": 138141, "likes": 1048, "comments": 45, "shares": 136, "days_ago": 15, "caption": "Day 20: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง รุ่น Halo กดติดตามไว้นะ #gaming #gaminggear"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7325263189119241209", "views": 102938, "likes": 1048, "comments": 59, "shares": 164, "days_ago": 18, "caption": "ใครจะเป็นแชมป์ลีกฤดูกาลนี้ ขอบคุณที่ดูจนจบ #esports"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7316005316334743449", "views": 45229, "likes": 864, "comments": 33, "shares": 75, "days_ago": 19, "caption": "สรุปให้: แว่นกันแสงสีฟ้า รุ่น Novaใส่เล่นเกมทั้งคืน ตาล้าน้อยลงจริงไหม #eyewear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7318289224759212211", "views": 146154, "likes": 2877, "comments": 204, "shares": 183, "days_ago": 20, "caption": "EP.19 เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย #desksetup #แว่นเกมมิ่ง"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7337155706526921904", "views": 70899, "likes": 1282, "comments": 54, "shares": 154, "days_ago": 25, "caption": "ตอบคอมเมนต์: ใครจะเป็นแชมป์ลีกฤดูกาลนี้ คิดว่าไง คอมเมนต์เลย #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7365205059434077516", "views": 108438, "likes": 1212, "comments": 44, "shares": 90, "days_ago": 26, "caption": "สรุปให้: สรุปผลแมตช์ Arena Legends รอบ18 ใครเคยลองบ้าง #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7460861355951375291", "views": 62195, "likes": 688, "comments": 16, "shares": 121, "days_ago": 28, "caption": "ตอบคอมเมนต์: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา กดติดตามไว้นะ #eyewear #gaming"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7376332639103230391", "views": 55803, "likes": 929, "comments": 47, "shares": 94, "days_ago": 38, "caption": "EP.32 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง รุ่น Aurora #gaming #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7423602672106914150", "views": 58547, "likes": 1130, "comments": 40, "shares": 145, "days_ago": 43, "caption": "มาแล้ว! วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง ใครเคยลองบ้าง #อีสปอร์ต"},
+      {"url": "https://www.tiktok.com/@gamernews.th/video/7493307436213007685", "views": 22160, "likes": 293, "comments": 22, "shares": 7, "days_ago": 44, "caption": "วิเคราะห์ดราฟต์ทีม Nova ก่อนนัดชิง #อีสปอร์ต"}
+    ]},
+  {"handle": "screenreview.joe", "url": "https://www.tiktok.com/@screenreview.joe", "nickname": "Joe Reviews Screens", "followers": 680000, "bio": "Monitor and gear reviews from Austin", "source": "apify", "text_language": "en", "location_created": "US", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7346398037832840091", "views": 154785, "likes": 3727, "comments": 128, "shares": 570, "days_ago": 9, "caption": "มาแล้ว! ไอเดียของขวัญให้เพื่อนร่วมงาน คลิปหน้ามีต่อ #wfh"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7464640002657124602", "views": 167645, "likes": 4709, "comments": 137, "shares": 404, "days_ago": 13, "caption": "พาดู: ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง ใครเคยลองบ้าง #officelife"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7357630203884577346", "views": 310356, "likes": 16152, "comments": 488, "shares": 925, "days_ago": 14, "caption": "blue light glasses after a 6h ranked grind ใครเคยลองบ้าง #gaming #eyewear"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7392439910360141529", "views": 268949, "likes": 10859, "comments": 773, "shares": 1246, "days_ago": 31, "caption": "สรุปให้: clip-on blue light lenses รุ่น Pixel for glasses wearers ใครเคยลองบ้าง #ถนอมสายตา #gaming"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7427777219022680152", "views": 228610, "likes": 9412, "comments": 733, "shares": 1084, "days_ago": 36, "caption": "มาแล้ว! clip-on blue light lenses รุ่น Orbit for glasses wearers กดติดตามไว้นะ #desksetup #แว่นเกมมิ่ง"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7346398037832840091", "views": 154785, "likes": 3727, "comments": 128, "shares": 570, "days_ago": 9, "caption": "มาแล้ว! ไอเดียของขวัญให้เพื่อนร่วมงาน คลิปหน้ามีต่อ #wfh"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7464640002657124602", "views": 167645, "likes": 4709, "comments": 137, "shares": 404, "days_ago": 13, "caption": "พาดู: ประชุมออนไลน์ทั้งวัน รอดมาได้ยังไง ใครเคยลองบ้าง #officelife"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7357630203884577346", "views": 310356, "likes": 16152, "comments": 488, "shares": 925, "days_ago": 14, "caption": "blue light glasses after a 6h ranked grind ใครเคยลองบ้าง #gaming #eyewear"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7316274213883336272", "views": 137816, "likes": 4702, "comments": 183, "shares": 244, "days_ago": 16, "caption": "สรุปให้: จัดโต๊ะทำงานมินิมอลที่บ้าน กดติดตามไว้นะ #officelife"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7334912470556391279", "views": 148795, "likes": 4511, "comments": 351, "shares": 164, "days_ago": 17, "caption": "Day 21: blue light glasses รุ่น Volt after a 6h ranked grind จริงใจไม่อวย #แว่นเกมมิ่ง #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7443683000783521157", "views": 76028, "likes": 1938, "comments": 53, "shares": 313, "days_ago": 25, "caption": "สรุปให้: เก้าอี้ทำงานตัวใหม่ นั่งยาวไม่ปวดหลัง จริงใจไม่อวย #wfh"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7392439910360141529", "views": 268949, "likes": 10859, "comments": 773, "shares": 1246, "days_ago": 31, "caption": "สรุปให้: clip-on blue light lenses รุ่น Pixel for glasses wearers ใครเคยลองบ้าง #ถนอมสายตา #gaming"},
+      {"url": "https://www.tiktok.com/@screenreview.joe/video/7427777219022680152", "views": 228610, "likes": 9412, "comments": 733, "shares": 1084, "days_ago": 36, "caption": "มาแล้ว! clip-on blue light lenses รุ่น Orbit for glasses wearers กดติดตามไว้นะ #desksetup #แว่นเกมมิ่ง"}
+    ]},
+  {"handle": "inactivegamer.tan", "url": "https://www.tiktok.com/@inactivegamer.tan", "nickname": "ตาลเลิกเล่นแล้ว", "followers": 110000, "bio": "เคยรีวิวเกียร์เกม พักก่อน", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7371015545778959619", "views": 54808, "likes": 1611, "comments": 43, "shares": 266, "days_ago": 95, "caption": "พาดู: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Shade ชุดเริ่มต้นเกมเมอร์งบน้อย #แว่นกันแสงสีฟ้า #eyewear"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7391603286444550928", "views": 66251, "likes": 3577, "comments": 166, "shares": 587, "days_ago": 128, "caption": "สรุปให้: ลองแว่นเกมมิ่งกับจอ 165Hz จริงใจไม่อวย #เกมเมอร์ #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7410706716191858731", "views": 115171, "likes": 1916, "comments": 79, "shares": 137, "days_ago": 162, "caption": "EP.32 ลองแว่นเกมมิ่ง รุ่น Haloกับจอ 165Hz คลิปหน้ามีต่อ #gaminggear #gaming"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7463856004107121046", "views": 54465, "likes": 2043, "comments": 159, "shares": 78, "days_ago": 185, "caption": "EP.47 ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า กดติดตามไว้นะ #desksetup #bluelightglasses"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7371015545778959619", "views": 54808, "likes": 1611, "comments": 43, "shares": 266, "days_ago": 95, "caption": "พาดู: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Shade ชุดเริ่มต้นเกมเมอร์งบน้อย #แว่นกันแสงสีฟ้า #eyewear"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7411043422674101702", "views": 45618, "likes": 1528, "comments": 71, "shares": 148, "days_ago": 113, "caption": "พาดู: เกมอินดี้ที่ต้องลองเดือนนี้ กดติดตามไว้นะ #เกม"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7343568647997297811", "views": 26060, "likes": 983, "comments": 39, "shares": 95, "days_ago": 122, "caption": "มาแล้ว! จัดโต๊ะเกมมิ่งใหม่ พร้อมแว่นถนอมสายตา คลิปหน้ามีต่อ #ถนอมสายตา #desksetup"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7343751076908137308", "views": 27651, "likes": 565, "comments": 25, "shares": 66, "days_ago": 126, "caption": "พาดู: เลนส์กรองแสงสีฟ้า ทรง Nova เทียบกับเลนส์ธรรมดา กดติดตามไว้นะ #gaminggear #desksetup"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7318037792595279948", "views": 30549, "likes": 1267, "comments": 42, "shares": 88, "days_ago": 127, "caption": "Day 5: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง ใครเคยลองบ้าง #gamer"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7391603286444550928", "views": 66251, "likes": 3577, "comments": 166, "shares": 587, "days_ago": 128, "caption": "สรุปให้: ลองแว่นเกมมิ่งกับจอ 165Hz จริงใจไม่อวย #เกมเมอร์ #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7468897277900592610", "views": 29457, "likes": 775, "comments": 45, "shares": 70, "days_ago": 151, "caption": "สรุปให้: เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง รุ่น Neo คิดว่าไง คอมเมนต์เลย #gaminggear #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7442646093810280938", "views": 51786, "likes": 1576, "comments": 79, "shares": 253, "days_ago": 158, "caption": "พาดู: เล่นเกมผีกับเพื่อน กรี๊ดทั้งคลิป ใครเคยลองบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7410706716191858731", "views": 115171, "likes": 1916, "comments": 79, "shares": 137, "days_ago": 162, "caption": "EP.32 ลองแว่นเกมมิ่ง รุ่น Haloกับจอ 165Hz คลิปหน้ามีต่อ #gaminggear #gaming"},
+      {"url": "https://www.tiktok.com/@inactivegamer.tan/video/7463856004107121046", "views": 54465, "likes": 2043, "comments": 159, "shares": 78, "days_ago": 185, "caption": "EP.47 ปวดตาตอนเล่นเกม ลองแว่นกันแสงสีฟ้า กดติดตามไว้นะ #desksetup #bluelightglasses"}
+    ]},
+  {"handle": "tinycreator.num", "url": "https://www.tiktok.com/@tinycreator.num", "nickname": "นุ่มเพิ่งเริ่ม", "followers": 600, "bio": "เพิ่งเริ่มทำคลิปเกม", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7309426824061635614", "views": 1652, "likes": 74, "comments": 1, "shares": 12, "days_ago": 18, "caption": "พาดู: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย กดติดตามไว้นะ #ถนอมสายตา #eyewear"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7464680747682697833", "views": 2175, "likes": 160, "comments": 10, "shares": 23, "days_ago": 34, "caption": "ลองจริง: แว่นกรองแสงกับการสตรีมเกมทั้งคืน จริงใจไม่อวย #gaminggear #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7372647798841971557", "views": 2355, "likes": 236, "comments": 14, "shares": 15, "days_ago": 43, "caption": "พาดู: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง จริงใจไม่อวย #bluelightglasses #gaminggear"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7475330479361444644", "views": 2546, "likes": 148, "comments": 7, "shares": 15, "days_ago": 47, "caption": "EP.35 เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง รุ่น Lumen จริงใจไม่อวย #gaminggear #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7442226851448762926", "views": 4813, "likes": 564, "comments": 37, "shares": 36, "days_ago": 48, "caption": "มาแล้ว! เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Nova ชุดเริ่มต้นเกมเมอร์งบน้อย #แว่นกันแสงสีฟ้า #eyewear"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7449475054420244118", "views": 706, "likes": 36, "comments": 2, "shares": 5, "days_ago": 13, "caption": "ตอบคอมเมนต์: รีวิวแว่นเกมมิ่ง น้ำหนักเบา ใส่กับหูฟังได้ไหม คิดว่าไง คอมเมนต์เลย #eyewear #bluelightglasses"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7309426824061635614", "views": 1652, "likes": 74, "comments": 1, "shares": 12, "days_ago": 18, "caption": "พาดู: เมาส์ คีย์บอร์ด แว่นเกมมิ่ง ชุดเริ่มต้นเกมเมอร์งบน้อย กดติดตามไว้นะ #ถนอมสายตา #eyewear"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7317294367487223384", "views": 928, "likes": 69, "comments": 1, "shares": 9, "days_ago": 28, "caption": "สรุปให้: ไต่แรงค์ Arena Legends จนเช้า คิดว่าไง คอมเมนต์เลย #gamer"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7464680747682697833", "views": 2175, "likes": 160, "comments": 10, "shares": 23, "days_ago": 34, "caption": "ลองจริง: แว่นกรองแสงกับการสตรีมเกมทั้งคืน จริงใจไม่อวย #gaminggear #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7486908367264696804", "views": 1555, "likes": 69, "comments": 5, "shares": 8, "days_ago": 36, "caption": "EP.28 ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง ทรง Nova #แว่นกันแสงสีฟ้า #ถนอมสายตา"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7372647798841971557", "views": 2355, "likes": 236, "comments": 14, "shares": 15, "days_ago": 43, "caption": "พาดู: ตั้งค่าจอให้ถนอมสายตา + แว่นเกมมิ่ง จริงใจไม่อวย #bluelightglasses #gaminggear"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7475330479361444644", "views": 2546, "likes": 148, "comments": 7, "shares": 15, "days_ago": 47, "caption": "EP.35 เล่นเกมจอคอมยาว 6 ชั่วโมง ใส่แว่นกันแสง รุ่น Lumen จริงใจไม่อวย #gaminggear #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7442226851448762926", "views": 4813, "likes": 564, "comments": 37, "shares": 36, "days_ago": 48, "caption": "มาแล้ว! เมาส์ คีย์บอร์ด แว่นเกมมิ่ง รุ่น Nova ชุดเริ่มต้นเกมเมอร์งบน้อย #แว่นกันแสงสีฟ้า #eyewear"},
+      {"url": "https://www.tiktok.com/@tinycreator.num/video/7488916448561284970", "views": 886, "likes": 101, "comments": 5, "shares": 6, "days_ago": 50, "caption": "ลองจริง: ไต่แรงค์ Arena Legends จนเช้า จริงใจไม่อวย #gamer"}
+    ]},
+  {"handle": "megastar.gamer", "url": "https://www.tiktok.com/@megastar.gamer", "nickname": "เมก้าสตาร์เกมเมอร์", "followers": 6200000, "bio": "ช่องเกมที่ใหญ่ที่สุด", "source": "apify", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7360558109881184387", "views": 470686, "likes": 8508, "comments": 241, "shares": 1156, "days_ago": 4, "caption": "ตอบคอมเมนต์: ตัวละครใหม่โกงเกินไปไหม #เกม"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7421010695037576346", "views": 289150, "likes": 6748, "comments": 314, "shares": 900, "days_ago": 13, "caption": "สรุปให้: สอนคอมโบตัวใหม่แบบละเอียด ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7333320359607534959", "views": 858119, "likes": 12284, "comments": 937, "shares": 1671, "days_ago": 17, "caption": "EP.12 ไต่แรงค์ Arena Legends จนเช้า จริงใจไม่อวย #เกม"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7398803123396406145", "views": 1251261, "likes": 20769, "comments": 523, "shares": 1879, "days_ago": 18, "caption": "มาแล้ว! เลนส์กรองแสงสีฟ้า ทรง Nova เทียบกับเลนส์ธรรมดา #gaminggear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7443384217164915436", "views": 384109, "likes": 5628, "comments": 320, "shares": 396, "days_ago": 19, "caption": "ลองจริง: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7440270184336998339", "views": 458365, "likes": 11303, "comments": 282, "shares": 771, "days_ago": 41, "caption": "Day 10: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คิดว่าไง คอมเมนต์เลย #gamer"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7346634254624226173", "views": 329573, "likes": 8532, "comments": 365, "shares": 1248, "days_ago": 42, "caption": "พาดู: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา ขอบคุณที่ดูจนจบ #gaminggear #desksetup"}
+    ], "profile_videos": [
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7360558109881184387", "views": 470686, "likes": 8508, "comments": 241, "shares": 1156, "days_ago": 4, "caption": "ตอบคอมเมนต์: ตัวละครใหม่โกงเกินไปไหม #เกม"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7421010695037576346", "views": 289150, "likes": 6748, "comments": 314, "shares": 900, "days_ago": 13, "caption": "สรุปให้: สอนคอมโบตัวใหม่แบบละเอียด ขอบคุณที่ดูจนจบ #gamer"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7415418643809335862", "views": 257769, "likes": 6783, "comments": 267, "shares": 473, "days_ago": 16, "caption": "ลองจริง: เกมอินดี้ที่ต้องลองเดือนนี้ คลิปหน้ามีต่อ #เกม"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7333320359607534959", "views": 858119, "likes": 12284, "comments": 937, "shares": 1671, "days_ago": 17, "caption": "EP.12 ไต่แรงค์ Arena Legends จนเช้า จริงใจไม่อวย #เกม"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7398803123396406145", "views": 1251261, "likes": 20769, "comments": 523, "shares": 1879, "days_ago": 18, "caption": "มาแล้ว! เลนส์กรองแสงสีฟ้า ทรง Nova เทียบกับเลนส์ธรรมดา #gaminggear #แว่นกันแสงสีฟ้า"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7443384217164915436", "views": 384109, "likes": 5628, "comments": 320, "shares": 396, "days_ago": 19, "caption": "ลองจริง: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง #เกม"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7323913497534465496", "views": 225657, "likes": 4409, "comments": 241, "shares": 524, "days_ago": 32, "caption": "ลองจริง: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา คิดว่าไง คอมเมนต์เลย #แว่นกันแสงสีฟ้า #เกมเมอร์"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7440270184336998339", "views": 458365, "likes": 11303, "comments": 282, "shares": 771, "days_ago": 41, "caption": "Day 10: อัปเดตแพตช์ล่าสุด เปลี่ยนอะไรบ้าง คิดว่าไง คอมเมนต์เลย #gamer"},
+      {"url": "https://www.tiktok.com/@megastar.gamer/video/7346634254624226173", "views": 329573, "likes": 8532, "comments": 365, "shares": 1248, "days_ago": 42, "caption": "พาดู: เลนส์กรองแสงสีฟ้า เทียบกับเลนส์ธรรมดา ขอบคุณที่ดูจนจบ #gaminggear #desksetup"}
+    ]},
+  {"handle": "@PloyGaming", "url": "https://www.tiktok.com/@ploygaming", "nickname": "พลอยเกมมิ่ง", "followers": 65000, "bio": "สาวเกมเมอร์", "source": "seed", "text_language": "th", "location_created": "TH", "query_group": 2, "videos": [
+    ], "profile_videos": [
+    ]}
 ]

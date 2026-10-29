@@ -30,6 +30,10 @@ Fewer than two timestamps leaves the field unset.
 
 ``content_summary`` is a short line of up to three captions plus the hashtag
 names on those videos, cut to 400 characters.
+
+Each update also carries ``videos`` (the same per-video stats as search, so the
+scorer can use profile data without a second lookup) and ``stats_source``
+``"profile"``. Cached updates written before videos existed simply omit them.
 """
 
 from __future__ import annotations
@@ -46,9 +50,11 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
-from ..models import KolProfile, normalize_handle
+from ..models import KolProfile, VideoStats, normalize_handle
 from .apify import ApifyBudget, ApifyClient, ApifyError, as_count, dig
+from .tiktok_videos import video_from_item
 
 PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -156,6 +162,13 @@ def enrich_from_items(items: list[Any], *, followers: int) -> dict[str, Any]:
         if (rate := engagement_rate(video, followers=followers)) is not None
     ]
     update: dict[str, Any] = {}
+    stats = [
+        video_from_item(video, _author_handle(video))
+        for video in videos
+    ]
+    if stats:
+        update["videos"] = stats
+        update["stats_source"] = "profile"
     if rates:
         median = statistics.median(rates)
         update["median_engagement_rate"] = round(min(1.0, max(0.0, float(median))), 4)
@@ -166,6 +179,13 @@ def enrich_from_items(items: list[Any], *, followers: int) -> dict[str, Any]:
     if summary:
         update["content_summary"] = summary
     return update
+
+
+def _author_handle(item: dict[str, Any]) -> str | None:
+    raw = dig(item, "authorMeta", "name")
+    if isinstance(raw, str) and raw.strip().lstrip("@").strip():
+        return raw.strip().lstrip("@").strip()
+    return None
 
 
 def _videos_for_stats(items: list[Any]) -> list[dict[str, Any]]:
@@ -245,6 +265,22 @@ def _clean_update(update: dict[str, Any]) -> dict[str, Any]:
     summary = update.get("content_summary")
     if isinstance(summary, str) and summary.strip():
         clean["content_summary"] = summary.strip()
+    raw_videos = update.get("videos")
+    if isinstance(raw_videos, list):
+        videos: list[dict[str, Any]] = []
+        for raw in raw_videos:
+            if not isinstance(raw, dict):
+                continue
+            try:
+                video = VideoStats.model_validate(raw)
+            except ValidationError:
+                continue
+            videos.append(video.model_dump(mode="json"))
+        if videos:
+            clean["videos"] = videos
+    source = update.get("stats_source")
+    if source in {"search", "profile"}:
+        clean["stats_source"] = source
     return clean
 
 

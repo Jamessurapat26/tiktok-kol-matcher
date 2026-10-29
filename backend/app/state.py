@@ -1,4 +1,5 @@
 import operator
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -9,6 +10,7 @@ from .models import (
     KolProfile,
     MatchRequest,
     RankedKol,
+    VideoStats,
     normalize_handle,
     outranks,
 )
@@ -18,6 +20,29 @@ from .models import (
 # None on the winner are filled from a strictly lower-priority row. Zero is a
 # real value (followers, posts_per_week), so it is not treated as missing.
 _WINNER_FIELDS = frozenset({"handle", "url", "source"})
+
+
+def _merge_videos(
+    left: list[VideoStats],
+    right: list[VideoStats],
+) -> list[VideoStats]:
+    """Union two video lists by URL, newest first, with undated videos last."""
+    videos: list[VideoStats] = []
+    seen: set[str] = set()
+    for video in [*left, *right]:
+        if video.url is not None:
+            if video.url in seen:
+                continue
+            seen.add(video.url)
+        videos.append(video)
+    videos.sort(
+        key=lambda video: (
+            video.posted_at is not None,
+            video.posted_at or datetime.min.replace(tzinfo=UTC),
+        ),
+        reverse=True,
+    )
+    return videos
 
 
 def _fill_missing(winner: KolProfile, donor: KolProfile) -> KolProfile:
@@ -38,7 +63,8 @@ def merge_kols(left: list[KolProfile], right: list[KolProfile]) -> list[KolProfi
 
     The winning row keeps its own values. Fields that are ``None`` on the winner
     are filled from strictly lower-priority rows (including values those rows
-    already inherited). Equal priority keeps the earlier row unchanged.
+    already inherited). Equal priority keeps the earlier row unchanged, except
+    that videos are always unioned by URL across every row for the same creator.
 
     LangGraph passes node updates to reducers as raw values, so list items may be
     dicts even though the state annotation says ``KolProfile``. Coerce them here.
@@ -49,11 +75,19 @@ def merge_kols(left: list[KolProfile], right: list[KolProfile]) -> list[KolProfi
         key = normalize_handle(kol.handle)
         current = merged.get(key)
         if current is None:
-            merged[key] = kol
-        elif outranks(kol.source, current.source):
-            merged[key] = _fill_missing(kol, current)
+            merged[key] = kol.model_copy(
+                update={"videos": _merge_videos([], kol.videos)}
+            )
+            continue
+        if outranks(kol.source, current.source):
+            winner = _fill_missing(kol, current)
         elif outranks(current.source, kol.source):
-            merged[key] = _fill_missing(current, kol)
+            winner = _fill_missing(current, kol)
+        else:
+            winner = current
+        merged[key] = winner.model_copy(
+            update={"videos": _merge_videos(current.videos, kol.videos)}
+        )
     return list(merged.values())
 
 

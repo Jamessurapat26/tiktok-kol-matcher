@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import (
@@ -179,6 +180,27 @@ def outranks(new_source: str, current_source: str) -> bool:
     return SOURCE_PRIORITY.get(new_source, 0) > SOURCE_PRIORITY.get(current_source, 0)
 
 
+class VideoStats(DomainModel):
+    """One recent video's public counts and metadata."""
+
+    url: str | None = None
+    views: int = Field(default=0, ge=0)
+    likes: int = Field(default=0, ge=0)
+    comments: int = Field(default=0, ge=0)
+    shares: int = Field(default=0, ge=0)
+    posted_at: datetime | None = None
+    caption: str = ""
+
+    @field_validator("posted_at")
+    @classmethod
+    def _as_utc(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+
 class KolProfile(DomainModel):
     handle: str
     url: HttpUrl
@@ -195,6 +217,8 @@ class KolProfile(DomainModel):
     )
     posts_per_week: float = Field(default=0, ge=0)
     content_summary: str | None = None
+    videos: list[VideoStats] = Field(default_factory=list)
+    stats_source: Literal["search", "profile"] = "search"
     source: Literal["apify", "seed", "cache"]
 
     @field_validator("handle")

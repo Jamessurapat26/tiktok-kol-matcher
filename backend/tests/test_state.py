@@ -1,8 +1,10 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from langgraph.graph import END, START, StateGraph
 from pydantic import ValidationError
 
-from app.models import KolProfile, MatchRequest, MatchWeights, ScoreBreakdown
+from app.models import KolProfile, MatchRequest, MatchWeights, ScoreBreakdown, VideoStats
 from app.state import MatchState, merge_kols
 
 
@@ -173,6 +175,72 @@ def test_merge_kols_fills_missing_fields_from_dict_rows():
     assert merged[0].source == "apify"
     assert merged[0].followers == 20
     assert merged[0].bio == "hello"
+
+
+def test_merge_kols_returns_the_union_of_videos_newest_first():
+    def video(suffix: str, days: int | None) -> VideoStats:
+        posted_at = None if days is None else datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=days)
+        return VideoStats(
+            url=f"https://www.tiktok.com/@creator/video/{suffix}",
+            views=100,
+            likes=10,
+            comments=1,
+            shares=1,
+            posted_at=posted_at,
+            caption=f"video {suffix}",
+        )
+
+    older = make_kol(
+        "creator",
+        "cache",
+        videos=[video("shared", 2), video("old", 3), video("shared", 2)],
+    )
+    newer = make_kol(
+        "CREATOR",
+        "apify",
+        videos=[video("middle", 1), video("newest", 5), video("undated", None)],
+    )
+
+    winner = merge_kols([older], [newer])[0]
+
+    assert winner.source == "apify"
+    assert [item.url.rsplit("/", 1)[-1] for item in winner.videos] == [
+        "newest",
+        "old",
+        "shared",
+        "middle",
+        "undated",
+    ]
+
+
+def test_merge_kols_unions_videos_for_equal_priority_rows():
+    first = make_kol(
+        "creator",
+        "seed",
+        followers=1,
+        videos=[
+            VideoStats(
+                url="https://www.tiktok.com/@creator/video/1",
+                posted_at=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+        ],
+    )
+    later = make_kol(
+        "Creator",
+        "seed",
+        followers=2,
+        videos=[
+            VideoStats(
+                url="https://www.tiktok.com/@creator/video/2",
+                posted_at=datetime(2026, 1, 2, tzinfo=UTC),
+            )
+        ],
+    )
+
+    winner = merge_kols([first], [later])[0]
+
+    assert winner.followers == 1
+    assert [item.url.rsplit("/", 1)[-1] for item in winner.videos] == ["2", "1"]
 
 
 def test_handle_strips_at_sign_and_preserves_case():

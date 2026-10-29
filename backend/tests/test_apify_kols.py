@@ -587,7 +587,7 @@ def test_live_kols_factory_uses_apify_and_keeps_other_services_mocked(monkeypatc
     assert isinstance(bundle.enricher, ApifyKolEnricher)
     assert bundle.kol_search.max_results == 4
     assert bundle.enricher.max_videos == 6
-    assert both.kol_search.max_results == 20
+    assert both.kol_search.max_results == 15
     assert both.enricher.max_videos == 6
     assert isinstance(bundle.facebook, MockFacebookScraper)
     assert isinstance(bundle.llm, MockBrandAnalyzer)
@@ -639,7 +639,7 @@ def test_live_sizes_come_from_env_in_the_actor_inputs(monkeypatch, tmp_path):
     assert profile_body["resultsPerPage"] == 3
     assert profile_params["maxItems"] == "3"
     assert any(row.get("handle") == "gretalynnhihi" for row in rows)
-    assert bundle.kol_search._apify._reserve_usd == pytest.approx(0.30)
+    assert bundle.kol_search._apify._reserve_usd == pytest.approx(0.35)
 
     bundle.kol_search._apify._client.close()
     bundle.enricher._apify._client.close()

@@ -27,14 +27,15 @@ _RUN_SYNC_ITEMS = (
 # sync HTTP call gave up, but the paid run may still be executing.
 _RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
-# Measured run costs on this account times about 1.5, so the estimate stays
-# above real spend. The sync endpoint returns dataset items only, not the run
-# usage or cost, so these numbers cannot be exact.
+# Measured live costs plus a modest margin (search 20 items: est 0.085 vs
+# measured 0.075; profile 10 videos: est 0.035 vs measured 0.03), and they
+# scale with the configured item counts. The sync endpoint returns dataset
+# items only, not the run usage or cost, so these numbers cannot be exact.
 _FIXED_RUN_USD = 0.005
 _DEFAULT_ITEM_USD = 0.01
 ESTIMATED_USD_PER_ITEM: dict[str, float] = {
-    "clockworks/tiktok-scraper": 0.0025,
-    "clockworks/tiktok-profile-scraper": 0.002,
+    "clockworks/tiktok-scraper": 0.004,
+    "clockworks/tiktok-profile-scraper": 0.003,
     "apify/facebook-pages-scraper": 0.015,
     "apify/facebook-posts-scraper": 0.005,
 }
@@ -60,9 +61,9 @@ class ApifyBudget:
     """Thread-safe estimated spend for one job's Apify calls.
 
     The run-sync-get-dataset-items endpoint returns only dataset items, not the
-    run cost, so ``record`` receives an estimate. The budget is soft: ``check``
-    runs before each actor call, and the call that crosses the limit is allowed
-    to finish. Spend can therefore exceed the limit by at most that last run.
+    run cost, so ``record`` receives an estimate. ``check`` runs before each
+    actor call and refuses a run whose worst-case estimate would cross the
+    limit, so estimated spend stays within the budget.
     """
 
     def __init__(self, limit_usd: float) -> None:
@@ -93,15 +94,25 @@ class ApifyBudget:
         with self._lock:
             return self._skipped
 
-    def check(self, actor: str, reserve_usd: float = 0.0) -> None:
+    def check(
+        self,
+        actor: str,
+        reserve_usd: float = 0.0,
+        *,
+        upcoming_usd: float = 0.0,
+    ) -> None:
         """Raise ``ApifyBudgetExceeded`` once spend (plus any reserve) is used up.
 
         ``reserve_usd`` keeps part of the budget free for a later stage. Search
         passes the enrichment reserve so it cannot spend the money that profile
-        enrichment still needs.
+        enrichment still needs. ``upcoming_usd`` is the estimate of the run
+        about to start, so a run only starts when its worst-case cost still
+        fits next to the reserve.
         """
+        if not math.isfinite(upcoming_usd) or upcoming_usd < 0:
+            raise ValueError("upcoming_usd must be zero or greater")
         with self._lock:
-            if self._spent + reserve_usd >= self._limit:
+            if self._spent + reserve_usd + upcoming_usd > self._limit:
                 self._skipped += 1
                 detail = (
                     f"${reserve_usd:.2f} is kept for enrichment; "
@@ -198,9 +209,9 @@ class ApifyLimits:
     tiktok_search_max_charge_usd: float
     tiktok_profile_max_charge_usd: float
     facebook_max_charge_usd: float
-    tiktok_results_per_query: int = 20
+    tiktok_results_per_query: int = 15
     tiktok_profile_videos: int = 10
-    enrich_reserve_usd: float = 0.30
+    enrich_reserve_usd: float = 0.35
 
     @classmethod
     def from_env(cls) -> ApifyLimits:
@@ -210,7 +221,7 @@ class ApifyLimits:
         facebook = _positive_env("APIFY_FACEBOOK_MAX_CHARGE_USD", 0.50)
         results_per_query = _int_env(
             "TIKTOK_RESULTS_PER_QUERY",
-            20,
+            15,
             minimum=1,
             maximum=50,
         )
@@ -220,7 +231,7 @@ class ApifyLimits:
             minimum=1,
             maximum=30,
         )
-        enrich_reserve = _non_negative_env("APIFY_ENRICH_RESERVE_USD", 0.30)
+        enrich_reserve = _non_negative_env("APIFY_ENRICH_RESERVE_USD", 0.35)
         for name, value in (
             ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", tiktok_search),
             ("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", tiktok_profile),
@@ -278,16 +289,18 @@ class DiscoveryLimits:
 
 def estimate_default_job_usd(
     limits: ApifyLimits,
-    queries: int = 8,
+    queries: int = 30,
 ) -> float:
     """Estimate the Apify cost of one default live job.
 
     The estimate uses the same per-run estimator and assumes one Facebook page
-    item, 20 Facebook posts, at most ``queries`` TikTok search runs (stopping
-    early once the enrichment reserve would be eaten), and 10 profile
-    enrichment runs at ``TIKTOK_PROFILE_VIDEOS`` videos each. Search runs use
-    ``TIKTOK_RESULTS_PER_QUERY`` videos. This is deliberately conservative and
-    is only used for planning and tests, never for billing.
+    item, 20 Facebook posts, then TikTok search runs that only start while
+    their estimate plus the enrichment reserve fits under the budget (at most
+    ``queries`` runs, default 3 rounds of up to 10 queries), then up to 10
+    profile enrichment runs at ``TIKTOK_PROFILE_VIDEOS`` videos each while each
+    one fits. Search runs use ``TIKTOK_RESULTS_PER_QUERY`` videos. This is
+    deliberately conservative and is only used for planning and tests, never
+    for billing.
     """
     if queries < 0:
         raise ValueError("queries must be zero or greater")
@@ -309,7 +322,10 @@ def estimate_default_job_usd(
         limits.tiktok_search_max_charge_usd,
     )
     for _ in range(queries):
-        if spent + limits.enrich_reserve_usd >= limits.job_budget_usd:
+        if (
+            spent + limits.enrich_reserve_usd + search_run
+            > limits.job_budget_usd
+        ):
             break
         spent += search_run
 
@@ -318,7 +334,11 @@ def estimate_default_job_usd(
         limits.tiktok_profile_videos,
         limits.tiktok_profile_max_charge_usd,
     )
-    return spent + 10 * enrichment_run
+    for _ in range(10):
+        if spent + enrichment_run > limits.job_budget_usd:
+            break
+        spent += enrichment_run
+    return spent
 
 
 def actor_run_sync_url(actor: str) -> str:
@@ -419,7 +439,13 @@ class ApifyClient:
         if max_items < 1:
             raise ValueError("max_items must be at least 1")
         if self._budget is not None:
-            self._budget.check(actor, reserve_usd=self._reserve_usd)
+            self._budget.check(
+                actor,
+                reserve_usd=self._reserve_usd,
+                upcoming_usd=estimate_run_cost(
+                    actor, max_items, self._max_charge_usd
+                ),
+            )
 
         url = actor_run_sync_url(actor)
         params = {

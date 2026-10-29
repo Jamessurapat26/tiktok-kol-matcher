@@ -104,7 +104,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Apify videos per search query; overrides TIKTOK_RESULTS_PER_QUERY "
-            "for search only (default: TIKTOK_RESULTS_PER_QUERY or 20). "
+            "for search only (default: TIKTOK_RESULTS_PER_QUERY or 15). "
             "Profile enrichment always uses TIKTOK_PROFILE_VIDEOS (default: 10)"
         ),
     )

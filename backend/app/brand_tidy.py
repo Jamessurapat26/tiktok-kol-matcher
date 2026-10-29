@@ -25,6 +25,7 @@ MAX_INTERESTS = 8
 MAX_INTEREST_WORDS = 3
 MAX_COMPETITORS = 8
 MAX_COMPETITOR_WORDS = 4
+MAX_RETAILERS = 8
 MAX_BRAND_HANDLES = 8
 MAX_BRAND_HANDLE_CHARS = 40
 
@@ -44,6 +45,12 @@ def tidy_brand_profile(profile: BrandProfile) -> BrandProfile:
                 max_words=MAX_INTEREST_WORDS,
             ),
         }
+    )
+    retailers = _tidy_list(
+        profile.retailers,
+        limit=MAX_RETAILERS,
+        max_words=MAX_COMPETITOR_WORDS,
+        max_chars=MAX_BRAND_NAME_CHARS,
     )
     return profile.model_copy(
         update={
@@ -73,12 +80,16 @@ def tidy_brand_profile(profile: BrandProfile) -> BrandProfile:
                 max_words=MAX_KEYWORD_WORDS,
                 max_chars=MAX_KEYWORD_CHARS,
             ),
-            "competitors": _tidy_list(
-                profile.competitors,
-                limit=MAX_COMPETITORS,
-                max_words=MAX_COMPETITOR_WORDS,
-                max_chars=MAX_BRAND_NAME_CHARS,
+            "competitors": _drop_listed(
+                _tidy_list(
+                    profile.competitors,
+                    limit=MAX_COMPETITORS,
+                    max_words=MAX_COMPETITOR_WORDS,
+                    max_chars=MAX_BRAND_NAME_CHARS,
+                ),
+                retailers,
             ),
+            "retailers": retailers,
             "brand_handles": _plain_items(
                 profile.brand_handles,
                 limit=MAX_BRAND_HANDLES,
@@ -86,6 +97,16 @@ def tidy_brand_profile(profile: BrandProfile) -> BrandProfile:
             ),
         }
     )
+
+
+def _drop_listed(items: list[str], listed: list[str]) -> list[str]:
+    """Remove items that also appear in ``listed``, ignoring case.
+
+    A seller named as both a retailer and a competitor stays a retailer, so it
+    never triggers the competitor filter or flags.
+    """
+    keys = {item.casefold() for item in listed}
+    return [item for item in items if item.casefold() not in keys]
 
 
 def _clean_text(value: str) -> str:

@@ -584,3 +584,24 @@ def test_mmr_asks_for_similarity_rows_of_selected_items_only():
     selected = mmr_select([0.9, 0.8, 0.7, 0.6, 0.5, 0.4], sim, 3, 0.7)
 
     assert rows <= set(selected)
+
+
+def test_retailer_mentions_are_not_competitor_mentions():
+    brief = _brief(retailers=["ExampleMart"])
+    kol = _kol(
+        "retail.haul",
+        videos=[_video(days_ago=3, caption="#ad haul from ExampleMart")],
+    )
+
+    flags = flags_for(
+        kol,
+        brief,
+        _brand_aliases(brief),
+        _competitor_aliases(brief),
+        0.1,
+        DEFAULT_CONFIG,
+        NOW,
+    )
+
+    assert "mentions_competitor" not in flags
+    assert "competitor_sponsored" not in flags

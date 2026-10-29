@@ -45,6 +45,12 @@ class MatchingConfig:
     tier_bounds: tuple[int, int, int] = (10_000, 100_000, 500_000)
     target_followers_min: int = 10_000
     target_followers_max: int = 2_000_000
+    # Creator follower centre for each tier the brand analysis may pick. The
+    # LLM chooses only the label; code maps it to a follower count.
+    tier_target_nano: int = 10_000
+    tier_target_micro: int = 30_000
+    tier_target_mid: int = 150_000
+    tier_target_macro: int = 800_000
 
     # Hard filters.
     followers_min: int = 1_000
@@ -107,6 +113,10 @@ class MatchingConfig:
             "er_shrink_k",
             "target_followers_min",
             "target_followers_max",
+            "tier_target_nano",
+            "tier_target_micro",
+            "tier_target_mid",
+            "tier_target_macro",
             "followers_min",
             "followers_max",
             "active_days",
@@ -121,6 +131,18 @@ class MatchingConfig:
 
         if self.target_followers_min >= self.target_followers_max:
             raise ValueError("target_followers_min must be below target_followers_max")
+        targets = self._tier_targets()
+        if not (
+            self.target_followers_min
+            <= targets[0]
+            < targets[1]
+            < targets[2]
+            < targets[3]
+            <= self.target_followers_max
+        ):
+            raise ValueError(
+                "tier targets must ascend within the target follower bounds"
+            )
         if self.followers_min >= self.followers_max:
             raise ValueError("followers_min must be below followers_max")
 
@@ -139,6 +161,19 @@ class MatchingConfig:
             )
         ):
             raise ValueError("tier_bounds must be three ascending follower counts")
+
+    def _tier_targets(self) -> tuple[int, int, int, int]:
+        return (
+            self.tier_target_nano,
+            self.tier_target_micro,
+            self.tier_target_mid,
+            self.tier_target_macro,
+        )
+
+    def target_followers_for(self, tier_label: str) -> int:
+        """Follower centre for a tier label: nano, micro, mid, or macro."""
+        targets = dict(zip(("nano", "micro", "mid", "macro"), self._tier_targets()))
+        return targets[tier_label]
 
     @staticmethod
     def _require_unit_sum(name: str, values: tuple[float, ...]) -> None:

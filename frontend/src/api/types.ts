@@ -63,6 +63,8 @@ export interface BrandProfile {
   topic_keywords_th: string[]
   topic_keywords_en: string[]
   competitors: string[]
+  /** Stores that sell the brand. Absent on briefs stored before the field existed. */
+  retailers?: string[]
   brand_handles: string[]
   brand_names: string[]
   target_followers: number

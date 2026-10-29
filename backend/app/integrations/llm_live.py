@@ -607,6 +607,7 @@ _BRAND_LIST_FIELDS = (
     "topic_keywords_th",
     "topic_keywords_en",
     "competitors",
+    "retailers",
     "brand_handles",
 )
 
@@ -628,6 +629,9 @@ def _as_list(value: Any) -> Any:
 
 def _coerce_brand_lists(data: dict[str, Any]) -> dict[str, Any]:
     out = dict(data)
+    # The follower target comes from tier_label in code, never from the model,
+    # which tends to copy the brand page's own follower count.
+    out.pop("target_followers", None)
     for name in _BRAND_LIST_FIELDS:
         if name in out:
             out[name] = _as_list(out[name])

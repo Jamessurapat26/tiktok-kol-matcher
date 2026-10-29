@@ -106,3 +106,43 @@ def test_matching_config_defaults_are_valid():
 
     assert config.fit_w_sim + config.fit_w_on_topic + config.fit_w_judge == pytest.approx(1.0)
     assert config.quality_w_e + config.quality_w_t + config.quality_w_a == pytest.approx(1.0)
+
+
+def test_live_brief_ignores_a_model_follower_count_and_maps_the_tier():
+    # The model copied the brand page's own 806k followers as the target.
+    profile = _analyze(_brief(target_followers=806_000, tier_label="mid"))
+
+    assert profile.tier_label == "mid"
+    assert profile.target_followers == MatchingConfig().tier_target_mid
+
+
+@pytest.mark.parametrize(
+    ("tier_label", "expected"),
+    [("nano", 10_000), ("micro", 30_000), ("mid", 150_000), ("macro", 800_000)],
+)
+def test_missing_target_followers_comes_from_the_tier_label(tier_label, expected):
+    data = _brief(tier_label=tier_label)
+    del data["target_followers"]
+
+    assert BrandProfile.model_validate(data).target_followers == expected
+
+
+def test_matching_config_rejects_tier_targets_out_of_order():
+    with pytest.raises(ValueError, match="tier targets"):
+        MatchingConfig(tier_target_mid=20_000)
+
+
+def test_retailers_are_kept_apart_from_competitors():
+    profile = _analyze(
+        _brief(
+            competitors=["OtherLens", "ExampleMart"],
+            retailers="ExampleMart, ExamplePharmacy",
+        )
+    )
+
+    assert profile.competitors == ["OtherLens"]
+    assert profile.retailers == ["ExampleMart", "ExamplePharmacy"]
+
+
+def test_retailers_default_to_empty_for_older_briefs():
+    assert BrandProfile.model_validate(_brief()).retailers == []

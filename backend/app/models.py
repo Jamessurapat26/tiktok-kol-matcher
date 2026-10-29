@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -7,6 +7,7 @@ from pydantic import (
     Field,
     HttpUrl,
     field_validator,
+    model_validator,
 )
 
 from .matching_config import DEFAULT_CONFIG
@@ -87,10 +88,16 @@ class TargetAudience(DomainModel):
 class BrandProfile(DomainModel):
     """Structured brand brief returned by the brand-analysis LLM call.
 
-    ``brand_names`` has a default so fixtures written before that field
-    existed stay valid. Jobs stored before matching-v2 use a different shape;
-    ``api.store`` drops their old profile on load. ``target_followers`` is
-    boundary validated because the value comes from the model.
+    ``brand_names`` and ``retailers`` have defaults so fixtures and jobs
+    written before those fields existed stay valid. Jobs stored before
+    matching-v2 use a different shape; ``api.store`` drops their old profile
+    on load.
+
+    ``target_followers`` is derived from ``tier_label`` when it is missing, so
+    the creator target never comes from the brand's own follower count. The
+    live analyzer drops any model-supplied value before validation.
+    ``competitors`` are competing brands only; shops and chains that sell the
+    brand go in ``retailers`` and never feed the competitor rules.
     """
 
     category: str
@@ -103,10 +110,27 @@ class BrandProfile(DomainModel):
     competitors: list[str]
     brand_handles: list[str]
     brand_names: list[str] = Field(default_factory=list)
+    retailers: list[str] = Field(default_factory=list)
     target_followers: int
     tier_label: Literal["nano", "micro", "mid", "macro"]
     tier_confidence: float = Field(ge=0, le=1)
     tier_reason: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _target_from_tier(cls, data: Any) -> Any:
+        if (
+            isinstance(data, dict)
+            and data.get("target_followers") is None
+            and data.get("tier_label") in ("nano", "micro", "mid", "macro")
+        ):
+            return {
+                **data,
+                "target_followers": DEFAULT_CONFIG.target_followers_for(
+                    data["tier_label"]
+                ),
+            }
+        return data
 
     @field_validator("target_followers")
     @classmethod

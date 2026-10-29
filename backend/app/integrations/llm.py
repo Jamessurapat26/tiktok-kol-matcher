@@ -188,6 +188,7 @@ class MockBrandAnalyzer:
 
         return BrandProfile(
             category="gaming eyewear / blue-light glasses",
+            brand_names=["ExampleBrand"],
             products=[
                 "blue-light glasses",
                 "gaming glasses",

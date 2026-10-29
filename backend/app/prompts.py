@@ -7,6 +7,7 @@ the instructions say the JSON belongs in the answer itself.
 
 from __future__ import annotations
 
+from .brand_match import mentions_brand, normalize_for_match
 from .models import BrandProfile, FacebookPage, KolProfile
 
 _SOURCE_CHARS = 12_000
@@ -30,6 +31,9 @@ Use the sources in this order of trust:
 
 The object must contain exactly these keys:
 - category: short product category
+- brand_names: the brand's own proper names and common aliases or
+  abbreviations as written in social posts, in Latin and Thai script, at
+  most 8 items. Proper names only, never generic words like the category.
 - products: the brand's own core product lines or categories, at most 8 items.
   Each item is a short noun phrase of at most 4 words.
   Prefer the primary sources over posts.
@@ -87,6 +91,12 @@ who could promote the brand, so score the brand's own account, other shops, and
 competing brands low, however closely their products match. reason is one
 short sentence in Thai or English. Include every handle from the input exactly
 once. Copy each handle unchanged.
+
+Only say a creator posts about the brand when one of brand_names appears in
+their content or bio and mentions_brand is yes. A similar promotion, stamp, or
+coupon campaign from another store or brand is not about this brand; do not
+attribute it to the brand. When mentions_brand is no, score only niche and
+audience fit, at most 0.6, and do not claim brand content in the reason.
 """
 
 _RERANK_SIMILARITY_NOTE = """
@@ -146,12 +156,20 @@ def rerank_messages(
 ) -> list[dict[str, str]]:
     if similarities is not None and len(similarities) != len(kols):
         raise ValueError("similarities must have one score per creator")
+    aliases = [normalize_for_match(name) for name in brand.brand_names]
+    check_mentions = bool(brand.brand_names)
+
+    def card(kol: KolProfile, similarity: float | None = None) -> str:
+        mentions = mentions_brand(kol, aliases) if check_mentions else None
+        return _kol_card(kol, similarity, mentions=mentions)
+
     if similarities is None:
-        cards = "\n\n".join(_kol_card(kol) for kol in kols)
+        cards = "\n\n".join(card(kol) for kol in kols)
         system = RERANK_SYSTEM
     else:
         cards = "\n\n".join(
-            _kol_card(kol, similarity) for kol, similarity in zip(kols, similarities, strict=True)
+            card(kol, similarity)
+            for kol, similarity in zip(kols, similarities, strict=True)
         )
         system = RERANK_SYSTEM + _RERANK_SIMILARITY_NOTE
     user = (
@@ -171,6 +189,7 @@ def _brand_summary(brand: BrandProfile) -> str:
     return "\n".join(
         [
             f"category: {brand.category}",
+            f"brand_names: {', '.join(brand.brand_names)}",
             f"products: {', '.join(brand.products)}",
             f"tone: {brand.tone}",
             f"content_style: {brand.content_style}",
@@ -214,7 +233,12 @@ def _facebook_text(page: FacebookPage | None) -> str:
     return "\n".join(lines)
 
 
-def _kol_card(kol: KolProfile, similarity: float | None = None) -> str:
+def _kol_card(
+    kol: KolProfile,
+    similarity: float | None = None,
+    *,
+    mentions: bool | None = None,
+) -> str:
     if kol.median_engagement_rate is None:
         rate = "unknown"
     else:
@@ -229,6 +253,8 @@ def _kol_card(kol: KolProfile, similarity: float | None = None) -> str:
         f"bio: {_clip(kol.bio, _BIO_CHARS)}",
         f"content: {_clip(kol.content_summary, _SUMMARY_CHARS)}",
     ]
+    if mentions is not None:
+        lines.append(f"mentions_brand: {'yes' if mentions else 'no'}")
     if similarity is not None:
         lines.append(f"embedding_similarity: {similarity:.4f}")
     return "\n".join(lines)

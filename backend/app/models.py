@@ -130,9 +130,14 @@ class TargetAudience(DomainModel):
 
 
 class BrandProfile(DomainModel):
-    """OpenAI strict structured output: every field is required (no defaults)."""
+    """Structured brand profile.
+
+    ``brand_names`` has a default so stored profiles and fixtures written
+    before that field existed stay valid.
+    """
 
     category: str
+    brand_names: list[str] = Field(default_factory=list)
     products: list[str]
     target_audience: TargetAudience
     tone: str

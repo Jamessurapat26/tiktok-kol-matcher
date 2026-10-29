@@ -301,6 +301,49 @@ def test_live_kols_without_token_exits_2(monkeypatch, capsys):
     assert "APIFY_TOKEN" in captured.err
 
 
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    [
+        ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0.30", "must be at least 0.50"),
+        ("APIFY_JOB_BUDGET_USD", "not-a-number", "must be a positive number"),
+    ],
+)
+def test_live_kols_rejects_invalid_apify_limits(
+    monkeypatch, capsys, name, value, message
+):
+    monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
+    for variable in (
+        "APIFY_JOB_BUDGET_USD",
+        "APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD",
+        "APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD",
+        "APIFY_FACEBOOK_MAX_CHARGE_USD",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setenv(name, value)
+
+    def fail_build(*args, **kwargs):
+        raise AssertionError("graph should not run")
+
+    monkeypatch.setattr("app.cli.build_graph", fail_build)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--live-kols",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert name in captured.err
+    assert message in captured.err
+    assert "Traceback" not in captured.err
+    assert captured.out == ""
+
+
 def test_live_kols_rejects_non_positive_max_results(monkeypatch, capsys):
     monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
 
@@ -330,6 +373,15 @@ def test_live_kols_rejects_non_positive_max_results(monkeypatch, capsys):
 
 def test_live_kols_flag_wires_apify_without_running_it(monkeypatch, capsys):
     monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
+    for name in (
+        "TIKTOK_RESULTS_PER_QUERY",
+        "TIKTOK_PROFILE_VIDEOS",
+        "APIFY_ENRICH_RESERVE_USD",
+        "DISCOVERY_MIN_THAI_CANDIDATES",
+        "DISCOVERY_MAX_ROUNDS",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("TIKTOK_PROFILE_VIDEOS", "6")
     captured: dict = {}
 
     def spy(integrations=None, **kwargs):
@@ -369,11 +421,109 @@ def test_live_kols_flag_wires_apify_without_running_it(monkeypatch, capsys):
     assert isinstance(captured["integrations"].kol_search, ApifyKolSearch)
     assert isinstance(captured["integrations"].enricher, ApifyKolEnricher)
     assert captured["integrations"].kol_search.max_results == 4
-    assert captured["integrations"].enricher.max_videos == 4
+    assert captured["integrations"].enricher.max_videos == 6
     assert captured["kwargs"]["enrich_limit"] == 3
     assert "cli-test-token" not in captured_io.out
     assert "cli-test-token" not in captured_io.err
     assert json.loads(captured_io.out)["stage"] == "done"
+
+
+def test_search_size_defaults_to_env_and_enrichment_uses_its_own_env(
+    monkeypatch, capsys
+):
+    monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
+    monkeypatch.setenv("TIKTOK_RESULTS_PER_QUERY", "9")
+    monkeypatch.setenv("TIKTOK_PROFILE_VIDEOS", "4")
+    captured: dict = {}
+
+    def spy(integrations=None, **kwargs):
+        captured["integrations"] = integrations
+        captured["kwargs"] = kwargs
+
+        class _Graph:
+            def stream(self, *args, **kwargs):
+                return iter([("values", {"stage": "done", "results": [], "errors": []})])
+
+        return _Graph()
+
+    monkeypatch.setattr("app.cli.build_graph", spy)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--json",
+            "--live-kols",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured["integrations"].kol_search.max_results == 9
+    assert captured["integrations"].enricher.max_videos == 4
+    assert "cli-test-token" not in capsys.readouterr().out
+
+
+def test_discovery_env_sets_cli_defaults_and_flags_override(monkeypatch, capsys):
+    monkeypatch.setenv("DISCOVERY_MIN_THAI_CANDIDATES", "12")
+    monkeypatch.setenv("DISCOVERY_MAX_ROUNDS", "2")
+    captured: dict = {}
+
+    def spy(integrations=None, **kwargs):
+        captured["kwargs"] = kwargs
+
+        class _Graph:
+            def stream(self, *args, **kwargs):
+                return iter([("values", {"stage": "done", "results": [], "errors": []})])
+
+        return _Graph()
+
+    monkeypatch.setattr("app.cli.build_graph", spy)
+    base = ["match", "--website", _WEBSITE, "--facebook", _FACEBOOK, "--json"]
+
+    assert main(base) == 0
+    assert captured["kwargs"]["min_candidates"] == 12
+    assert captured["kwargs"]["max_search_rounds"] == 2
+
+    assert main([*base, "--min-candidates", "5", "--max-rounds", "1"]) == 0
+    assert captured["kwargs"]["min_candidates"] == 5
+    assert captured["kwargs"]["max_search_rounds"] == 1
+    capsys.readouterr()
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("DISCOVERY_MIN_THAI_CANDIDATES", "0"),
+        ("DISCOVERY_MIN_THAI_CANDIDATES", "nope"),
+        ("DISCOVERY_MAX_ROUNDS", "0"),
+        ("DISCOVERY_MAX_ROUNDS", "6"),
+        ("DISCOVERY_MAX_ROUNDS", "nope"),
+    ],
+)
+def test_invalid_discovery_env_exits_2(monkeypatch, capsys, name, value):
+    monkeypatch.setenv(name, value)
+
+    def fail_build(*args, **kwargs):
+        raise AssertionError("graph should not run")
+
+    monkeypatch.setattr("app.cli.build_graph", fail_build)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert name in captured.err
+    assert "Traceback" not in captured.err
+    assert captured.out == ""
 
 
 def test_max_enrich_must_be_positive(capsys):

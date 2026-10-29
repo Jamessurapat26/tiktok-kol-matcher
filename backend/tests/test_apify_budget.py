@@ -11,10 +11,14 @@ from app.integrations.apify import (
     ApifyBudget,
     ApifyBudgetExceeded,
     ApifyClient,
+    ApifyConfigError,
     ApifyError,
     ApifyLimits,
+    DiscoveryLimits,
+    estimate_default_job_usd,
     estimate_run_cost,
 )
+from app.integrations.kol_enricher_live import ApifyKolEnricher
 from app.integrations.kol_search_live import ApifyKolSearch
 from app.models import KolProfile, MatchRequest
 from app.nodes import make_nodes
@@ -27,6 +31,12 @@ _LIMIT_ENV = (
     "APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD",
     "APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD",
     "APIFY_FACEBOOK_MAX_CHARGE_USD",
+)
+_APIFY_ENV = (
+    *_LIMIT_ENV,
+    "TIKTOK_RESULTS_PER_QUERY",
+    "TIKTOK_PROFILE_VIDEOS",
+    "APIFY_ENRICH_RESERVE_USD",
 )
 
 
@@ -44,7 +54,7 @@ def _kol(handle: str, followers: int) -> KolProfile:
 
 
 def _clear_limit_env(monkeypatch) -> None:
-    for name in _LIMIT_ENV:
+    for name in _APIFY_ENV:
         monkeypatch.delenv(name, raising=False)
 
 
@@ -82,6 +92,55 @@ def test_budget_rejects_a_non_positive_limit():
         ApifyBudget(0)
 
 
+def test_budget_reserve_is_kept_for_enrichment():
+    budget = ApifyBudget(1.0)
+    budget.record(_SEARCH_ACTOR, 0.71)
+
+    with pytest.raises(ApifyBudgetExceeded, match="kept for enrichment"):
+        budget.check(_SEARCH_ACTOR, reserve_usd=0.3)
+
+    # Without the reserve, later stages may still spend what is left.
+    budget.check(_SEARCH_ACTOR)
+
+
+def test_budget_refuses_an_upcoming_run_that_would_cross_the_limit():
+    budget = ApifyBudget(1.0)
+    budget.record(_SEARCH_ACTOR, 0.5)
+
+    with pytest.raises(ApifyBudgetExceeded):
+        budget.check(_SEARCH_ACTOR, upcoming_usd=0.6)
+
+    assert budget.skipped == 1
+    assert budget.spent == pytest.approx(0.5)
+
+    # Landing exactly on the limit is allowed.
+    budget.check(_SEARCH_ACTOR, upcoming_usd=0.5)
+    assert budget.skipped == 1
+
+
+def test_budget_rejects_a_negative_upcoming_estimate():
+    budget = ApifyBudget(1.0)
+
+    with pytest.raises(ValueError, match="upcoming_usd"):
+        budget.check(_SEARCH_ACTOR, upcoming_usd=-0.01)
+
+    assert budget.skipped == 0
+
+
+def test_estimate_run_cost_uses_the_actor_rate_and_the_run_cap():
+    assert estimate_run_cost(_SEARCH_ACTOR, 2, 0.50) == pytest.approx(0.013)
+    assert estimate_run_cost("unknown/actor", 0, 0.50) == pytest.approx(0.015)
+    assert estimate_run_cost(_SEARCH_ACTOR, 1_000, 0.50) == 0.50
+
+
+def test_estimate_run_cost_scales_with_the_item_count():
+    fifteen = estimate_run_cost(_SEARCH_ACTOR, 15, 0.50)
+    twenty = estimate_run_cost(_SEARCH_ACTOR, 20, 0.50)
+
+    assert twenty - fifteen == pytest.approx(5 * 0.004)
+    assert twenty == pytest.approx(0.085)
+
+
 def test_budget_records_are_thread_safe():
     budget = ApifyBudget(100.0)
 
@@ -89,12 +148,6 @@ def test_budget_records_are_thread_safe():
         list(pool.map(lambda _: budget.record(_SEARCH_ACTOR, 0.001), range(1_000)))
 
     assert budget.spent == pytest.approx(1.0)
-
-
-def test_estimate_run_cost_uses_the_actor_rate_and_the_run_cap():
-    assert estimate_run_cost(_SEARCH_ACTOR, 2, 0.50) == pytest.approx(0.02)
-    assert estimate_run_cost("unknown/actor", 0, 0.50) == pytest.approx(0.02)
-    assert estimate_run_cost(_SEARCH_ACTOR, 1_000, 0.50) == 0.50
 
 
 def test_client_records_an_estimate_then_refuses_without_http():
@@ -117,12 +170,38 @@ def test_client_records_an_estimate_then_refuses_without_http():
     items = client.run_sync_get_items(_SEARCH_ACTOR, {}, max_items=2)
 
     assert len(items) == 2
-    assert budget.spent == pytest.approx(0.02)
-    assert budget.exhausted
+    assert budget.spent == pytest.approx(0.013)
+    assert budget.remaining == pytest.approx(0.007)
     with pytest.raises(ApifyBudgetExceeded):
         client.run_sync_get_items(_SEARCH_ACTOR, {}, max_items=2)
 
     assert calls["n"] == 1
+    assert budget.skipped == 1
+
+
+def test_client_does_not_start_a_run_whose_estimate_would_exceed_the_budget():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(201, json=[])
+
+    budget = ApifyBudget(0.02)
+    client = ApifyClient(
+        _TOKEN,
+        client=_client(handler),
+        budget=budget,
+        max_charge_usd=0.50,
+        max_retries=0,
+        backoff=0,
+    )
+
+    # A 15-item search is estimated at $0.065, more than the $0.02 left.
+    with pytest.raises(ApifyBudgetExceeded):
+        client.run_sync_get_items(_SEARCH_ACTOR, {}, max_items=15)
+
+    assert calls["n"] == 0
+    assert budget.spent == 0.0
     assert budget.skipped == 1
 
 
@@ -196,7 +275,20 @@ def test_limits_from_env_defaults(monkeypatch):
     assert limits.tiktok_search_max_charge_usd == pytest.approx(0.50)
     assert limits.tiktok_profile_max_charge_usd == pytest.approx(0.50)
     assert limits.facebook_max_charge_usd == pytest.approx(0.50)
+    assert limits.tiktok_results_per_query == 15
+    assert limits.tiktok_profile_videos == 10
+    assert limits.enrich_reserve_usd == pytest.approx(0.35)
     assert limits.budget().remaining == pytest.approx(1.00)
+
+
+def test_discovery_limits_from_env_defaults(monkeypatch):
+    monkeypatch.delenv("DISCOVERY_MIN_THAI_CANDIDATES", raising=False)
+    monkeypatch.delenv("DISCOVERY_MAX_ROUNDS", raising=False)
+
+    limits = DiscoveryLimits.from_env()
+
+    assert limits.min_thai_candidates == 30
+    assert limits.max_rounds == 3
 
 
 def test_limits_from_env_overrides(monkeypatch):
@@ -205,6 +297,9 @@ def test_limits_from_env_overrides(monkeypatch):
     monkeypatch.setenv("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0.6")
     monkeypatch.setenv("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", "0.7")
     monkeypatch.setenv("APIFY_FACEBOOK_MAX_CHARGE_USD", "0.8")
+    monkeypatch.setenv("TIKTOK_RESULTS_PER_QUERY", "37")
+    monkeypatch.setenv("TIKTOK_PROFILE_VIDEOS", "23")
+    monkeypatch.setenv("APIFY_ENRICH_RESERVE_USD", "0.4")
 
     limits = ApifyLimits.from_env()
 
@@ -212,6 +307,19 @@ def test_limits_from_env_overrides(monkeypatch):
     assert limits.tiktok_search_max_charge_usd == pytest.approx(0.6)
     assert limits.tiktok_profile_max_charge_usd == pytest.approx(0.7)
     assert limits.facebook_max_charge_usd == pytest.approx(0.8)
+    assert limits.tiktok_results_per_query == 37
+    assert limits.tiktok_profile_videos == 23
+    assert limits.enrich_reserve_usd == pytest.approx(0.4)
+
+
+def test_discovery_limits_from_env_overrides(monkeypatch):
+    monkeypatch.setenv("DISCOVERY_MIN_THAI_CANDIDATES", "12")
+    monkeypatch.setenv("DISCOVERY_MAX_ROUNDS", "2")
+
+    limits = DiscoveryLimits.from_env()
+
+    assert limits.min_thai_candidates == 12
+    assert limits.max_rounds == 2
 
 
 @pytest.mark.parametrize("name", _LIMIT_ENV)
@@ -220,7 +328,60 @@ def test_limits_from_env_rejects_invalid_values(monkeypatch, name, value):
     _clear_limit_env(monkeypatch)
     monkeypatch.setenv(name, value)
 
-    with pytest.raises(ValueError, match=name):
+    with pytest.raises(ApifyConfigError, match=name):
+        ApifyLimits.from_env()
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("TIKTOK_RESULTS_PER_QUERY", "0"),
+        ("TIKTOK_RESULTS_PER_QUERY", "51"),
+        ("TIKTOK_RESULTS_PER_QUERY", "not-a-number"),
+        ("TIKTOK_PROFILE_VIDEOS", "0"),
+        ("TIKTOK_PROFILE_VIDEOS", "31"),
+        ("TIKTOK_PROFILE_VIDEOS", "not-a-number"),
+        ("APIFY_ENRICH_RESERVE_USD", "-1"),
+        ("APIFY_ENRICH_RESERVE_USD", "not-a-number"),
+    ],
+)
+def test_limits_from_env_rejects_invalid_sizes_or_reserve(
+    monkeypatch, name, value
+):
+    _clear_limit_env(monkeypatch)
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ApifyConfigError, match=name):
+        ApifyLimits.from_env()
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("DISCOVERY_MIN_THAI_CANDIDATES", "0"),
+        ("DISCOVERY_MIN_THAI_CANDIDATES", "not-a-number"),
+        ("DISCOVERY_MAX_ROUNDS", "0"),
+        ("DISCOVERY_MAX_ROUNDS", "6"),
+        ("DISCOVERY_MAX_ROUNDS", "not-a-number"),
+    ],
+)
+def test_discovery_limits_from_env_rejects_invalid_values(
+    monkeypatch, name, value
+):
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ApifyConfigError, match=name):
+        DiscoveryLimits.from_env()
+
+
+def test_limits_from_env_rejects_a_reserve_that_is_not_below_the_budget(
+    monkeypatch,
+):
+    _clear_limit_env(monkeypatch)
+    monkeypatch.setenv("APIFY_JOB_BUDGET_USD", "0.25")
+    monkeypatch.setenv("APIFY_ENRICH_RESERVE_USD", "0.25")
+
+    with pytest.raises(ApifyConfigError, match="APIFY_ENRICH_RESERVE_USD"):
         ApifyLimits.from_env()
 
 
@@ -237,8 +398,59 @@ def test_limits_from_env_rejects_a_tiktok_cap_below_the_actor_minimum(
     _clear_limit_env(monkeypatch)
     monkeypatch.setenv(name, "0.49")
 
-    with pytest.raises(ValueError, match="must be at least 0.50"):
+    with pytest.raises(ApifyConfigError, match="must be at least 0.50"):
         ApifyLimits.from_env()
+
+
+def test_estimate_default_job_stays_within_budget_and_allows_eight_search_runs(
+    monkeypatch,
+):
+    _clear_limit_env(monkeypatch)
+    limits = ApifyLimits.from_env()
+
+    estimate = estimate_default_job_usd(limits)
+    search_run = estimate_run_cost(
+        _SEARCH_ACTOR,
+        limits.tiktok_results_per_query,
+        limits.tiktok_search_max_charge_usd,
+    )
+
+    assert estimate == pytest.approx(0.995)
+    assert estimate <= limits.job_budget_usd
+    empty = estimate_default_job_usd(limits, queries=0)
+    assert estimate == pytest.approx(empty + 8 * search_run)
+
+    # Eight search runs are allowed; a ninth would not fit next to the reserve.
+    facebook = estimate_run_cost(
+        "apify/facebook-pages-scraper", 1, limits.facebook_max_charge_usd
+    ) + estimate_run_cost(
+        "apify/facebook-posts-scraper", 20, limits.facebook_max_charge_usd
+    )
+    assert (
+        facebook + 8 * search_run + limits.enrich_reserve_usd
+        <= limits.job_budget_usd
+    )
+    assert (
+        facebook + 9 * search_run + limits.enrich_reserve_usd
+        > limits.job_budget_usd
+    )
+    eight = estimate_default_job_usd(limits, queries=8)
+    nine = estimate_default_job_usd(limits, queries=9)
+    assert eight == pytest.approx(estimate)
+    assert nine == pytest.approx(eight)
+
+
+def test_default_reserve_covers_ten_profile_runs(monkeypatch):
+    _clear_limit_env(monkeypatch)
+    limits = ApifyLimits.from_env()
+
+    profile_run = estimate_run_cost(
+        "clockworks/tiktok-profile-scraper",
+        limits.tiktok_profile_videos,
+        limits.tiktok_profile_max_charge_usd,
+    )
+
+    assert limits.enrich_reserve_usd >= 10 * profile_run
 
 
 def test_search_stops_after_the_budget_and_keeps_found_creators():
@@ -258,7 +470,7 @@ def test_search_stops_after_the_budget_and_keeps_found_creators():
         max_charge_usd=0.50,
         max_retries=0,
         backoff=0,
-        budget=ApifyBudget(0.01),
+        budget=ApifyBudget(0.025),
     )
 
     rows = search.search(["one", "two", "three"], round=1)
@@ -271,6 +483,67 @@ def test_search_stops_after_the_budget_and_keeps_found_creators():
     assert [row["handle"] for row in creators] == ["found_creator"]
     assert len(budget_rows) == 1
     assert "skipped 2 queries" in budget_rows[0]["error"]
+
+
+def test_search_reserve_leaves_room_for_enrichment(tmp_path):
+    calls = {"search": 0, "profile": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "profile-scraper" in request.url.path:
+            calls["profile"] += 1
+            return httpx.Response(
+                201,
+                json=[
+                    {
+                        "text": "latest post",
+                        "diggCount": 20,
+                        "commentCount": 0,
+                        "shareCount": 0,
+                        "playCount": 200,
+                    }
+                ],
+            )
+        calls["search"] += 1
+        return httpx.Response(
+            201,
+            json=[{"authorMeta": {"name": "found_creator", "fans": 1200}}],
+        )
+
+    budget = ApifyBudget(0.309)
+    search = ApifyKolSearch(
+        token=_TOKEN,
+        client=_client(handler),
+        max_results=1,
+        max_charge_usd=0.50,
+        max_retries=0,
+        backoff=0,
+        budget=budget,
+        reserve_usd=0.30,
+    )
+
+    rows = search.search(["one", "two", "three"], round=1)
+
+    assert calls["search"] == 1
+    assert len(
+        [row for row in rows if row.get("errorCode") == "APIFY_BUDGET_EXCEEDED"]
+    ) == 1
+
+    enricher = ApifyKolEnricher(
+        token=_TOKEN,
+        client=_client(handler),
+        max_videos=1,
+        max_charge_usd=0.50,
+        max_retries=0,
+        backoff=0,
+        budget=budget,
+        cache_dir=tmp_path,
+        clock=lambda: 1_000.0,
+    )
+    update = enricher.enrich(_kol("found_creator", 1200))
+
+    assert calls["profile"] == 1
+    assert update["median_engagement_rate"] == pytest.approx(0.1)
+    assert budget.spent == pytest.approx(0.009 + 0.008)
 
 
 class _BudgetEnricher:
@@ -327,12 +600,19 @@ def test_build_integrations_shares_one_budget_across_live_apify_services(
     monkeypatch.setenv("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0.6")
     monkeypatch.setenv("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", "0.7")
     monkeypatch.setenv("APIFY_FACEBOOK_MAX_CHARGE_USD", "0.8")
+    monkeypatch.setenv("TIKTOK_RESULTS_PER_QUERY", "7")
+    monkeypatch.setenv("TIKTOK_PROFILE_VIDEOS", "6")
+    monkeypatch.setenv("APIFY_ENRICH_RESERVE_USD", "0.4")
 
     bundle = build_integrations(
         live_kols=True,
         live_fb=True,
         apify_token=_TOKEN,
         max_results_per_query=3,
+    )
+    from_env = build_integrations(
+        live_kols=True,
+        apify_token=_TOKEN,
     )
 
     search_budget = bundle.kol_search._apify._budget
@@ -346,7 +626,16 @@ def test_build_integrations_shares_one_budget_across_live_apify_services(
     assert bundle.kol_search._apify._max_charge_usd == pytest.approx(0.6)
     assert bundle.enricher._apify._max_charge_usd == pytest.approx(0.7)
     assert bundle.facebook._apify._max_charge_usd == pytest.approx(0.8)
+    # The CLI flag overrides search only; enrichment always uses its env value.
+    assert bundle.kol_search.max_results == 3
+    assert bundle.enricher.max_videos == 6
+    assert bundle.kol_search._apify._reserve_usd == pytest.approx(0.4)
+    assert bundle.enricher._apify._reserve_usd == 0.0
+    assert bundle.facebook._apify._reserve_usd == 0.0
+    assert from_env.kol_search.max_results == 7
+    assert from_env.enricher.max_videos == 6
 
-    bundle.kol_search._apify._client.close()
-    bundle.enricher._apify._client.close()
+    for service in (bundle, from_env):
+        service.kol_search._apify._client.close()
+        service.enricher._apify._client.close()
     bundle.facebook._apify._client.close()

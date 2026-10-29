@@ -5,7 +5,10 @@ from pathlib import Path
 from app.graph import build_graph, initial_state
 from app.integrations import mock_integrations
 from app.integrations.kol_enricher import MockKolEnricher
-from app.models import KolProfile, MatchRequest
+from app.integrations.llm import MockBrandAnalyzer
+from app.models import KolProfile, MatchRequest, ScoreBreakdown
+from app.nodes import make_nodes
+from app.state import MatchState
 
 _KOL_FIXTURE = Path(__file__).resolve().parents[1] / "app" / "fixtures" / "kols.json"
 
@@ -77,8 +80,8 @@ def test_loop_stops_at_max_rounds_even_with_too_few_candidates():
 
     names, final = run_stream(graph, make_request())
 
-    assert final["search_rounds"] == 2
-    assert names.count("generate_queries") == 2
+    assert final["search_rounds"] == 3
+    assert names.count("generate_queries") == 3
     assert final["stage"] == "done"
 
     queries = final["search_queries"]
@@ -92,6 +95,63 @@ def test_loop_stops_early_when_enough_candidates():
     final = build_graph(min_candidates=5).invoke(initial_state(make_request()))
 
     assert final["search_rounds"] == 1
+    assert final["stage"] == "done"
+
+
+def non_thai_fixture(handle: str, group: int) -> dict:
+    return make_fixture(
+        handle,
+        group,
+        text_language="en",
+        location_created="US",
+        bio="English gaming creator.",
+    )
+
+
+def test_discovery_keeps_searching_while_thai_creators_are_short():
+    # Round 1 is mostly non-Thai: 5 Thai out of 40 must not stop discovery.
+    fixtures = [make_fixture(f"thai-1-{index}", 1) for index in range(5)]
+    fixtures += [non_thai_fixture(f"foreign-1-{index}", 1) for index in range(35)]
+    fixtures += [make_fixture(f"thai-2-{index}", 2) for index in range(30)]
+
+    graph = build_graph(mock_integrations(kol_fixtures=fixtures), min_candidates=30)
+    names, final = run_stream(graph, make_request())
+
+    assert final["search_rounds"] == 2
+    assert names.count("generate_queries") == 2
+    assert len(final["candidates"]) >= 30
+    assert final["stage"] == "done"
+
+
+def test_discovery_stops_after_one_round_when_thai_target_is_met():
+    fixtures = [make_fixture(f"thai-{index}", 1) for index in range(30)]
+
+    graph = build_graph(mock_integrations(kol_fixtures=fixtures), min_candidates=30)
+    names, final = run_stream(graph, make_request())
+
+    assert final["search_rounds"] == 1
+    assert names.count("generate_queries") == 1
+    assert final["stage"] == "done"
+
+
+def test_discovery_never_exceeds_max_search_rounds():
+    fixtures = [make_fixture(f"thai-1-{index}", 1) for index in range(5)]
+    fixtures += [non_thai_fixture(f"foreign-1-{index}", 1) for index in range(35)]
+    fixtures += [
+        non_thai_fixture(f"foreign-{group}-{index}", group)
+        for group in (2, 3)
+        for index in range(10)
+    ]
+
+    graph = build_graph(
+        mock_integrations(kol_fixtures=fixtures),
+        min_candidates=30,
+        max_search_rounds=3,
+    )
+    names, final = run_stream(graph, make_request())
+
+    assert final["search_rounds"] == 3
+    assert names.count("generate_queries") == 3
     assert final["stage"] == "done"
 
 
@@ -216,9 +276,11 @@ def test_search_failure_after_a_successful_round_is_a_warning():
     base = mock_integrations()
     search = FailSecondRound(base.kol_search)
     integrations = replace(base, kol_search=search)
-    final = build_graph(integrations, min_candidates=30).invoke(
-        initial_state(make_request())
-    )
+    final = build_graph(
+        integrations,
+        min_candidates=30,
+        max_search_rounds=2,
+    ).invoke(initial_state(make_request()))
 
     assert search.calls == 2
     assert final["stage"] == "done"
@@ -255,9 +317,11 @@ def test_discover_searches_only_the_latest_round_queries():
     base = mock_integrations()
     search = RecordingSearch(base.kol_search)
     integrations = replace(base, kol_search=search)
-    final = build_graph(integrations, min_candidates=30).invoke(
-        initial_state(make_request())
-    )
+    final = build_graph(
+        integrations,
+        min_candidates=30,
+        max_search_rounds=2,
+    ).invoke(initial_state(make_request()))
 
     assert [round_no for round_no, _ in search.calls] == [1, 2]
     round_1 = search.calls[0][1]
@@ -437,3 +501,105 @@ def test_enrich_limit_default_enriches_everyone():
     integrations = replace(mock_integrations(), enricher=enricher)
     final = build_graph(integrations).invoke(initial_state(make_request()))
     assert len(enricher.calls) == len(final["candidates"])
+
+
+def test_analyze_brand_merges_url_aliases_after_model_names():
+    class _NamedAnalyzer(MockBrandAnalyzer):
+        def analyze_brand(self, website_content, facebook_page):
+            profile = super().analyze_brand(website_content, facebook_page)
+            return profile.model_copy(
+                update={"brand_names": ["ExampleBrand", "EB-24"]}
+            )
+
+    integrations = replace(mock_integrations(), llm=_NamedAnalyzer())
+    nodes = make_nodes(integrations, min_candidates=1, max_search_rounds=1)
+    request = MatchRequest(
+        website_url="https://www.example-brand.co.th",
+        facebook_url="https://www.facebook.com/ExampleBrandThailand",
+    )
+
+    update = nodes["analyze_brand"](
+        MatchState(request=request, website_content="site text")
+    )
+
+    assert update["brand_profile"].brand_names == [
+        "ExampleBrand",
+        "EB-24",
+        "ExampleBrandThailand",
+    ]
+
+
+def test_llm_rerank_caps_relevance_when_the_brand_is_not_named():
+    othermart_caption = (
+        "พามาล่าแสตมป์ 🎁 แลกของที่ OtherMart กันครับทุกคน!! "
+        "ช่วงนี้เค้ามีกิจกรรมสะสม E-Stamp แลกของได้เยอะมากกก "
+        "#OtherMart #ขุมทรัพย์นักช้อป2569"
+    )
+
+    class _HighRelevanceAnalyzer(MockBrandAnalyzer):
+        def rerank(self, brand, kols, *, similarities=None):
+            scores = ScoreBreakdown(
+                relevance=0.95,
+                engagement=0.5,
+                audience_fit=1.0,
+                tier_fit=1.0,
+                audience_confidence="high",
+            )
+            return [(kol, scores, "Strong fit.") for kol in kols]
+
+    brand = MockBrandAnalyzer().analyze_brand("website", None).model_copy(
+        update={"brand_names": ["ExampleBrand", "EB-24", "เอ็กแซมเปิล"]}
+    )
+    request = MatchRequest(
+        website_url="https://www.example-brand.co.th",
+        facebook_url="https://www.facebook.com/ExampleBrandThailand",
+        top_k=2,
+    )
+    other = KolProfile(
+        handle="OtherMartCreator",
+        url="https://www.tiktok.com/@OtherMartCreator",
+        nickname="นักช้อป",
+        followers=50_000,
+        language="th",
+        region="TH",
+        median_engagement_rate=0.05,
+        content_summary=othermart_caption,
+        source="seed",
+    )
+    example = KolProfile(
+        handle="ExampleCreator",
+        url="https://www.tiktok.com/@ExampleCreator",
+        nickname="นักรีวิว",
+        followers=50_000,
+        language="th",
+        region="TH",
+        median_engagement_rate=0.05,
+        content_summary="โปร ExampleBrand ข้าว+น้ำ 69.- #รีวิวของกิน",
+        source="seed",
+    )
+    state = MatchState(
+        request=request,
+        brand_profile=brand,
+        shortlisted=[other, example],
+        stage="embedding_prefilter",
+    )
+
+    update = make_nodes(
+        replace(mock_integrations(), llm=_HighRelevanceAnalyzer()),
+        min_candidates=1,
+        max_search_rounds=1,
+    )["llm_rerank"](state)
+
+    ranked = update["ranked"]
+    by_handle = {item.kol.handle: item for item in ranked}
+    capped = by_handle["OtherMartCreator"]
+    named = by_handle["ExampleCreator"]
+
+    assert capped.scores.relevance == 0.6
+    assert capped.total_score == request.weights.apply(capped.scores)
+    assert capped.reason.endswith("Brand not named in sampled posts.")
+    assert named.scores.relevance == 0.95
+    assert [item.kol.handle for item in ranked] == [
+        "ExampleCreator",
+        "OtherMartCreator",
+    ]

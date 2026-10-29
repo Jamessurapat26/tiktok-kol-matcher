@@ -13,7 +13,7 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from ..integrations import Integrations, build_integrations
-from ..integrations.apify import ApifyConfigError
+from ..integrations.apify import ApifyConfigError, DiscoveryLimits
 from ..integrations.embeddings import EmbedConfigError
 from ..integrations.llm_live import LlmConfigError
 from ..integrations.web_reader_live import is_public_address
@@ -152,6 +152,7 @@ def create_app(
             top_k=body.top_k,
         )
         try:
+            discovery_limits = DiscoveryLimits.from_env()
             flags = settings.resolve_flags(body.model_dump(include=set(LiveFlags.model_fields)))
             integrations = make_integrations(flags)
         except (FlagUnavailable, ApifyConfigError, LlmConfigError, EmbedConfigError) as exc:
@@ -171,7 +172,13 @@ def create_app(
 
         def work() -> None:
             try:
-                run_job(store, job.id, integrations, enrich_limit=enrich_limit)
+                run_job(
+                    store,
+                    job.id,
+                    integrations,
+                    enrich_limit=enrich_limit,
+                    discovery_limits=discovery_limits,
+                )
             finally:
                 slots.release()
 

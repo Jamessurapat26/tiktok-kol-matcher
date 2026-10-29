@@ -14,6 +14,7 @@ from app.api.settings import LiveFlags, Settings
 from app.api.store import JobStore
 from app.graph import _NODE_ORDER
 from app.integrations import mock_integrations
+from app.integrations.apify import ApifyClient
 from app.integrations.web_reader import MockWebReader
 from app.models import MatchRequest
 
@@ -31,6 +32,15 @@ _ENV_VARS = (
     "EMBED_MODEL",
     "JOB_WORKERS",
     "MAX_QUEUED_JOBS",
+    "APIFY_JOB_BUDGET_USD",
+    "APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD",
+    "APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD",
+    "APIFY_FACEBOOK_MAX_CHARGE_USD",
+    "TIKTOK_RESULTS_PER_QUERY",
+    "TIKTOK_PROFILE_VIDEOS",
+    "APIFY_ENRICH_RESERVE_USD",
+    "DISCOVERY_MIN_THAI_CANDIDATES",
+    "DISCOVERY_MAX_ROUNDS",
 )
 _BODY = {
     "website_url": "https://example-brand.co.th",
@@ -244,6 +254,86 @@ def test_live_mode_rejects_flag_without_credential(make_client, monkeypatch):
     assert "APIFY_TOKEN" in kols.json()["detail"]
     assert llm.status_code == 400
     assert "LLM_API_KEY" in llm.json()["detail"]
+    assert listed == []
+
+
+def _live_app_without_factory(tmp_path, submitted):
+    # No integrations_factory, so live jobs build the real bundle and read the
+    # Apify limit variables.
+    return create_app(
+        Settings(jobs_db=tmp_path / "jobs.db"),
+        submit=lambda work: submitted.append(work),
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0.30"),
+        ("APIFY_JOB_BUDGET_USD", "not-a-number"),
+    ],
+)
+def test_live_mode_rejects_invalid_apify_limits(tmp_path, monkeypatch, name, value):
+    monkeypatch.setenv("APIFY_TOKEN", "dummy-token")
+    monkeypatch.setenv(name, value)
+    submitted = []
+
+    def fail_run(*args, **kwargs):
+        raise AssertionError("Apify should not be called")
+
+    monkeypatch.setattr(ApifyClient, "run_sync_get_items", fail_run)
+    with TestClient(_live_app_without_factory(tmp_path, submitted)) as client:
+        response = client.post("/api/jobs", json=_BODY)
+        listed = client.get("/api/jobs").json()
+
+    assert response.status_code == 400
+    assert name in response.json()["detail"]
+    assert listed == []
+    assert submitted == []
+
+
+def test_runner_passes_discovery_env_to_the_graph(make_client, monkeypatch):
+    monkeypatch.setenv("DISCOVERY_MIN_THAI_CANDIDATES", "12")
+    monkeypatch.setenv("DISCOVERY_MAX_ROUNDS", "2")
+    captured: dict = {}
+
+    def fake_build(integrations, **kwargs):
+        captured["integrations"] = integrations
+        captured["kwargs"] = kwargs
+
+        class _Graph:
+            def stream(self, *args, **kwargs):
+                return iter([("values", {"stage": "done", "results": [], "errors": []})])
+
+        return _Graph()
+
+    monkeypatch.setattr("app.api.runner.build_graph", fake_build)
+    with make_client() as client:
+        job_id = client.post("/api/jobs", json=_BODY).json()["job_id"]
+        job = client.get(f"/api/jobs/{job_id}").json()
+
+    assert job["status"] == "succeeded"
+    assert captured["kwargs"]["min_candidates"] == 12
+    assert captured["kwargs"]["max_search_rounds"] == 2
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("DISCOVERY_MIN_THAI_CANDIDATES", "0"),
+        ("DISCOVERY_MAX_ROUNDS", "0"),
+        ("DISCOVERY_MAX_ROUNDS", "6"),
+        ("DISCOVERY_MAX_ROUNDS", "nope"),
+    ],
+)
+def test_invalid_discovery_env_is_400(make_client, monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    with make_client() as client:
+        response = client.post("/api/jobs", json=_BODY)
+        listed = client.get("/api/jobs").json()
+
+    assert response.status_code == 400
+    assert name in response.json()["detail"]
     assert listed == []
 
 

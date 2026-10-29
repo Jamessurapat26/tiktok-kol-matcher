@@ -16,7 +16,7 @@ from .graph import (
     initial_state,
 )
 from .integrations import build_integrations
-from .integrations.apify import ApifyConfigError
+from .integrations.apify import ApifyConfigError, DiscoveryLimits
 from .integrations.embeddings import EmbedConfigError
 from .integrations.llm_live import LlmConfigError, llm_api_key_from_env
 from .models import MatchRequest, RankedKol
@@ -58,14 +58,20 @@ def _build_parser() -> argparse.ArgumentParser:
     match.add_argument(
         "--min-candidates",
         type=int,
-        default=MIN_CANDIDATES,
-        help=f"discovery target before filtering (default: {MIN_CANDIDATES})",
+        default=None,
+        help=(
+            "discovery target of Thai creators "
+            f"(default: DISCOVERY_MIN_THAI_CANDIDATES or {MIN_CANDIDATES})"
+        ),
     )
     match.add_argument(
         "--max-rounds",
         type=int,
-        default=MAX_SEARCH_ROUNDS,
-        help=f"maximum discovery rounds (default: {MAX_SEARCH_ROUNDS})",
+        default=None,
+        help=(
+            "maximum discovery rounds "
+            f"(default: DISCOVERY_MAX_ROUNDS or {MAX_SEARCH_ROUNDS})"
+        ),
     )
     match.add_argument(
         "--live-web",
@@ -95,10 +101,11 @@ def _build_parser() -> argparse.ArgumentParser:
     match.add_argument(
         "--max-results-per-query",
         type=int,
-        default=10,
+        default=None,
         help=(
-            "Apify videos per search query and per profile enrichment "
-            "(default: 10)"
+            "Apify videos per search query; overrides TIKTOK_RESULTS_PER_QUERY "
+            "for search only (default: TIKTOK_RESULTS_PER_QUERY or 15). "
+            "Profile enrichment always uses TIKTOK_PROFILE_VIDEOS (default: 10)"
         ),
     )
     match.add_argument(
@@ -336,10 +343,28 @@ def _resolve_prefilter_limit(args: argparse.Namespace) -> int:
 
 
 def _cmd_match(args: argparse.Namespace) -> int:
-    if args.max_rounds < 0:
+    try:
+        discovery = DiscoveryLimits.from_env()
+    except ApifyConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    min_candidates = (
+        args.min_candidates
+        if args.min_candidates is not None
+        else discovery.min_thai_candidates
+    )
+    max_rounds = (
+        args.max_rounds
+        if args.max_rounds is not None
+        else discovery.max_rounds
+    )
+    if max_rounds < 0:
         print("error: --max-rounds must be zero or greater", file=sys.stderr)
         return 2
-    if args.max_results_per_query < 1:
+    if (
+        args.max_results_per_query is not None
+        and args.max_results_per_query < 1
+    ):
         print(
             "error: --max-results-per-query must be at least 1",
             file=sys.stderr,
@@ -392,8 +417,8 @@ def _cmd_match(args: argparse.Namespace) -> int:
         return 2
 
     graph_kwargs: dict[str, Any] = {
-        "min_candidates": args.min_candidates,
-        "max_search_rounds": args.max_rounds,
+        "min_candidates": min_candidates,
+        "max_search_rounds": max_rounds,
         "prefilter_n": prefilter_limit,
     }
     if args.live_kols:

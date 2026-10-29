@@ -16,6 +16,8 @@ from .models import BrandProfile
 MAX_PRODUCTS = 8
 MAX_PRODUCT_WORDS = 4
 MAX_PRODUCT_CHARS = 60
+MAX_BRAND_NAMES = 8
+MAX_BRAND_NAME_CHARS = 40
 MAX_KEYWORDS = 12
 MAX_KEYWORD_WORDS = 3
 MAX_KEYWORD_CHARS = 40
@@ -53,6 +55,13 @@ def tidy_brand_profile(profile: BrandProfile) -> BrandProfile:
                 limit=MAX_PRODUCTS,
                 max_words=MAX_PRODUCT_WORDS,
                 max_chars=MAX_PRODUCT_CHARS,
+            ),
+            "brand_names": _filter_items(
+                profile.brand_names,
+                limit=MAX_BRAND_NAMES,
+                max_words=None,
+                max_chars=MAX_BRAND_NAME_CHARS,
+                transform=None,
             ),
             "target_audience": tidy_audience,
             "keywords_th": _tidy_list(

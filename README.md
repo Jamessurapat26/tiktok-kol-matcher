@@ -1,780 +1,399 @@
 # TikTok KOL Matcher
 
-A LangGraph pipeline that turns a brand's website and Facebook page into a ranked
-shortlist of Thai TikTok creators. It runs as a CLI, or as an HTTP service with
-a web frontend.
+Give it a brand's website and Facebook page, and it returns a ranked, explained
+shortlist of Thai TikTok creators who fit the brand.
 
-Given a brand website and Facebook page, it scrapes the sources, builds a
-structured brand profile, generates TikTok search queries, discovers creators,
-keeps Thai creators, enriches their profiles, and scores the shortlist on:
+![Ranked results from a live run](docs/screenshots/live-results.png)
 
-| Signal | Weight |
+KOL Matcher is a LangGraph pipeline behind a FastAPI service and a React web
+app. It reads the brand's own pages, has an LLM build a structured brand
+profile, searches TikTok for creators, keeps the Thai ones, and scores each
+creator on four signals:
+
+| Signal | Weight | How it is scored |
+| --- | --- | --- |
+| Relevance | 40% | LLM rerank of each creator against the brand profile, with the embedding cosine as a hint |
+| Engagement | 25% | Median `(likes + comments + shares) / views` over recent videos |
+| Audience fit | 20% | Thai language and Thailand region signals |
+| Follower tier | 15% | nano, micro, macro, or mega against the tiers the brand profile prefers |
+
+Every result shows its component scores, the weighted total, and a one-line
+reason. The whole pipeline also runs offline in demo mode, with no keys.
+
+## Contents
+
+- [Screenshots](#screenshots)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Design decisions and trade-offs](#design-decisions-and-trade-offs)
+- [Known limitations](#known-limitations)
+- [Testing](#testing)
+- [Next steps](#next-steps)
+- [Repo layout](#repo-layout)
+- [Reference: HTTP API and live integrations](docs/reference.md)
+
+## Screenshots
+
+These come from one live run with every integration on (website, Facebook,
+TikTok search, LLM, and embeddings). The brand URL is only sample input. The
+run took about three minutes for a top 10.
+
+| Brand form | Live progress |
 | --- | --- |
-| Relevance to the brand | 40% |
-| Engagement | 25% |
-| Audience fit | 20% |
-| Follower tier | 15% |
+| ![Brand form with the live toggles](docs/screenshots/live-form.png) | ![Stepper mid-run, with the brand profile already shown](docs/screenshots/live-progress.png) |
 
-Each result includes the component scores, a total score, and a short reason for
-the match.
+The brand profile appears as soon as `analyze_brand` finishes, while discovery
+is still running. Each step shows its duration and a short summary such as
+`queries+6` or `candidates=12`.
 
-## Architecture
+| Score breakdown | Mobile |
+| --- | --- |
+| ![Expanded row with the component scores](docs/screenshots/live-score-breakdown.png) | <img src="docs/screenshots/live-mobile.png" alt="Results on a phone-width screen" width="220"> |
 
-### Pipeline
+Demo mode runs the same UI on fixtures. The history sheet reopens earlier jobs,
+and the job id stays in the URL as `?job=`, so a reload or a shared link opens
+the same job.
 
-The graph in `backend/app/graph.py` runs these nodes:
+| Demo results | History |
+| --- | --- |
+| ![Demo-mode results on fixture data](docs/screenshots/demo-results.png) | ![History sheet with recent jobs](docs/screenshots/demo-history.png) |
 
-```mermaid
-flowchart TD
-    START([MatchRequest]) --> W[scrape_website]
-    START --> F[scrape_facebook]
-    W --> A[analyze_brand]
-    F --> A
-    A --> G[generate_queries]
-    G --> D[discover_kols]
-    D -->|"under 30 discovered KOLs before the Thai filter, and under 2 rounds"| G
-    D -->|"enough discovered KOLs or 2 rounds"| T[filter_thai]
-    T --> E[enrich_kols]
-    E --> P[embed_and_prefilter]
-    P --> R[llm_rerank]
-    R --> O[rank_and_output]
-    O --> OUT([Top-k ranked shortlist])
-```
+## Quick start
 
-The website and Facebook scrapers run in parallel, and `analyze_brand` waits
-for both. Discovery loops back to query generation until it has at least 30
-KOLs or reaches the 2-round cap. The 30-KOL target counts discovered (deduped)
-KOLs before the Thai filter, so `filter_thai` runs after the target is met and
-can shrink the list. A fatal node failure sets `stage` to `failed` and ends the
-graph. A scraper failure is only a warning.
-
-### HTTP service
-
-```mermaid
-flowchart LR
-    C[Client] -->|"POST /api/jobs"| API[FastAPI app]
-    API -->|"insert job (queued)"| DB[("SQLite data/jobs.db: jobs, events")]
-    API -->|"start"| RUN[Runner thread]
-    RUN -->|"graph.stream"| G[LangGraph pipeline]
-    RUN -->|"status, stage, node events, results"| DB
-    C -->|"GET /api/jobs/{id}/events"| API
-    API -->|"poll events after cursor"| DB
-    API -->|"SSE"| C
-```
-
-`POST /api/jobs` stores the job as `queued`, starts a daemon thread, and
-returns the job id. The thread moves the job to `running`, streams the graph,
-and writes a `started` and a `finished` or `failed` event for every node. It
-ends the job as `succeeded` or `failed` and writes a final `done` or `failed`
-event. The SSE endpoint polls SQLite for events after the client's cursor, so a
-replay and a live stream use the same code. On startup, jobs that a previous
-process left `queued` or `running` are marked `failed` with
-"interrupted by restart".
-
-## Current status
-
-Every external service in `backend/app/integrations/` has a `Protocol` and a
-`Mock` implementation, so the whole pipeline runs offline and produces stable
-output. Five pieces can run live:
-
-| CLI flag | API flag | What runs live | Needs |
-| --- | --- | --- | --- |
-| `--live-web` | `live_web` | Brand website reading | nothing (`JINA_API_KEY` optional) |
-| `--live-fb` | `live_fb` | Facebook page and recent posts | `APIFY_TOKEN` |
-| `--live-kols` | `live_kols` | TikTok creator search and enrichment | `APIFY_TOKEN` |
-| `--live-llm` | `live_llm` | Brand analysis, query generation, rerank | `LLM_API_KEY`, `NVIDIA_API_KEY`, or `OPENAI_API_KEY` |
-| `--live-embed` | `live_embed` | Embeddings and the cosine prefilter | the `embed` extra (`uv sync --extra embed`) |
-
-[Live integrations](#live-integrations) describes each one.
-
-## Tech stack
-
-- Python 3.13
-- [uv](https://docs.astral.sh/uv/) for dependency management
-- [LangGraph](https://langchain-ai.github.io/langgraph/) for orchestration
-- Pydantic for domain models and structured outputs, pydantic-settings for
-  service configuration
-- FastAPI for the HTTP API, with SQLite job storage and server-sent events
-- Frontend: Vite, React, TypeScript, Tailwind CSS, shadcn/ui, and TanStack
-  Query, built with pnpm and served by nginx in Docker
-
-## How to run
-
-Install the dependencies first:
+### Docker Compose
 
 ```bash
-cd backend
-uv sync
+cp .env.example .env   # optional: add keys for live mode
+docker compose up --build
 ```
+
+Open http://localhost:5173. With no `.env`, or no `APIFY_TOKEN` in it, the
+service starts in demo mode. Press **Try demo** to fill the form with the
+example brand.
+
+Both services bind to `127.0.0.1` only (frontend on 5173, API on 8000), because
+the API has no authentication. nginx serves the built app, proxies `/api` to
+the backend, and turns off buffering on the event stream. Jobs and caches live
+in the `backend-data` volume. The backend runs as a non-root user with a health
+check on `/api/health`.
+
+The image skips the local embedding model by default. To include it (this pulls
+the CPU build of torch):
+
+```bash
+docker build --build-arg INSTALL_EMBED=true -t tkm-backend backend
+```
+
+### Local development
+
+You need Python 3.13 with [uv](https://docs.astral.sh/uv/), and Node 24 with
+pnpm 11.
+
+```bash
+# terminal 1: API in demo mode on :8000
+cd backend
+uv sync                  # add --extra embed for the local embedding model
+DEMO_MODE=1 uv run uvicorn app.api.main:app --port 8000
+
+# terminal 2: Vite dev server on :5173, proxies /api to :8000
+cd frontend
+pnpm install
+pnpm dev
+```
+
+The API reads its settings from the environment at startup. It does not load
+`.env` itself, so export the variables or use Compose. Run it from `backend/`
+so `data/jobs.db` lands there, or set `JOBS_DB`.
 
 ### CLI
 
-The CLI runs one match in the foreground. With no `--live-*` flag every service
-is mocked and nothing touches the network:
+The same graph runs in the foreground from the CLI. With no `--live-*` flag,
+every service is mocked and nothing touches the network:
 
 ```bash
+cd backend
 uv run python -m app.cli match \
   --website https://example-brand.co.th \
   --facebook https://www.facebook.com/example-brand \
   --top-k 10
 ```
 
-Progress goes to stderr and the ranked table goes to stdout:
-
-```text
-[ 1] scrape_facebook    facebook=ExampleBrand
-[ 2] scrape_website     website=1330 chars
-[ 3] analyze_brand      brand=profile
-[ 4] generate_queries   queries+8
-[ 5] discover_kols      round=1 discovered=22 (+22 new)
-...
-rank  handle                     followers    ER % relevance engagement audience tier    total  reason
-------------------------------------------------------------------------------------------------------------------------------------
-   1  BankZaGaming               1,250,000   9.10%      0.21       0.61     1.00 mega    0.588  Embedding similarity 0.21. Tier: mega; audience...
-```
-
-`--json` prints the same run as one JSON object on stdout. Tune discovery with
-`--min-candidates N` and `--max-rounds N`.
-
-Add any `--live-*` flag from the table in [Current status](#current-status) to
-run that service live. The flags combine. For example, this run reads the
-website, the Facebook page, and TikTok live, and keeps the LLM and embeddings
-on the mocks:
-
-```bash
-export APIFY_TOKEN=...
-uv run python -m app.cli match \
-  --website https://example-brand.co.th \
-  --facebook https://www.facebook.com/example-brand \
-  --top-k 5 \
-  --live-web --live-fb --live-kols --max-enrich 5
-```
-
-If `--live-fb` or `--live-kols` is set without `APIFY_TOKEN`, the CLI exits
-with code 2 before the pipeline starts.
-
-### HTTP API on your machine
-
-```bash
-cd backend
-uv run uvicorn app.api.main:app --port 8000
-```
-
-The service reads its configuration from the environment when it starts. It
-does not read `.env` itself, so export the variables or use Docker Compose.
-Jobs go to `data/jobs.db` relative to the working directory, so run it from
-`backend/` or set `JOBS_DB`. [HTTP API](#http-api) lists the endpoints.
-
-The API has no authentication and is meant for local use. Anyone who can reach
-the port can start jobs, which spend Apify and LLM credit in live mode. Keep it
-on localhost (uvicorn's default) or put it behind something that authenticates.
-
-### Frontend
-
-The frontend in `frontend/` is a single page: a brand form, a live stepper of
-the pipeline nodes, the brand profile, and the ranked KOLs with a CSV export.
-It needs Node 24 and pnpm 11. Start the API on port 8000 first (demo mode
-needs no keys), then the Vite dev server, which proxies `/api` to it:
-
-```bash
-cd backend && DEMO_MODE=1 uv run uvicorn app.api.main:app --port 8000
-cd frontend && pnpm install && pnpm dev
-```
-
-Open http://localhost:5173. The selected job id stays in the URL as `?job=`,
-so a refresh or a shared link reopens that job. Other scripts:
-
-```bash
-pnpm lint    # ESLint and Prettier
-pnpm test    # Vitest and React Testing Library
-pnpm build   # type-check and build into dist/
-```
-
-The colors, type scale, radii, spacing, and shadows are design tokens in
-`frontend/src/styles/tokens.css`, which Tailwind and the shadcn/ui components
-read.
-
-### Docker Compose
-
-From the repository root:
-
-```bash
-cp .env.example .env   # optional: fill in keys for live mode
-docker compose up --build
-```
-
-Open http://localhost:5173. The `frontend` service builds the app and serves
-it with nginx on `127.0.0.1:5173`. nginx proxies `/api` to the backend and
-turns off buffering on the event stream, so progress events arrive as they
-happen.
-
-The `backend` service listens on `127.0.0.1:8000` only, since the API has no
-authentication. Compose loads `.env` when it exists
-and runs in demo mode without it. The caches and `jobs.db` live in the
-`backend-data` volume, mounted at `/app/data`. The container runs as a non-root
-user, and a health check calls `/api/health`.
-
-The image installs the default dependencies only. To bake in the local
-embedder, build with the `embed` extra (this downloads the CPU build of torch):
-
-```bash
-docker build --build-arg INSTALL_EMBED=true -t tkm-backend backend
-```
-
-### Tests
-
-```bash
-cd backend
-uv run pytest
-cd ../frontend
-pnpm test
-```
-
-The tests make no network calls.
-
-### Screenshots
-
-<!-- Add screenshots of the frontend here: the empty state, a run in progress, and the ranked results. -->
-
-Screenshots of the frontend go here.
+Progress goes to stderr and the ranked table to stdout. `--json` prints one
+JSON object instead. Add `--live-web`, `--live-fb`, `--live-kols`,
+`--live-llm`, or `--live-embed` to run that service for real. Cost flags:
+`--max-results-per-query`, `--max-enrich`, `--min-candidates`, `--max-rounds`,
+and `--prefilter-limit`.
 
 ## Configuration
 
 ### Demo and live mode
 
-The HTTP service runs in one of two modes. `GET /api/health` reports the mode.
+`GET /api/health` reports the mode.
 
-- **Demo mode** forces every flag off, so jobs run from the mocks and fixtures
-  with no keys. A request that asks for a live flag still runs mocked. The
-  service is in demo mode when `DEMO_MODE` is true, or when `DEMO_MODE` is
+- **Demo mode** turns every live flag off, so jobs run on mocks and fixtures
+  with no keys. It applies when `DEMO_MODE` is true, or when `DEMO_MODE` is
   unset and `APIFY_TOKEN` is missing.
-- **Live mode** applies when `DEMO_MODE` is false, or when `DEMO_MODE` is unset
-  and `APIFY_TOKEN` is set. A flag the request omits turns on when it can run:
-  web always, Facebook and KOLs with `APIFY_TOKEN`, the LLM with an LLM key,
-  and embeddings when the `embed` extra is installed. A flag set to `true` that
-  cannot run returns 400 and names the missing variable, for example
-  `live_kols is unavailable: APIFY_TOKEN is not set`. A flag set to `false`
-  stays off.
+- **Live mode** applies when `DEMO_MODE` is false, or when it is unset and
+  `APIFY_TOKEN` is set. A flag the request omits turns on when it can run. A
+  flag set to `true` that cannot run returns 400 and names the missing
+  variable, for example `live_kols is unavailable: APIFY_TOKEN is not set`.
 
-The job records the flags it ran with in `flags`. The CLI has no mode. It runs
-live only the services you name with `--live-*` flags.
+Each job stores the flags it actually ran with.
 
 ### Environment variables
 
-[`.env.example`](.env.example) lists every variable the code reads, with a
-one-line description each. Blank values take the defaults. The main ones:
+[`.env.example`](.env.example) lists every variable the code reads. Blank
+values take the defaults. Keys and tokens are never logged or put in error
+messages, and `/api/health` reports each one only as set or missing.
 
-| Variable | Used by | Default |
+| Variable | Purpose | Default |
 | --- | --- | --- |
-| `DEMO_MODE` | API mode | unset: demo unless `APIFY_TOKEN` is set |
-| `APIFY_TOKEN` | live Facebook, TikTok search, enrichment | unset |
-| `APIFY_JOB_BUDGET_USD` | estimated Apify budget for one job or CLI run | `1.00` |
-| `APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD` | per-run cap for TikTok search | `0.50` (actor minimum) |
-| `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD` | per-run cap for TikTok enrichment | `0.50` (actor minimum) |
-| `APIFY_FACEBOOK_MAX_CHARGE_USD` | per-run cap for each Facebook run | `0.50` |
-| `JINA_API_KEY` | live web reader | unset (requests go without a key) |
-| `LLM_BASE_URL` | live LLM | `https://integrate.api.nvidia.com/v1` |
-| `LLM_MODEL` | live LLM | `nvidia/nemotron-3.5-lightning-30b-a3b` |
-| `LLM_API_KEY`, `NVIDIA_API_KEY`, `OPENAI_API_KEY` | live LLM, first non-empty wins | unset |
-| `EMBED_MODEL` | live embedder | `google/embeddinggemma-2` |
-| `KOL_CACHE_DIR` | every live cache | `data/cache` at the repo root |
-| `JOBS_DB` | API job store | `data/jobs.db` |
-| `CORS_ORIGINS` | API, comma-separated | `http://localhost:5173` |
-| `JOB_WORKERS` | API, jobs that run at once | `2` |
-| `MAX_QUEUED_JOBS` | API, jobs queued or running before `POST /api/jobs` returns 429 | `20` |
+| `DEMO_MODE` | `1` forces demo, `0` forces live | unset: live only when `APIFY_TOKEN` is set |
+| `APIFY_TOKEN` | Apify, for Facebook, TikTok search, and enrichment | unset |
+| `APIFY_JOB_BUDGET_USD` | Soft, estimated Apify budget for one job or CLI run | `1.00` |
+| `APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD` | Per-run cap for each TikTok search, at least 0.50 | `0.50` |
+| `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD` | Per-run cap for each profile enrichment, at least 0.50 | `0.50` |
+| `APIFY_FACEBOOK_MAX_CHARGE_USD` | Per-run cap for each Facebook page or posts run | `0.50` |
+| `JINA_API_KEY` | Optional Jina Reader key for a higher rate limit | unset |
+| `LLM_BASE_URL` | OpenAI-compatible API root | `https://integrate.api.nvidia.com/v1` |
+| `LLM_MODEL` | Chat model id | `nvidia/nemotron-3.5-lightning-30b-a3b` |
+| `LLM_API_KEY`, `NVIDIA_API_KEY`, `OPENAI_API_KEY` | LLM bearer token, first non-empty wins | unset |
+| `LLM_TIMEOUT`, `LLM_MAX_TOKENS`, `LLM_TEMPERATURE` | Request limits | `120`, `4096`, `0.2` |
+| `LLM_RERANK_BATCH_SIZE` | Creators per rerank request | `5` |
+| `LLM_DISABLE_REASONING`, `LLM_NO_THINK_MESSAGE` | How to turn model thinking off | `extra_body` for the default model only |
+| `EMBED_MODEL` | Local sentence-transformers model | `google/embeddinggemma-2` |
+| `EMBED_DEVICE`, `EMBED_DIM`, `EMBED_DTYPE`, `EMBED_BATCH_SIZE` | Embedder settings | `cpu`, `768`, `float32`, `32` |
+| `HF_TOKEN` | Hugging Face token, only for a gated model | unset |
+| `PREFILTER_LIMIT` | CLI only: creators kept by the embedding prefilter | `25` |
+| `KOL_CACHE_DIR` | Cache root for web, Facebook, Apify, and embeddings | `data/cache` at the repo root |
+| `JOBS_DB` | SQLite job store | `data/jobs.db` |
+| `CORS_ORIGINS` | Allowed browser origins, comma-separated | `http://localhost:5173` |
+| `JOB_WORKERS` | Jobs that run at once | `2` |
+| `MAX_QUEUED_JOBS` | Queued or running jobs before `POST /api/jobs` returns 429 | `20` |
 
-[LLM](#llm) and [Embeddings](#embeddings) list the tuning variables for those
-integrations. Keys and tokens are never logged. `/api/health` reports each one
-only as set or missing.
+The last five must be unset, not blank, to take their defaults.
 
-## HTTP API
+## Architecture
 
-| Method and path | Result |
-| --- | --- |
-| `POST /api/jobs` | 202 `{"job_id": "..."}`. 400 when a requested live flag cannot run. 422 on an invalid body, a `facebook_url` outside facebook.com or fb.com, or a `website_url` on a local or private address. 429 when `MAX_QUEUED_JOBS` jobs are queued or running |
-| `GET /api/jobs/{id}` | Status, stage, request, effective flags, errors, brand profile, and ranked results. 404 when unknown |
-| `GET /api/jobs/{id}/events` | Server-sent events, ending with a `done` or `failed` event. 404 when unknown |
-| `GET /api/jobs?limit=20` | Recent jobs, newest first. `limit` is 1 to 100 |
-| `GET /api/health` | Mode, default flags, the configured models, and which credentials are set |
+### Pipeline
 
-The examples below come from a local run in demo mode, trimmed.
+The graph lives in `backend/app/graph.py` and the nodes in
+`backend/app/nodes.py`.
 
-### Create a job
+```mermaid
+flowchart TD
+    REQ([Brand website + Facebook URL]) --> W
+    REQ --> F
 
-`top_k` is 1 to 200 and defaults to 10. The live flags are optional. An omitted
-flag takes the mode's default.
+    subgraph ingest [Brand ingest, in parallel]
+        W["scrape_website<br/>Jina Reader, trafilatura fallback"]
+        F["scrape_facebook<br/>Apify page + posts actors"]
+    end
+
+    W --> A["analyze_brand<br/>LLM brand profile, then tidy_brand_profile"]
+    F --> A
+    A --> Q["generate_queries<br/>LLM: Thai and English TikTok queries"]
+    Q --> D["discover_kols<br/>Apify clockworks/tiktok-scraper"]
+    D -->|"under 30 creators and under 2 rounds"| Q
+    D -->|"enough creators or 2 rounds"| T["filter_thai<br/>language th or region TH"]
+    T --> E["enrich_kols<br/>Apify clockworks/tiktok-profile-scraper<br/>largest accounts first"]
+    E --> P["embed_and_prefilter<br/>embeddinggemma cosine, keep top 25"]
+    P --> R["llm_rerank<br/>LLM relevance + reason, heuristic scores"]
+    R --> O(["rank_and_output<br/>weighted total, top k"])
+```
+
+1. **Brand ingest.** The website and Facebook nodes run in the same
+   superstep. The website is required. A missing Facebook page is only a
+   warning, and brand analysis runs on the website alone.
+2. **Brand profile.** The LLM returns category, products, target audience,
+   tone, content style, Thai and English keywords, hashtags, and preferred
+   tiers as JSON, validated with Pydantic. The website and the Facebook
+   "about" text are the main evidence. At most the three newest posts, cut to
+   200 characters each, go in as weak signals for tone. `tidy_brand_profile`
+   then drops sentence-like keywords, caps list lengths, and fixes age bounds.
+3. **Discovery loop.** Query generation and TikTok search repeat until 30
+   unique creators are found or two rounds have run. Each round asks the LLM
+   only for queries it has not tried yet.
+4. **Thai filter.** Keeps creators whose content language is Thai or whose
+   account region is Thailand.
+5. **Enrichment.** Fetches recent videos for the largest accounts (10 by
+   default), then computes the median engagement rate and posts per week.
+6. **Prefilter.** Embeds the brand text and every creator's bio, captions, and
+   hashtags with a local model, and keeps the closest 25 (or `top_k` if that is
+   larger) by cosine similarity.
+7. **Rerank.** The LLM scores relevance from 0 to 1 with a short reason, in
+   batches of 5. Engagement, audience fit, and tier fit are deterministic
+   heuristics. The total is the weighted sum, with ties broken by engagement,
+   then followers.
+
+A fatal node error sets `stage` to `failed` and ends the graph. A partial
+failure, such as one profile that fails to enrich, is recorded in `errors` and
+the run continues.
+
+### Service
+
+```mermaid
+flowchart LR
+    UI["React app<br/>Vite, TanStack Query, EventSource"] -->|"POST /api/jobs"| API[FastAPI]
+    API -->|"insert job"| DB[("SQLite<br/>jobs + events")]
+    API -->|"submit"| POOL["Thread pool<br/>JOB_WORKERS"]
+    POOL -->|"graph.stream"| G[LangGraph pipeline]
+    POOL -->|"node events, profile, results"| DB
+    UI -->|"GET /api/jobs/{id}/events"| API
+    API -->|"SSE, reads events after the cursor"| UI
+    G --> EXT["Jina, Apify, LLM API,<br/>local embedder"]
+```
+
+`POST /api/jobs` validates the request, stores the job, and hands it to a
+thread pool. The worker streams the graph and writes a `started` and a
+`finished` or `failed` event for each node, and saves the brand profile as soon
+as it exists. The SSE endpoint reads stored events after the client's cursor
+(`Last-Event-ID` or `?after=`), so a live stream, a reconnect, and a replay of
+a finished job all use the same code. Jobs left running by a previous process
+are marked failed on startup.
+
+Every external service in `backend/app/integrations/` is a `Protocol` with a
+mock and a live implementation, selected per job by the live flags. Each live
+integration caches its results on disk (7 days for web, Facebook, and
+enrichment), so a repeated run costs nothing.
+
+## Design decisions and trade-offs
+
+**An OpenAI-compatible LLM, chosen by configuration.** The live client speaks
+the chat completions API, so moving from the default NVIDIA-hosted Nemotron
+model to OpenAI or a local server means changing `LLM_BASE_URL`, `LLM_MODEL`,
+and the key. Every call asks for one JSON object, validates it with Pydantic,
+and retries once with the validation error in the prompt. The default model is
+a reasoning model, so thinking is turned off through `chat_template_kwargs`.
+That cut a brand-analysis call from 30-45 seconds to about 3.
+
+**Local embeddings as a cheap prefilter.** embeddinggemma runs on CPU through
+sentence-transformers, with no per-call cost and no data leaving the machine.
+It narrows the candidates before the slower, paid LLM rerank. The trade-off is
+a heavy optional dependency (torch), so it sits behind the `embed` extra and
+the default install and tests stay light.
+
+**LLM for relevance only, heuristics for the rest.** Engagement, audience fit,
+and tier fit come from numbers the scraper returns, so they are cheap,
+repeatable, and easy to explain. Only relevance, which needs judgement, goes to
+the model. The weights are part of the request model (`weights` in
+`POST /api/jobs`) and are normalised to sum to 1.
+
+**A soft Apify budget plus per-run caps.** Every Apify run sets `maxItems`,
+`limit`, and `maxTotalChargeUsd`. The TikTok actors reject a cap below $0.50,
+so the TikTok caps default to that minimum and a lower value is rejected
+with an error before any run starts. On top of that, `APIFY_JOB_BUDGET_USD` (default $1.00) covers the
+whole job. The sync endpoint returns items but not usage, so spend is
+estimated from the items returned. Once the estimate crosses the budget, the
+remaining Apify calls are skipped and recorded as warnings, and the job still
+finishes with what it has. Enrichment goes to the largest accounts first, so
+the budget is spent on the creators most likely to matter.
+
+**SSE instead of polling from the browser.** Progress is a one-way stream of
+small events, which is what server-sent events are for. `EventSource`
+reconnects and resends `Last-Event-ID` on its own. Inside the server the stream
+reads SQLite every 0.25 seconds, which keeps replay and live delivery on one
+code path at the cost of a little latency. Before reconnecting, the frontend
+checks that the job still exists, so a stale `?job=` link stops instead of
+retrying forever.
+
+**SQLite for jobs and events.** One file, no extra service, and it survives a
+restart in the Compose volume. It fits a single-node tool with a few jobs at a
+time. Several API replicas would need a shared database and a real queue.
+
+**Demo mode by default.** Without an `APIFY_TOKEN`, the service runs the full
+graph on fixtures, so anyone can clone the repo and see the product in a minute
+without spending money. The fixtures cover the awkward cases: duplicate handles
+with different casing, non-Thai creators, and a second discovery round.
+
+**Guarding a public-URL fetcher.** The API only accepts Facebook URLs on
+facebook.com or fb.com, rejects website URLs on local or private addresses,
+and the web reader checks resolved addresses before a direct fetch.
+
+## Known limitations
+
+- **The Apify budget is an estimate.** It is computed from returned items plus a
+  per-run allowance, not from Apify's billing, and the run that crosses it
+  still finishes. Real spend can land a little over the budget.
+- **No warning when the budget skips the Facebook run.** If the budget stops a
+  Facebook run, the reader quietly falls back to the web reader, or keeps the
+  page without posts, and the job shows no warning about it.
+- **The Facebook web fallback can accept a login wall.** When it reads the page
+  through Jina, it does not detect Facebook's login page, so the brand profile
+  may get login text instead of the page's "about".
+- **The ranking weights are not tuned.** 40/25/20/15 is a reasoned starting
+  point, not a value fitted to labelled data.
+- **The candidate pool is small.** Two search rounds with 10 videos per query
+  give tens of creators. In the live run above, 48 were discovered and 12 were
+  left after the Thai filter.
+- **Audience fit is a proxy.** It uses the creator's language and region, not
+  real audience demographics, which TikTok does not expose to scrapers.
+- **The API has no authentication.** It is built for local use and binds to
+  localhost in Compose.
+
+## Testing
 
 ```bash
-curl -X POST localhost:8000/api/jobs -H 'content-type: application/json' -d '{
-  "website_url": "https://example-brand.co.th",
-  "facebook_url": "https://www.facebook.com/example-brand",
-  "top_k": 3
-}'
+cd backend && uv run pytest          # 264 tests
+cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 41 Vitest tests
 ```
 
-```json
-{"job_id":"14aa56a39f8845cab15a866b34308480"}
-```
-
-### Read a job
-
-A job moves from `queued` to `running` to `succeeded` or `failed`.
-`brand_profile` is `null` until `analyze_brand` finishes, and is saved before
-the next node starts.
-
-```bash
-curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
-```
-
-```json
-{
-  "id": "14aa56a39f8845cab15a866b34308480",
-  "status": "succeeded",
-  "stage": "done",
-  "request": {
-    "website_url": "https://example-brand.co.th/",
-    "facebook_url": "https://www.facebook.com/example-brand",
-    "top_k": 3,
-    "weights": {"relevance": 0.4, "engagement": 0.25, "audience": 0.2, "tier": 0.15}
-  },
-  "flags": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false},
-  "errors": [],
-  "brand_profile": {
-    "category": "gaming eyewear / blue-light glasses",
-    "products": ["blue-light glasses", "gaming glasses", "clip-on blue-light lenses"],
-    "target_audience": {"age_min": 16, "age_max": 34, "gender": "any", "interests": ["gaming", "esports", "tech"], "location": "Thailand (Bangkok)"},
-    "tone": "energetic, friendly, gamer-coded",
-    "content_style": "short-form reviews, gameplay commentary and desk setups",
-    "keywords_th": ["แว่นกันแสงสีฟ้า", "แว่นเกมมิ่ง"],
-    "keywords_en": ["blue light glasses", "gaming glasses"],
-    "hashtags": ["#ExampleBrand", "#BlueLightGlasses"],
-    "preferred_tiers": ["micro", "macro", "mega"],
-    "reasoning": "Mock analysis derived from the website and Facebook page: ..."
-  },
-  "results": [
-    {
-      "kol": {
-        "handle": "BankZaGaming",
-        "url": "https://www.tiktok.com/@BankZaGaming",
-        "followers": 1250000,
-        "language": "th",
-        "region": "TH",
-        "median_engagement_rate": 0.091,
-        "posts_per_week": 1.1,
-        "content_summary": "Topics: gaming, esports",
-        "source": "apify"
-      },
-      "scores": {
-        "relevance": 0.2145,
-        "engagement": 0.6067,
-        "audience_fit": 1.0,
-        "tier_fit": 1.0,
-        "audience_confidence": "high"
-      },
-      "total_score": 0.5875,
-      "reason": "Embedding similarity 0.21. Tier: mega; audience fit: high."
-    }
-  ],
-  "created_at": "2026-10-27T06:17:33.008856+00:00",
-  "updated_at": "2026-10-27T06:17:33.057882+00:00"
-}
-```
-
-### Stream progress
-
-```bash
-curl -N localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480/events
-```
-
-Each event carries its sequence number as the SSE `id`. Node events have type
-`node`, and the last event is `done` or `failed`, after which the server closes
-the stream. A `finished` event carries a short summary such as `discovered+22`.
-
-```text
-event: node
-data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":1,"type":"node","node":"scrape_facebook","status":"started","summary":"","timestamp":"2026-10-27T06:17:33.020539+00:00"}
-id: 1
-
-event: node
-data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":3,"type":"node","node":"scrape_facebook","status":"finished","summary":"facebook=ExampleBrand","timestamp":"2026-10-27T06:17:33.024247+00:00"}
-id: 3
-
-event: node
-data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":10,"type":"node","node":"discover_kols","status":"finished","summary":"round=1 discovered+22","timestamp":"2026-10-27T06:17:33.034594+00:00"}
-id: 10
-
-event: done
-data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":25,"type":"done","node":null,"status":null,"summary":"ranked 3 KOLs","timestamp":"2026-10-27T06:17:33.057947+00:00"}
-id: 25
-```
-
-To resume after a dropped connection, send the last `id` you received as
-`Last-Event-ID` (an `EventSource` does this on its own) or pass `?after=N`. The
-stream then starts after that event:
-
-```bash
-curl -N -H 'Last-Event-ID: 22' localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480/events
-```
-
-```text
-event: node
-data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":23,"type":"node","node":"rank_and_output","status":"started","summary":"","timestamp":"2026-10-27T06:17:33.055289+00:00"}
-id: 23
-
-event: node
-data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":24,"type":"node","node":"rank_and_output","status":"finished","summary":"results=3","timestamp":"2026-10-27T06:17:33.056399+00:00"}
-id: 24
-
-event: done
-data: {"job_id":"14aa56a39f8845cab15a866b34308480","seq":25,"type":"done","node":null,"status":null,"summary":"ranked 3 KOLs","timestamp":"2026-10-27T06:17:33.057947+00:00"}
-id: 25
-```
-
-### List jobs
-
-```bash
-curl 'localhost:8000/api/jobs?limit=5'
-```
-
-The response is a JSON array of jobs in the same shape as `GET /api/jobs/{id}`,
-newest first.
-
-### Check health
-
-```bash
-curl localhost:8000/api/health
-```
-
-```json
-{
-  "status": "ok",
-  "mode": "demo",
-  "defaults": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false},
-  "credentials": {
-    "APIFY_TOKEN": false,
-    "LLM_API_KEY": false,
-    "NVIDIA_API_KEY": false,
-    "OPENAI_API_KEY": false,
-    "JINA_API_KEY": false
-  },
-  "models": {
-    "llm_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
-    "llm_host": "integrate.api.nvidia.com",
-    "embed_model": "google/embeddinggemma-2"
-  }
-}
-```
-
-`defaults` are the flags an omitted request field takes. `models` shows what
-the live LLM and embedder would use. `llm_host` is the host of `LLM_BASE_URL`
-only, never the full URL.
-
-## Live integrations
-
-Each section below covers one `--live-*` flag. The API flag of the same name
-runs the same code.
-
-### Web reading
-
-The default run uses the offline website fixture and does not touch the network.
-`--live-web` fetches the brand site for real and leaves Facebook, TikTok search,
-embeddings, and the LLM mocked:
-
-- **Jina Reader** (`https://r.jina.ai/`) is the primary fetcher. Set `JINA_API_KEY`
-  to send a bearer token and raise the rate limit. The key is not written to logs
-  or error messages. Image links and empty bullets are stripped from its markdown.
-- **trafilatura** is the fallback. It fetches the page directly when Jina errors
-  or returns fewer than 200 characters. The request uses browser-like
-  `Accept`, `Accept-Language`, and `Accept-Encoding` headers and HTTP/2, because
-  some storefronts answer 200 to curl and 429 to a bare
-  HTTP/1.1 client.
-- Successful pages are cached as JSON under `data/cache/web` for 7 days. The cache
-  key is the SHA-256 of the normalized URL. Set `KOL_CACHE_DIR` to move the cache
-  root (`$KOL_CACHE_DIR/web`). A cache hit skips the network.
-- Page text is cut to 20,000 characters before it enters graph state.
-
-```bash
-uv run python -m app.cli match \
-  --website https://example-brand.co.th \
-  --facebook https://www.facebook.com/example-brand \
-  --top-k 5 \
-  --live-web
-```
-
-### Facebook page (Apify)
-
-The default run uses the offline Facebook fixture and does not call Apify.
-`--live-fb` reads the page through Apify. It needs `APIFY_TOKEN`, handled the
-same way as `--live-kols`: if the token is missing, the CLI exits with code 2
-before the pipeline starts.
-
-- **Profile** uses [apify/facebook-pages-scraper](https://apify.com/apify/facebook-pages-scraper)
-  with `startUrls`. The page name, title, `intro`, `categories`, `followers`
-  (or `likes` when followers is missing), website (`websites`, then the bare
-  `website` domain), and `ad_status` are mapped onto the Facebook page.
-- **Recent posts** use [apify/facebook-posts-scraper](https://apify.com/apify/facebook-posts-scraper)
-  with `resultsLimit` 20. Up to 20 post texts are kept, each with its
-  whitespace collapsed and cut to 1,000 characters. Brand analysis sees only
-  the newest 3 posts, each cut to 200 characters, and treats them as weak
-  signals for tone and current campaigns rather than as product evidence.
-- **Cost controls.** Each page is two runs, and each run sets `maxItems`,
-  `limit`, and `maxTotalChargeUsd` ($0.50). The store lists the page scraper
-  from about $5–$12 per 1,000 pages and the posts scraper from about $2–$5 per
-  1,000 posts.
-- **Fallback.** When the profile run fails or returns no usable item, the page
-  URL is read with the live web reader (Jina, then trafilatura, with its own
-  cache), even without `--live-web`. The page name comes from the URL, the title
-  from the first heading, and the intro from the page text. If that also
-  fails, `scrape_facebook` records a warning and brand analysis runs on the
-  website alone. When only the posts run fails, the page is kept with no posts.
-- **Cache.** Complete Apify results are stored as JSON under
-  `data/cache/facebook` for 7 days. The key is the SHA-256 of the normalized
-  URL. Set `KOL_CACHE_DIR` to move the root (`$KOL_CACHE_DIR/facebook`). A hit
-  does not call Apify. Fallback pages and pages without posts are not cached.
-  A failed cache write keeps the fetched page.
-
-```bash
-export APIFY_TOKEN=...
-uv run python -m app.cli match \
-  --website https://example-brand.co.th \
-  --facebook https://www.facebook.com/example-brand \
-  --top-k 5 \
-  --live-fb
-```
-
-### TikTok KOL search (Apify)
-
-The default run uses the offline KOL fixtures and does not call Apify.
-`--live-kols` searches TikTok and enriches Thai creators through Apify (at most
-`--max-enrich`, default 10, largest accounts first, one paid run each).
-Combine it with `--live-web` when both the site and the creator data should be live.
-
-`APIFY_TOKEN` is read from the environment and sent only as an `Authorization`
-header. It is not written to logs or error messages. If it is missing, the CLI
-exits with code 2 before the pipeline starts.
-
-- **Search** uses [clockworks/tiktok-scraper](https://apify.com/clockworks/tiktok-scraper).
-  A query that is only a hashtag (a trailing "tiktok" is ignored, so
-  `#examplebrand tiktok` counts) is sent as `hashtags`. Every other query is sent as
-  `searchQueries` with `searchSection` set to `/video`, so each item is a video
-  with `authorMeta`. Authors are deduped. Rows without a handle, and actor
-  `errorCode` items, are skipped and recorded by `discover_kols`.
-- **Enrichment** uses [clockworks/tiktok-profile-scraper](https://apify.com/clockworks/tiktok-profile-scraper)
-  to fetch recent videos for one profile. The engagement rate for a video is
-  `(likes + comments + shares) / views` (`diggCount`, `commentCount`,
-  `shareCount`, `playCount`). When `playCount` is missing or zero, that video
-  uses the same numerator divided by the profile's follower count. The stored
-  value is the median of those rates, capped to the range 0–1.
-  `posts_per_week` is `(n - 1) / weeks` between the oldest and newest non-pinned
-  video in the sample. `content_summary` is a short line of captions and hashtags.
-- **Cost controls.** `--max-results-per-query` (default 10) caps videos per
-  search query and videos fetched per profile. `--max-enrich` (default 10)
-  caps how many profiles are enriched. Video, cover, subtitle, and avatar
-  downloads stay off, and comment scraping stays at zero. Each run sets
-  `maxItems`, `limit`, and `maxTotalChargeUsd` (default $0.50) on the sync
-  endpoint. Transport errors and HTTP 429/5xx are retried once. Timeouts and
-  HTTP 408 are not retried, because the paid run may already be in progress.
-  The store lists these actors from about $1–$2 per 1,000 results.
-- **Cost control.** Each run has its own cap (`APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD`,
-  `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD`, and `APIFY_FACEBOOK_MAX_CHARGE_USD`),
-  and one `APIFY_JOB_BUDGET_USD` budget covers the whole job across Facebook,
-  search, and enrichment. The sync endpoint returns dataset items but no usage,
-  so spend is estimated from the items returned plus a small per-run amount.
-  The budget is soft: the run that crosses it finishes, then later calls are
-  skipped and recorded as warnings instead of failing the job. Cache hits do
-  not call Apify and cost nothing.
-- **Cache.** Enrichment results are stored as JSON under `data/cache/apify` for
-  7 days. Set `KOL_CACHE_DIR` to move the root (`$KOL_CACHE_DIR/apify`). A hit
-  does not call Apify.
-
-```bash
-export APIFY_TOKEN=...
-uv run python -m app.cli match \
-  --website https://example-brand.co.th \
-  --facebook https://www.facebook.com/example-brand \
-  --top-k 5 \
-  --live-kols \
-  --max-results-per-query 5 \
-  --max-enrich 10
-```
-
-`backend/scripts/apify_smoke.py` runs one search query with a maximum of 5
-results and prints `handle`, `url`, and `followers`. It is the live check to
-run once a token is available:
-
-```bash
-uv run python scripts/apify_smoke.py "รีวิวแว่นตา"
-```
-
-### LLM
-
-The default run uses the offline brand analyzer and does not call a model.
-`--live-llm` sends brand analysis, TikTok query generation, and relevance
-reranking to an OpenAI-compatible chat completions API. Facebook scraping
-stays mocked unless `--live-fb` is set. Embeddings stay on the offline mock unless `--live-embed` is
-set. Combine the flag with `--live-web` and `--live-kols`
-when those sources should be live too. Switching providers is configuration
-only: set `LLM_BASE_URL`, `LLM_MODEL`, and a key.
-
-| Variable | Default | Role |
-| --- | --- | --- |
-| `LLM_BASE_URL` | `https://integrate.api.nvidia.com/v1` | API root, including the `/v1` prefix |
-| `LLM_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Chat model id |
-| `LLM_API_KEY` | unset | Bearer token. If empty, `NVIDIA_API_KEY` is used, then `OPENAI_API_KEY` |
-| `LLM_TIMEOUT` | `120` | Request timeout in seconds |
-| `LLM_MAX_TOKENS` | `4096` | Completion token budget, shared with any reasoning trace |
-| `LLM_TEMPERATURE` | `0.2` | Sampling temperature |
-| `LLM_RERANK_BATCH_SIZE` | `5` | Creators scored per rerank request |
-| `LLM_DISABLE_REASONING` | `extra_body` for the default endpoint and model, otherwise `off` | Provider-specific reasoning control, below |
-| `LLM_NO_THINK_MESSAGE` | `/no_think` | System message used when reasoning control is `system` or `both` |
-
-The default model is a reasoning model. A short prompt can take tens of seconds
-and spend most of its completion tokens on `reasoning_content`. With a small
-`max_tokens`, `content` comes back null. The client defaults are sized for
-that: 4096 completion tokens and a 120 second timeout. Empty or missing
-`content` is retried once.
-
-`LLM_DISABLE_REASONING` picks how thinking is turned off. When it is unset, the
-default NVIDIA endpoint and model use `extra_body` and every other provider
-gets a plain request. The values are provider-specific:
-
-- `off` sends a normal chat request.
-- `system` prepends `LLM_NO_THINK_MESSAGE` (default `/no_think`). The default
-  model ignores it, so it still thinks.
-- `extra_body` sends `chat_template_kwargs.enable_thinking` set to false. On the
-  default model this turns thinking off: a brand-analysis call dropped from
-  about 30-45 seconds and 2,000-3,700 completion tokens to about 3 seconds and
-  250 tokens.
-- `both`, and also `true`, `1`, or `on`, does both.
-
-A provider that rejects unknown JSON fields works with the default (`off` for
-anything but the NVIDIA default). Point `LLM_BASE_URL` at
-`https://api.openai.com/v1` and set `LLM_MODEL` plus `OPENAI_API_KEY` to use
-OpenAI with no code change.
-
-Each call asks for one JSON object. Code fences and leading prose are stripped,
-the first JSON object is validated with Pydantic, and a validation failure is
-retried once with the error in the next prompt. A second failure raises. The
-graph records that on `errors`, sets `stage` to `failed`, and stops, the same
-way other node failures do.
-
-The model returns relevance from 0 to 1 and a short Thai or English reason.
-Engagement, audience fit, and tier fit stay on the existing heuristics. The
-total still uses the weights 0.4, 0.25, 0.2, and 0.15, with relevance as the
-0.4 term. Query generation returns only the new queries for that round, so the
-discovery loop and `last_queries` keep working. Rerank requests are batched.
-
-The API key is not written to logs. It is stripped from error text.
-
-```bash
-export LLM_API_KEY=...
-uv run python -m app.cli match \
-  --website https://example-brand.co.th \
-  --facebook https://www.facebook.com/example-brand \
-  --top-k 5 \
-  --live-llm
-```
-
-`backend/scripts/llm_smoke.py` runs one small brand-analysis call. It exits
-with a message and code 2 when no key is set:
-
-```bash
-uv run python scripts/llm_smoke.py
-```
-
-### Embeddings
-
-The default run uses an offline embedder. It does not download a model and it
-does not touch the network. `--live-embed` loads `google/embeddinggemma-2`
-with sentence-transformers, on CPU unless `EMBED_DEVICE` is set. The model is
-loaded once per process and reused. Vision and audio towers are left unloaded
-so only the text tower stays in memory.
-
-The model is Apache 2.0. `HF_TOKEN` is optional.
-
-Install the extra before a live run. It pulls sentence-transformers,
-transformers, and the CPU build of torch. A plain `uv sync` does not install
-them, so the default install and the tests stay offline.
-
-```bash
-cd backend
-uv sync --extra embed
-uv run python -m app.cli match \
-  --website https://example-brand.co.th \
-  --facebook https://www.facebook.com/example-brand \
-  --top-k 5 \
-  --live-embed
-```
-
-| Variable | Default | Role |
-| --- | --- | --- |
-| `EMBED_MODEL` | `google/embeddinggemma-2` | sentence-transformers model id |
-| `EMBED_DEVICE` | `cpu` | device passed to the model |
-| `EMBED_DIM` | `768` | Matryoshka size passed as `truncate_dim` (`768`, `512`, `256`, or `128`) |
-| `EMBED_DTYPE` | `float32` | `float32` or `bfloat16` |
-| `EMBED_BATCH_SIZE` | `32` | texts encoded per call |
-| `PREFILTER_LIMIT` | `25` | candidates kept after cosine ranking, before rerank |
-| `KOL_CACHE_DIR` | `data/cache` | cache root; embeddings are `$KOL_CACHE_DIR/embeddings` |
-| `HF_TOKEN` | unset | optional download token |
-
-The brand text (category, products, audience, keywords, hashtags) is the
-query. Each creator (nickname, bio, caption summary, hashtags) is a document.
-Queries use the `SearchQuery` prompt (`task: search result | query: `).
-Documents use the `Document` prompt (`title: none | text: `). If those prompts
-are not on the model, a document is formatted as
-`title: {nickname or handle} | text: {content}`.
-
-Similarity is cosine on L2-normalized vectors. `EMBED_DIM` truncates the
-vector. The context window is 8192 tokens. Dtype is float32 or bfloat16, not
-float16.
-
-`--prefilter-limit` (or `PREFILTER_LIMIT`) sets how many creators go to the
-reranker. The default is 25. If `--top-k` is larger, the width is raised to
-`--top-k`, so a larger shortlist is not silently cut.
-
-The offline reranker uses that cosine as the relevance score. The live
-reranker still scores relevance itself and sees the cosine as
-`embedding_similarity`. Engagement, audience fit, and tier fit are unchanged.
-The total still uses the weights 0.4, 0.25, 0.2, and 0.15.
-
-Vectors are cached as JSON under `data/cache/embeddings`. The file name is the
-SHA-256 of the model, the prompt prefix, the text, and the dimension. Writes
-are atomic. A cache hit does not call the model.
-
-`backend/scripts/embed_smoke.py` embeds one query and two short documents:
-
-```bash
-uv run python scripts/embed_smoke.py
-```
+The tests make no network calls. The backend suite covers the graph routing and
+fail-fast behaviour, every live integration against mocked HTTP (Jina and
+captcha replies, Apify errors and budgets, LLM JSON repair and retries, and
+the embedder), the API and SSE resume, and brand-profile cleanup. The frontend
+suite covers the step reducer, the SSE follower's retry and stop rules, the
+job-progress hook, the API client, formatting, the CSV export, and the app
+flow.
+
+`backend/scripts/` has small live smoke checks for Apify, the LLM, and the
+embedder. They need real keys, and the Apify one spends credit.
+
+## Next steps
+
+1. **Evaluation set and weight tuning.** Label a few brands with creators a
+   marketer would and would not pick, measure precision at k and NDCG, then
+   tune the weights and the prefilter width against that set.
+2. **A larger candidate pool.** More results per query, a third round when the
+   Thai filter leaves too few creators, and hashtag-based discovery.
+3. **Better signals.** Read the Facebook login wall as a failure, add a budget
+   warning for skipped Facebook runs, and use comment language as an audience
+   signal.
+4. **Real spend tracking.** Read `usageTotalUsd` from Apify's run API after each
+   run instead of estimating.
+5. **CI.** Run the backend and frontend suites and the Docker build on every
+   pull request.
+6. **Production shape.** Authentication, a shared database, and a job queue if
+   it ever needs more than one node.
 
 ## Repo layout
 
 ```text
 backend/
   app/
-    graph.py         # graph wiring, parallel fan-in, discovery loop
-    nodes.py         # the ten pipeline nodes
-    models.py        # MatchRequest, BrandProfile, KolProfile, RankedKol, ...
-    state.py         # MatchState and list reducers
-    cli.py           # argparse CLI (table or JSON)
-    api/             # FastAPI app: settings, SQLite job store, graph runner, routes
-    prompts.py       # LLM prompt text for brand analysis, queries, and rerank
-    integrations/    # Protocol + Mock per service; live web, Facebook, Apify, LLM, and embedder
-    fixtures/        # mock website, Facebook page, KOL records, Apify samples
-  scripts/           # apify_smoke.py, llm_smoke.py, and embed_smoke.py
+    graph.py          # graph wiring, parallel fan-in, discovery loop
+    nodes.py          # the pipeline nodes
+    models.py         # MatchRequest, BrandProfile, KolProfile, RankedKol, weights
+    brand_tidy.py     # cleanup of the LLM brand profile
+    prompts.py        # prompts for brand analysis, queries, and rerank
+    cli.py            # CLI (table or JSON)
+    api/              # FastAPI app, settings, SQLite store, job runner
+    integrations/     # Protocol + mock + live client per service, with caches
+    fixtures/         # demo website, Facebook page, creators, Apify samples
+  scripts/            # live smoke checks
   tests/
-  Dockerfile
-  pyproject.toml
 frontend/
   src/
-    api/             # wire types, fetch client, TanStack Query hooks, SSE follower
-    lib/             # step reducer, formatting, CSV export, form validation
-    hooks/           # job progress over SSE, ?job= URL state
-    components/      # page sections; components/ui/ holds the shadcn/ui primitives
-    styles/tokens.css  # design tokens
-  Dockerfile         # pnpm build, then nginx
-  nginx.conf         # static files, /api proxy, unbuffered event stream
+    api/              # wire types, fetch client, query hooks, SSE follower
+    components/       # form, progress, brand profile, results, history
+    hooks/ lib/       # job progress, URL state, step reducer, CSV, validation
+    styles/tokens.css # design tokens
+  Dockerfile          # pnpm build, then nginx
+  nginx.conf          # static files, /api proxy, unbuffered event stream
+docs/
+  reference.md        # HTTP API and live integration details
+  screenshots/
 docker-compose.yml
 .env.example
-README.md
 ```

@@ -36,7 +36,7 @@ import openai
 from openai import OpenAI
 from pydantic import Field, ValidationError
 
-from ..brand_match import normalize_for_match
+from ..brand_match import MIN_ALIAS_CHARS, normalize_for_match
 from ..brand_tidy import tidy_brand_profile
 from ..models import (
     BrandProfile,
@@ -421,9 +421,14 @@ class LiveBrandAnalyzer:
         previous = {query.strip().casefold() for query in previous_queries}
 
         def accept(batch: QueryBatch) -> None:
-            if not _new_queries(batch.queries, set(previous)):
+            new = _new_queries(batch.queries, set(previous))
+            if not new:
                 raise ValueError(
                     "no new queries; every query repeats an earlier round"
+                )
+            if all(_contains_brand_alias(query, brand) for query in new):
+                raise ValueError(
+                    "every query names the brand; search for the topic instead"
                 )
 
         batch = self._structured(
@@ -436,10 +441,6 @@ class LiveBrandAnalyzer:
             for query in _new_queries(batch.queries, set(previous))
             if not _contains_brand_alias(query, brand)
         ]
-        if not fresh:
-            raise LlmOutputError(
-                f"LLM returned no new search queries for round {round}"
-            )
         return fresh[:MAX_QUERIES]
 
     def judge(
@@ -447,16 +448,22 @@ class LiveBrandAnalyzer:
         brief: BrandProfile,
         kols: list[KolProfile],
     ) -> list[Judgement]:
-        """Judge all creators in one chat call and clamp every score."""
+        """Judge all creators in one chat call and clamp every score.
+
+        Creators the model leaves out are asked for once more in a smaller
+        call. Any still missing are returned unjudged; the caller reports them.
+        """
         if not kols:
             return []
-        batch = self._structured(judge_messages(brief, kols), JudgementBatch)
-        known = {normalize_handle(kol.handle) for kol in kols}
-        by_handle: dict[str, JudgementItem] = {}
-        for item in batch.creators:
-            key = normalize_handle(item.handle)
-            if key in known and key not in by_handle:
-                by_handle[key] = item
+        by_handle = self._judge_items(brief, kols)
+        missing = [
+            kol for kol in kols if normalize_handle(kol.handle) not in by_handle
+        ]
+        if missing:
+            logger.warning(
+                "judge skipped %d of %d creators; asking again", len(missing), len(kols)
+            )
+            by_handle.update(self._judge_items(brief, missing))
 
         judgements: list[Judgement] = []
         for kol in kols:
@@ -474,6 +481,20 @@ class LiveBrandAnalyzer:
                 )
             )
         return judgements
+
+    def _judge_items(
+        self,
+        brief: BrandProfile,
+        kols: list[KolProfile],
+    ) -> dict[str, JudgementItem]:
+        batch = self._structured(judge_messages(brief, kols), JudgementBatch)
+        known = {normalize_handle(kol.handle) for kol in kols}
+        by_handle: dict[str, JudgementItem] = {}
+        for item in batch.creators:
+            key = normalize_handle(item.handle)
+            if key in known and key not in by_handle:
+                by_handle[key] = item
+        return by_handle
 
     def _structured(
         self,
@@ -620,15 +641,19 @@ def _coerce_brand_lists(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _contains_brand_alias(query: str, brand: BrandProfile) -> bool:
-    """True when a query repeats the brand's own name or handle."""
+    """True when a query repeats the brand's own name or handle.
+
+    Uses the same minimum alias length as the graph's recall guard, so a short
+    brand name such as "Sun" cannot knock out every topic query.
+    """
     text = normalize_for_match(query)
     return any(
-        alias and alias in text
+        alias in text
         for alias in (
             normalize_for_match(value)
             for value in (*brand.brand_names, *brand.brand_handles)
         )
-        if len(alias) >= 3
+        if len(alias) >= MIN_ALIAS_CHARS
     )
 
 

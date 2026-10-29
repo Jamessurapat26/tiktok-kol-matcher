@@ -87,9 +87,10 @@ class TargetAudience(DomainModel):
 class BrandProfile(DomainModel):
     """Structured brand brief returned by the brand-analysis LLM call.
 
-    ``brand_names`` has a default so stored profiles and fixtures written
-    before that field existed stay valid. ``target_followers`` is boundary
-    validated because the value comes from the model.
+    ``brand_names`` has a default so fixtures written before that field
+    existed stay valid. Jobs stored before matching-v2 use a different shape;
+    ``api.store`` drops their old profile on load. ``target_followers`` is
+    boundary validated because the value comes from the model.
     """
 
     category: str

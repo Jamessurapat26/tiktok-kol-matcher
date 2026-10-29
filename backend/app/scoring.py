@@ -8,6 +8,7 @@ compose them without the old weighted-sum scorer.
 from __future__ import annotations
 
 import math
+import re
 import statistics
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -24,15 +25,18 @@ from .models import (
     normalize_handle,
 )
 
-# Sponsorship markers are checked on the raw caption so "#ad" cannot match a
-# random word. The Thai markers are included exactly as the design lists them.
-_SPONSOR_MARKERS = (
-    "#ad",
-    "#sponsored",
+# English hashtags must end at a tag boundary, so "#adidas" and "#adventure"
+# are not "#ad". The Thai markers are substring matches exactly as the design
+# lists them, because Thai tags run straight into the next word.
+_SPONSOR_TAG_RE = re.compile(r"#(?:ad|sponsored)(?![a-z0-9_])")
+_THAI_SPONSOR_MARKERS = (
     "#โฆษณา",
     "#รีวิว",
     "ได้รับการสนับสนุน",
 )
+
+# Neutral judge prior for creators left out of the judge stage.
+_UNJUDGED_JUDGE_CAP = 0.5
 
 
 @dataclass(frozen=True)
@@ -312,6 +316,13 @@ def _mentions(text: str, terms: Iterable[str]) -> bool:
     return any(term in text for term in terms)
 
 
+def _is_sponsored(caption: str) -> bool:
+    caption = caption.casefold()
+    return bool(_SPONSOR_TAG_RE.search(caption)) or any(
+        marker in caption for marker in _THAI_SPONSOR_MARKERS
+    )
+
+
 def _competitor_sponsored(
     kol: KolProfile,
     competitor_terms: Iterable[str],
@@ -322,8 +333,7 @@ def _competitor_sponsored(
     for video in kol.videos:
         if video.posted_at is None or video.posted_at < cutoff:
             continue
-        caption = video.caption.casefold()
-        if not any(marker in caption for marker in _SPONSOR_MARKERS):
+        if not _is_sponsored(video.caption):
             continue
         if _mentions(normalize_for_match(video.caption), competitor_terms):
             return True
@@ -374,12 +384,15 @@ def score_pool(
 
     Raw cosine similarities are converted to within-pool percentiles. Before
     stage 6 there is no LLM judge, so ``judge`` falls back to that same sim
-    percentile and ``A_eff`` stays neutral.
+    percentile and ``A_eff`` stays neutral. Once some creators are judged, an
+    unjudged creator's ``judge`` is capped at a neutral 0.5, so a creator the
+    judge never saw cannot outrank the judged leaders on sim alone.
     """
     sim_percentiles = percentile_ranks(sims)
     engagements = engagement(kols, cfg)
 
     judged_by_handle: dict[str, Judgement] = {}
+    unjudged_cap = _UNJUDGED_JUDGE_CAP if judgements else 1.0
     if judgements:
         for key, judgement in judgements.items():
             judged_by_handle[normalize_handle(key)] = judgement
@@ -399,7 +412,7 @@ def score_pool(
             )
             a_conf = judgement.audience_confidence
         else:
-            judge = sim_pct
+            judge = min(sim_pct, unjudged_cap)
             a_eff = 0.5
             a_conf = 0.0
 
@@ -468,7 +481,9 @@ def mmr_select(
         best_index = remaining[0]
         best_score = None
         for index in remaining:
-            max_sim = max(sim(index, chosen) for chosen in selected)
+            # Chosen item first: an embedder-backed ``sim`` then builds one
+            # row per selected item instead of one per remaining candidate.
+            max_sim = max(sim(chosen, index) for chosen in selected)
             score = lam * finals[index] - (1 - lam) * max_sim
             if best_score is None or score > best_score:
                 best_score = score

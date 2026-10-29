@@ -787,6 +787,28 @@ def test_generate_queries_drops_previous_and_retries_when_all_repeat():
     assert "no new queries" in prompts[1]
 
 
+def test_generate_queries_keeps_topic_queries_for_a_short_brand_name():
+    brand = _brand().model_copy(update={"brand_names": ["Sun"], "brand_handles": ["@eve"]})
+    sent = ["กันแดด sunscreen review", "skincare everyday routine"]
+    chat = _ScriptedChat([json.dumps({"queries": sent})])
+    analyzer = LiveBrandAnalyzer(settings=LlmSettings(api_key=_KEY), chat=chat)
+
+    assert analyzer.generate_queries(brand, [], 1) == sent
+
+
+def test_generate_queries_retries_when_every_query_names_the_brand():
+    brand = _brand().model_copy(update={"brand_names": ["Lumina Eyewear"]})
+    chat = _ScriptedChat(
+        [
+            json.dumps({"queries": ["Lumina Eyewear review", "luminaeyewear แว่น"]}),
+            json.dumps({"queries": ["Lumina Eyewear รีวิว", "แว่นกรองแสง รีวิว"]}),
+        ]
+    )
+    analyzer = LiveBrandAnalyzer(settings=LlmSettings(api_key=_KEY), chat=chat)
+
+    assert analyzer.generate_queries(brand, [], 1) == ["แว่นกรองแสง รีวิว"]
+
+
 def test_generate_queries_caps_an_oversized_batch_at_the_prompt_limit():
     sent = [f"query {i}" for i in range(60)]
     chat = _ScriptedChat([json.dumps({"queries": sent})])
@@ -797,7 +819,7 @@ def test_generate_queries_caps_an_oversized_batch_at_the_prompt_limit():
     assert queries == sent[:10]
 
 
-def test_judge_is_one_call_and_drops_unknown_or_missing_handles():
+def test_judge_asks_again_for_missing_handles_and_drops_unknown_ones():
     kols = [_kol("Alpha"), _kol("Beta"), _kol("Gamma")]
     prompts: list[str] = []
 
@@ -838,11 +860,15 @@ def test_judge_is_one_call_and_drops_unknown_or_missing_handles():
     finally:
         analyzer.close()
 
-    assert len(prompts) == 1
+    assert len(prompts) == 2
     assert "handle: Alpha" in prompts[0]
     assert "handle: Beta" in prompts[0]
     assert "handle: Gamma" in prompts[0]
-    # Beta is missing from the reply, Ghost is unknown, and Alpha appears twice.
+    # The follow-up asks only for the creators the first reply left out.
+    assert "handle: Alpha" not in prompts[1]
+    assert "handle: Beta" in prompts[1]
+    assert "handle: Gamma" in prompts[1]
+    # Beta and Gamma stay missing, Ghost is unknown, and Alpha appears twice.
     assert [item.handle for item in judgements] == ["Alpha"]
     judged = judgements[0]
     assert judged.judge == 1.0

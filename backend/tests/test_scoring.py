@@ -407,3 +407,80 @@ def test_quality_combines_the_three_configured_weights():
         + cfg.quality_w_t * 0.6
         + cfg.quality_w_a * 0.4
     )
+
+
+def test_sponsor_tag_needs_a_tag_boundary():
+    brief = _brief(competitors=["Adidas"])
+    competitor_aliases = _competitor_aliases(brief)
+
+    def flags(caption: str) -> list[str]:
+        kol = _kol("tagged.creator", videos=[_video(days_ago=3, caption=caption)])
+        return flags_for(
+            kol,
+            brief,
+            _brand_aliases(brief),
+            competitor_aliases,
+            0.1,
+            DEFAULT_CONFIG,
+            NOW,
+        )
+
+    assert "competitor_sponsored" not in flags("new kicks #adidas")
+    assert "competitor_sponsored" in flags("new kicks #ad Adidas")
+    assert "competitor_sponsored" in flags("Adidas drop #AD, thanks")
+
+
+def test_unjudged_creator_cannot_outrank_judged_leaders_on_sim_alone():
+    brief = _brief()
+    kols = [
+        _kol(f"creator{index}", videos=[_video(caption="gaming glasses")])
+        for index in range(3)
+    ]
+    judgements = {
+        f"creator{index}": Judgement(
+            handle=f"creator{index}",
+            judge=0.5,
+            audience=0.5,
+            audience_confidence=0.0,
+            reason="ok",
+        )
+        for index in range(2)
+    }
+
+    scored = score_pool(
+        kols,
+        brief,
+        [0.1, 0.2, 0.9],
+        judgements,
+        _brand_aliases(brief),
+        _competitor_aliases(brief),
+        DEFAULT_CONFIG,
+        NOW,
+    )
+
+    unjudged = scored[2]
+    assert unjudged.scores.judged is False
+    assert unjudged.scores.judge == pytest.approx(0.5)
+    first_pass = score_pool(
+        kols,
+        brief,
+        [0.1, 0.2, 0.9],
+        None,
+        _brand_aliases(brief),
+        _competitor_aliases(brief),
+        DEFAULT_CONFIG,
+        NOW,
+    )
+    assert first_pass[2].scores.judge == pytest.approx(first_pass[2].scores.sim)
+
+
+def test_mmr_asks_for_similarity_rows_of_selected_items_only():
+    rows: set[int] = set()
+
+    def sim(left: int, right: int) -> float:
+        rows.add(left)
+        return 0.0
+
+    selected = mmr_select([0.9, 0.8, 0.7, 0.6, 0.5, 0.4], sim, 3, 0.7)
+
+    assert rows <= set(selected)

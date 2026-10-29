@@ -64,6 +64,8 @@ export interface Step {
   error: string | null
   /** How many times the stage started. The discovery loop runs some stages twice. */
   runs: number
+  /** Nodes of this stage that started and have not ended yet. */
+  activeNodes: string[]
 }
 
 export interface Progress {
@@ -83,6 +85,7 @@ export function initialProgress(): Progress {
       finishedAt: null,
       error: null,
       runs: 0,
+      activeNodes: [],
     })),
     lastSeq: 0,
     outcome: null,
@@ -117,7 +120,13 @@ export function applyEvent(progress: Progress, event: JobEvent): Progress {
       // so whatever was still running ends failed with the job's reason.
       const steps = progress.steps.map((step) =>
         step.status === 'running'
-          ? { ...step, status: 'failed' as const, error: event.summary, finishedAt: event.timestamp }
+          ? {
+              ...step,
+              status: 'failed' as const,
+              error: event.summary,
+              finishedAt: event.timestamp,
+              activeNodes: [],
+            }
           : step,
       )
       return { ...next, steps, outcome: { type: event.type, summary: event.summary } }
@@ -133,46 +142,60 @@ export function applyEvent(progress: Progress, event: JobEvent): Progress {
   const at = event.timestamp
   const steps = finishReceived(progress.steps, at)
 
+  const node = event.node
   switch (event.status) {
     case 'started':
       return {
         ...next,
-        steps: updateStep({ ...progress, steps }, stage, (step) => ({
-          ...step,
-          status: 'running',
-          summary: '',
-          startedAt: at,
-          finishedAt: null,
-          error: null,
-          // The two scrapers share one stage; only the first start is a new run.
-          runs: step.status === 'running' ? step.runs : step.runs + 1,
-        })),
+        steps: updateStep({ ...progress, steps }, stage, (step) =>
+          step.activeNodes.length > 0
+            ? // The two scrapers share one stage; a second start joins the current run.
+              { ...step, activeNodes: [...step.activeNodes, node] }
+            : {
+                ...step,
+                status: 'running',
+                summary: '',
+                startedAt: at,
+                finishedAt: null,
+                error: null,
+                runs: step.runs + 1,
+                activeNodes: [node],
+              },
+        ),
       }
     case 'finished':
+    case 'failed': {
+      const failed = event.status === 'failed'
       return {
         ...next,
-        steps: updateStep({ ...progress, steps }, stage, (step) => ({
-          ...step,
-          status: 'finished',
-          summary: event.summary,
-          startedAt: step.startedAt ?? at,
-          finishedAt: at,
-        })),
+        steps: updateStep({ ...progress, steps }, stage, (step) => {
+          const activeNodes = step.activeNodes.filter((name) => name !== node)
+          const summary = failed ? step.summary : joinSummary(step.summary, event.summary)
+          const error = failed ? joinSummary(step.error ?? '', event.summary) : step.error
+          // A shared stage ends only when its last node ends, and a failure sticks.
+          const status =
+            failed || step.status === 'failed' ? 'failed' : activeNodes.length > 0 ? 'running' : 'finished'
+          return {
+            ...step,
+            status,
+            summary,
+            error,
+            startedAt: step.startedAt ?? at,
+            finishedAt: activeNodes.length > 0 ? null : at,
+            activeNodes,
+          }
+        }),
       }
-    case 'failed':
-      return {
-        ...next,
-        steps: updateStep({ ...progress, steps }, stage, (step) => ({
-          ...step,
-          status: 'failed',
-          error: event.summary,
-          startedAt: step.startedAt ?? at,
-          finishedAt: at,
-        })),
-      }
+    }
     default:
       return progress
   }
+}
+
+function joinSummary(current: string, addition: string): string {
+  if (!current) return addition
+  if (!addition) return current
+  return `${current} · ${addition}`
 }
 
 /** Milliseconds of the latest run, or null until it ends. */

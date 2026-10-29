@@ -313,14 +313,34 @@ def make_nodes(
 
     @_guarded("hard_filter")
     def hard_filter(state: MatchState) -> dict[str, Any]:
-        """Keep creators that pass every hard rule and count each rejection."""
+        """Keep creators that pass every hard rule and count each rejection.
+
+        Activity is checked after enrichment instead: search hits are not a
+        creator's newest videos, so one old viral hit must not reject them.
+        """
+        candidates, rejected = _filter_candidates(
+            state, state.discovered, {}, check_activity=False
+        )
+        return {
+            "candidates": candidates,
+            "rejected": rejected,
+            "stage": "filtering",
+        }
+
+    def _filter_candidates(
+        state: MatchState,
+        kols: list[KolProfile],
+        rejected: dict[str, int],
+        *,
+        check_activity: bool,
+    ) -> tuple[list[KolProfile], dict[str, int]]:
         if state.brand_profile is None:
             raise ValueError("brand_profile is required before hard filtering")
         now = datetime.now(UTC)
         brand_alias_list, competitor_alias_list = _alias_sets(state)
-        candidates: list[KolProfile] = []
-        rejected: dict[str, int] = {}
-        for kol in state.discovered:
+        kept: list[KolProfile] = []
+        counts = dict(rejected)
+        for kol in kols:
             reason = apply_hard_filter(
                 kol,
                 state.brand_profile,
@@ -328,18 +348,15 @@ def make_nodes(
                 competitor_alias_list,
                 cfg,
                 now,
+                check_activity=check_activity,
             )
             if reason is None:
-                candidates.append(kol)
+                kept.append(kol)
             else:
-                rejected[reason] = rejected.get(reason, 0) + 1
-        if not candidates:
+                counts[reason] = counts.get(reason, 0) + 1
+        if not kept:
             raise ValueError("no candidates passed the hard filters")
-        return {
-            "candidates": candidates,
-            "rejected": rejected,
-            "stage": "filtering",
-        }
+        return kept, counts
 
     @_guarded("first_pass_rank")
     def first_pass_rank(state: MatchState) -> dict[str, Any]:
@@ -414,6 +431,13 @@ def make_nodes(
             except Exception as exc:  # noqa: BLE001 - one profile must not drop the rest
                 enriched.append(kol)
                 errors.append(f"enrich_kols: failed for {kol.handle}: {exc}")
+        # Re-apply every hard rule, activity included, now that enriched
+        # profiles carry their real follower counts and newest videos.
+        rejected = state.rejected
+        if state.brand_profile is not None:
+            enriched, rejected = _filter_candidates(
+                state, enriched, rejected, check_activity=True
+            )
         if skipped:
             noun = "profile" if skipped == 1 else "profiles"
             errors.append(
@@ -422,6 +446,7 @@ def make_nodes(
             )
         update: dict[str, Any] = {
             "candidates": enriched,
+            "rejected": rejected,
             "stage": "enriching_kols",
         }
         if attempted:

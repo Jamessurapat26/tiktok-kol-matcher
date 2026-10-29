@@ -58,7 +58,7 @@ describe('applyEvent', () => {
     const progress = fold(events)
     expect(progress.steps.every((s) => s.status === 'finished')).toBe(true)
     expect(step(progress, 'filtering').summary).toBe('candidates=25')
-    expect(step(progress, 'scraping').summary).toBe('facebook=ExampleBrand')
+    expect(step(progress, 'scraping').summary).toBe('website=1330 chars · facebook=ExampleBrand')
     expect(stepDuration(step(progress, 'analyzing_brand'))).toBeGreaterThanOrEqual(0)
     expect(progress.outcome).toEqual({ type: 'done', summary: 'ranked 3 KOLs' })
     expect(progress.lastSeq).toBe(25)
@@ -68,6 +68,30 @@ describe('applyEvent', () => {
     const progress = fold(events.slice(0, 4))
     expect(step(progress, 'scraping')).toMatchObject({ status: 'finished', runs: 1 })
     expect(step(progress, 'received').status).toBe('finished')
+  })
+
+  it('keeps the scraping stage running until both scrapers finish', () => {
+    const progress = fold(events.slice(0, 3))
+    expect(step(progress, 'scraping')).toMatchObject({
+      status: 'running',
+      summary: 'website=1330 chars',
+      finishedAt: null,
+    })
+  })
+
+  it('keeps a scraper failure when the other scraper finishes later', () => {
+    const progress = fold([
+      nodeEvent(1, 'scrape_website', 'started'),
+      nodeEvent(2, 'scrape_facebook', 'started'),
+      nodeEvent(3, 'scrape_facebook', 'failed', 'scrape_facebook: blocked'),
+      nodeEvent(4, 'scrape_website', 'finished', 'website=10 chars'),
+    ])
+    expect(step(progress, 'scraping')).toMatchObject({
+      status: 'failed',
+      error: 'scrape_facebook: blocked',
+      summary: 'website=10 chars',
+      activeNodes: [],
+    })
   })
 
   it('shows a stage as running between its started and finished events', () => {

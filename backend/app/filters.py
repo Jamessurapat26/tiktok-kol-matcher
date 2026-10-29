@@ -22,34 +22,51 @@ NOT_THAI = "not_thai"
 FOLLOWERS_OUT_OF_RANGE = "followers_out_of_range"
 INACTIVE = "inactive"
 
-# Matched against handle segments (split on ".", "_", "-") and against the
-# nickname. Short English tokens are deliberately not word-boundary checked:
-# "gadgetshop" and "gamernews" should count as shop/news accounts.
+# Matched anywhere in a handle segment (split on ".", "_", "-") or nickname
+# word: "gadgetshop" counts as a shop. Thai has no word spaces, so Thai tokens
+# must be substring matches.
 _SHOP_MEDIA_TOKENS = (
     "shop",
     "store",
     "official",
-    "mall",
-    "news",
     "media",
-    "tv",
     "magazine",
     "ร้าน",
     "ข่าว",
     "สำนักข่าว",
 )
+# Short tokens hide inside ordinary words ("smallgirl", "itvlogs"), so they
+# count only as a whole segment or word, or as a suffix after a real prefix
+# ("gamernews", "channeltv"), never "small".
+_SHORT_SHOP_MEDIA_TOKENS = ("mall", "news", "tv")
+_SHORT_TOKEN_MIN_PREFIX = 3
 _HANDLE_SPLIT_RE = re.compile(r"[._-]+")
+_NICKNAME_SPLIT_RE = re.compile(r"[\s._\-|/·,()]+")
 _THAI_LANGUAGES = frozenset({"th", "thai"})
 
 
+def _word_is_shop_or_media(word: str) -> bool:
+    word = normalize_for_match(word)
+    if not word:
+        return False
+    if any(normalize_for_match(token) in word for token in _SHOP_MEDIA_TOKENS):
+        return True
+    return any(
+        word == token
+        or (
+            word.endswith(token)
+            and len(word) - len(token) >= _SHORT_TOKEN_MIN_PREFIX
+        )
+        for token in _SHORT_SHOP_MEDIA_TOKENS
+    )
+
+
 def _is_shop_or_media(kol: KolProfile) -> bool:
-    normalized_tokens = tuple(normalize_for_match(token) for token in _SHOP_MEDIA_TOKENS)
-    for segment in _HANDLE_SPLIT_RE.split(kol.handle.casefold()):
-        normalized_segment = normalize_for_match(segment)
-        if any(token in normalized_segment for token in normalized_tokens if token):
-            return True
-    nickname = normalize_for_match(kol.nickname or "")
-    return any(token in nickname for token in normalized_tokens if token)
+    words = [
+        *_HANDLE_SPLIT_RE.split(kol.handle.casefold()),
+        *_NICKNAME_SPLIT_RE.split((kol.nickname or "").casefold()),
+    ]
+    return any(_word_is_shop_or_media(word) for word in words)
 
 
 def _is_thai(kol: KolProfile) -> bool:
@@ -79,6 +96,8 @@ def hard_filter(
     competitor_aliases: Iterable[str],
     cfg: MatchingConfig,
     now: datetime,
+    *,
+    check_activity: bool = True,
 ) -> str | None:
     """Return a rejection reason, or None when the creator passes every rule.
 
@@ -86,6 +105,10 @@ def hard_filter(
     follower range, activity. ``brief`` is part of the boundary so callers can
     pass the same brief used to build the aliases; the rules themselves read
     only the aliases and config.
+
+    ``check_activity=False`` skips the activity rule. The graph uses it before
+    enrichment, because search hits are not a creator's newest videos, and
+    applies the full filter again once profiles are enriched.
     """
     if account_matches(kol.handle, brand_aliases):
         return OWN_BRAND_ACCOUNT
@@ -98,6 +121,8 @@ def hard_filter(
     if not cfg.followers_min <= kol.followers <= cfg.followers_max:
         return FOLLOWERS_OUT_OF_RANGE
 
+    if not check_activity:
+        return None
     newest = _newest_video_at(kol)
     if newest is not None and newest < now - timedelta(days=cfg.active_days):
         return INACTIVE

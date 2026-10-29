@@ -143,6 +143,17 @@ def rank_candidates(
                 judgements[normalize_handle(judgement.handle)] = judgement
         except Exception as exc:  # noqa: BLE001 - judging is an optional stage
             errors.append(f"judge: {exc}")
+        else:
+            missing = [
+                kol.handle
+                for kol in to_judge
+                if normalize_handle(kol.handle) not in judgements
+            ]
+            if missing:
+                errors.append(
+                    f"judge: no score for {len(missing)} of {len(to_judge)} "
+                    f"creators ({', '.join(missing)}); ranked them unjudged"
+                )
 
     scored = score_pool(
         candidates,

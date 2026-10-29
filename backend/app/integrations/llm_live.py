@@ -6,12 +6,15 @@ default NVIDIA endpoint or at any other ``/v1`` chat API.
 
 The default model is a reasoning model. It can return ``reasoning_content``
 and a null ``content`` when the completion budget is used up by the trace, so
-``max_tokens`` defaults to 4096, the timeout defaults to 120 seconds, and
-empty content is retried once. ``LLM_DISABLE_REASONING`` controls thinking:
-``extra_body`` sends ``chat_template_kwargs.enable_thinking=false``, ``system``
-prepends a ``/no_think`` message, ``both`` does both, and ``off`` sends a plain
-request. When unset it is ``extra_body`` for the default NVIDIA endpoint and
-model (measured about 10x faster) and ``off`` for any other provider.
+``max_tokens`` defaults to 4096 and empty content is retried once. Each request
+attempt times out after 60 seconds. Transport failures (timeouts, connection
+errors, 408, 429, and 5xx) are retried twice with doubling backoff, so the
+worst case for one call with the defaults is 3 x 60 s + 2 s + 4 s = 186 s.
+``LLM_DISABLE_REASONING`` controls thinking: ``extra_body`` sends
+``chat_template_kwargs.enable_thinking=false``, ``system`` prepends a
+``/no_think`` message, ``both`` does both, and ``off`` sends a plain request.
+When unset it is ``extra_body`` for the default NVIDIA endpoint and model
+(measured about 10x faster) and ``off`` for any other provider.
 
 The API key is never logged. It is removed from every error string.
 """
@@ -19,14 +22,17 @@ The API key is never logged. It is removed from every error string.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 from urllib.parse import quote
 
+import openai
 from openai import OpenAI
 from pydantic import Field, ValidationError
 
@@ -50,11 +56,18 @@ from .llm import ChatClient, heuristic_score
 
 DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
-DEFAULT_TIMEOUT = 120.0
+DEFAULT_TIMEOUT = 60.0
+DEFAULT_MAX_RETRIES = 2
+DEFAULT_RETRY_BACKOFF = 2.0
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_RERANK_BATCH_SIZE = 5
 DEFAULT_NO_THINK_MESSAGE = "/no_think"
+
+_MAX_RETRY_AFTER = 30.0
+_RETRYABLE_STATUS = frozenset({408, 429})
+
+logger = logging.getLogger(__name__)
 
 _KEY_ENV_VARS = ("LLM_API_KEY", "NVIDIA_API_KEY", "OPENAI_API_KEY")
 ReasoningMode = Literal["off", "system", "extra_body", "both"]
@@ -85,6 +98,8 @@ class LlmSettings:
     model: str = DEFAULT_MODEL
     api_key: str = field(default="", repr=False)
     timeout: float = DEFAULT_TIMEOUT
+    max_retries: int = DEFAULT_MAX_RETRIES
+    retry_backoff: float = DEFAULT_RETRY_BACKOFF
     max_tokens: int = DEFAULT_MAX_TOKENS
     temperature: float = DEFAULT_TEMPERATURE
     reasoning: ReasoningMode = "off"
@@ -100,6 +115,12 @@ class LlmSettings:
 
         model = os.environ.get("LLM_MODEL", "").strip() or DEFAULT_MODEL
         timeout = _env_float("LLM_TIMEOUT", DEFAULT_TIMEOUT, minimum=0.0, positive=True)
+        max_retries = _env_int("LLM_MAX_RETRIES", DEFAULT_MAX_RETRIES, minimum=0)
+        retry_backoff = _env_float(
+            "LLM_RETRY_BACKOFF",
+            DEFAULT_RETRY_BACKOFF,
+            minimum=0.0,
+        )
         max_tokens = _env_int("LLM_MAX_TOKENS", DEFAULT_MAX_TOKENS, minimum=1)
         temperature = _env_float("LLM_TEMPERATURE", DEFAULT_TEMPERATURE, minimum=0.0)
         batch_size = _env_int(
@@ -119,6 +140,8 @@ class LlmSettings:
             model=model,
             api_key=llm_api_key_from_env(api_key),
             timeout=timeout,
+            max_retries=max_retries,
+            retry_backoff=retry_backoff,
             max_tokens=max_tokens,
             temperature=temperature,
             reasoning=reasoning,
@@ -152,6 +175,41 @@ def redact_secret(text: str, secret: str) -> str:
     if encoded and encoded != secret:
         redacted = redacted.replace(encoded, "[redacted]")
     return redacted
+
+
+def _is_transient(exc: BaseException) -> bool:
+    if isinstance(exc, openai.APITimeoutError):
+        return True
+    if isinstance(exc, openai.APIConnectionError):
+        return True
+    if isinstance(exc, openai.APIStatusError):
+        status = getattr(exc, "status_code", None)
+        return status in _RETRYABLE_STATUS or (
+            isinstance(status, int) and status >= 500
+        )
+    return False
+
+
+def _retry_after_seconds(exc: BaseException) -> float | None:
+    if not isinstance(exc, openai.APIStatusError):
+        return None
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    try:
+        raw = headers.get("Retry-After")
+    except (AttributeError, TypeError):
+        return None
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return value
 
 
 def parse_json_object(text: str) -> dict[str, Any]:
@@ -194,9 +252,11 @@ class RelevanceBatch(DomainModel):
 class OpenAIChatClient:
     """Chat completions via the official OpenAI SDK.
 
-    ``max_retries`` is 0 so the only automatic retry is the empty-content
-    retry below. Timeouts and HTTP errors are not retried: a reasoning call
-    can already sit for most of the timeout.
+    The SDK's own ``max_retries`` is 0. This class retries transient transport
+    failures itself: timeouts, connection errors, 408, 429, and 5xx, up to
+    ``settings.max_retries`` times with doubling backoff. Other HTTP errors and
+    non-OpenAI exceptions are not retried. Empty content has its own retry in
+    ``complete``.
     """
 
     def __init__(
@@ -205,11 +265,14 @@ class OpenAIChatClient:
         *,
         client: Any = None,
         http_client: Any = None,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if not settings.api_key:
             raise LlmConfigError(_MISSING_KEY)
         self._settings = settings
         self._api_key = settings.api_key
+        self._sleep = sleep
+        self.retry_count = 0
         if client is not None:
             self._client = client
             return
@@ -258,22 +321,56 @@ class OpenAIChatClient:
         }
         if extra:
             kwargs["extra_body"] = extra
-        try:
-            completion = self._client.chat.completions.create(**kwargs)
-        except Exception as exc:
-            # Drop the cause. OpenAI exceptions can keep the request, including
-            # the Authorization header, on the traceback context.
-            raise self._request_error(exc) from None
-        choices = getattr(completion, "choices", None) or []
-        if not choices:
-            return None
-        return choices[0].message
+        attempts = self._settings.max_retries + 1
+        retries = 0
+        for attempt in range(attempts):
+            try:
+                completion = self._client.chat.completions.create(**kwargs)
+            except Exception as exc:
+                if not _is_transient(exc) or attempt >= attempts - 1:
+                    # Drop the cause. OpenAI exceptions can keep the request,
+                    # including the Authorization header, on the traceback
+                    # context.
+                    raise self._request_error(exc, retries=retries) from None
+                retries += 1
+                self.retry_count += 1
+                delay = self._retry_delay(exc, retries)
+                logger.warning(
+                    "LLM request failed (%s); retry %d of %d in %.1fs",
+                    self._short_error(exc),
+                    retries,
+                    self._settings.max_retries,
+                    delay,
+                )
+                self._sleep(delay)
+                continue
+            choices = getattr(completion, "choices", None) or []
+            if not choices:
+                return None
+            return choices[0].message
+        raise AssertionError("unreachable")
 
-    def _request_error(self, exc: BaseException) -> LlmError:
+    def _retry_delay(self, exc: BaseException, retry: int) -> float:
+        delay = self._settings.retry_backoff * 2 ** (retry - 1)
+        retry_after = _retry_after_seconds(exc)
+        if retry_after is None:
+            return delay
+        return min(max(delay, retry_after), _MAX_RETRY_AFTER)
+
+    def _short_error(self, exc: BaseException) -> str:
+        text = type(exc).__name__
+        status = getattr(exc, "status_code", None)
+        if status is not None:
+            text += f" status {status}"
+        return redact_secret(text, self._api_key)
+
+    def _request_error(self, exc: BaseException, *, retries: int = 0) -> LlmError:
         message = redact_secret(f"{type(exc).__name__}: {exc}", self._api_key)
         message = " ".join(message.split())
         if len(message) > 500:
             message = message[:497] + "..."
+        if retries > 0:
+            message += f" (after {retries} retries)"
         return LlmError(f"LLM request failed: {message}")
 
 

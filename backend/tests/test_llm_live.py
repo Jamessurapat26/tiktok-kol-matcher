@@ -8,15 +8,18 @@ that must redact the key even when the exception text is not an HTTP body.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import quote
 
 import httpx2
+import openai
 import pytest
 
 from app.cli import main
@@ -28,8 +31,11 @@ from app.integrations.kol_search import MockKolSearch
 from app.integrations.llm import MockBrandAnalyzer, heuristic_score
 from app.integrations.llm_live import (
     DEFAULT_BASE_URL,
+    DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
+    DEFAULT_RERANK_BATCH_SIZE,
+    DEFAULT_RETRY_BACKOFF,
     DEFAULT_TEMPERATURE,
     DEFAULT_TIMEOUT,
     LlmConfigError,
@@ -63,6 +69,8 @@ _KEY_ENVS = (
     "LLM_BASE_URL",
     "LLM_MODEL",
     "LLM_TIMEOUT",
+    "LLM_MAX_RETRIES",
+    "LLM_RETRY_BACKOFF",
     "LLM_MAX_TOKENS",
     "LLM_TEMPERATURE",
     "LLM_DISABLE_REASONING",
@@ -131,11 +139,13 @@ def _analyzer(handler, **overrides) -> LiveBrandAnalyzer:
         model=overrides.get("model", "test-model"),
         api_key=overrides.get("api_key", _KEY),
         timeout=overrides.get("timeout", DEFAULT_TIMEOUT),
+        max_retries=overrides.get("max_retries", DEFAULT_MAX_RETRIES),
+        retry_backoff=overrides.get("retry_backoff", 0.0),
         max_tokens=overrides.get("max_tokens", DEFAULT_MAX_TOKENS),
         temperature=overrides.get("temperature", DEFAULT_TEMPERATURE),
         reasoning=overrides.get("reasoning", "off"),
         no_think_message=overrides.get("no_think_message", "/no_think"),
-        rerank_batch_size=overrides.get("rerank_batch_size", 5),
+        rerank_batch_size=overrides.get("rerank_batch_size", DEFAULT_RERANK_BATCH_SIZE),
     )
     http = httpx2.Client(transport=httpx2.MockTransport(handler))
     return LiveBrandAnalyzer(settings=settings, http_client=http)
@@ -197,6 +207,41 @@ class _FakeCompletions:
         raise self.error
 
 
+class _ScriptedCompletions:
+    def __init__(self, outcomes: list[object]) -> None:
+        self._outcomes = list(outcomes)
+        self.calls = 0
+        self.chat = self
+        self.completions = self
+
+    def create(self, **kwargs):
+        self.calls += 1
+        outcome = self._outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+
+def _fake_completion(content: str) -> SimpleNamespace:
+    message = SimpleNamespace(content=content, reasoning_content=None)
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+def _status_error(
+    status: int,
+    *,
+    headers: dict[str, str] | None = None,
+    message: str | None = None,
+) -> openai.APIStatusError:
+    request = httpx2.Request("POST", "https://llm.test/v1/chat/completions")
+    response = httpx2.Response(status, headers=headers, request=request)
+    return openai.APIStatusError(
+        message or f"HTTP {status}",
+        response=response,
+        body=None,
+    )
+
+
 class _ScriptedChat:
     def __init__(self, replies: list[str]) -> None:
         self._replies = list(replies)
@@ -233,7 +278,9 @@ def test_default_settings_and_key_fallback(monkeypatch):
     settings = LlmSettings.from_env()
     assert settings.base_url == DEFAULT_BASE_URL
     assert settings.model == DEFAULT_MODEL
-    assert settings.timeout == DEFAULT_TIMEOUT == 120
+    assert settings.timeout == DEFAULT_TIMEOUT == 60
+    assert settings.max_retries == DEFAULT_MAX_RETRIES == 2
+    assert settings.retry_backoff == DEFAULT_RETRY_BACKOFF == 2.0
     assert settings.max_tokens == DEFAULT_MAX_TOKENS == 4096
     assert settings.temperature == DEFAULT_TEMPERATURE
     assert settings.reasoning == "extra_body"
@@ -307,6 +354,36 @@ def test_settings_overrides_and_invalid_values(monkeypatch):
     monkeypatch.setenv("LLM_BASE_URL", "ftp://example.test")
     monkeypatch.delenv("LLM_DISABLE_REASONING")
     with pytest.raises(LlmConfigError, match="LLM_BASE_URL"):
+        LlmSettings.from_env()
+
+
+def test_retry_settings_from_env_and_invalid_values(monkeypatch):
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("LLM_MAX_RETRIES", "4")
+    monkeypatch.setenv("LLM_RETRY_BACKOFF", "0.5")
+    settings = LlmSettings.from_env()
+    assert settings.max_retries == 4
+    assert settings.retry_backoff == 0.5
+
+    monkeypatch.setenv("LLM_MAX_RETRIES", "0")
+    monkeypatch.setenv("LLM_RETRY_BACKOFF", "0")
+    settings = LlmSettings.from_env()
+    assert settings.max_retries == 0
+    assert settings.retry_backoff == 0.0
+
+    monkeypatch.setenv("LLM_MAX_RETRIES", "-1")
+    with pytest.raises(LlmConfigError, match="LLM_MAX_RETRIES"):
+        LlmSettings.from_env()
+    monkeypatch.setenv("LLM_MAX_RETRIES", "nope")
+    with pytest.raises(LlmConfigError, match="LLM_MAX_RETRIES"):
+        LlmSettings.from_env()
+
+    monkeypatch.setenv("LLM_MAX_RETRIES", "2")
+    monkeypatch.setenv("LLM_RETRY_BACKOFF", "-0.5")
+    with pytest.raises(LlmConfigError, match="LLM_RETRY_BACKOFF"):
+        LlmSettings.from_env()
+    monkeypatch.setenv("LLM_RETRY_BACKOFF", "nope")
+    with pytest.raises(LlmConfigError, match="LLM_RETRY_BACKOFF"):
         LlmSettings.from_env()
 
 
@@ -448,6 +525,204 @@ def test_fake_client_exception_redacts_raw_and_encoded_key():
     assert encoded not in str(exc.value)
     assert str(exc.value).count("[redacted]") >= 2
     assert exc.value.__cause__ is None
+
+
+def test_transient_500_is_retried_then_succeeds():
+    queue = _Queue(
+        [
+            (500, {"error": {"message": "temporary failure"}}),
+            (200, _completion(json.dumps(_BRAND_JSON))),
+        ]
+    )
+    analyzer = _analyzer(queue)
+    try:
+        profile = analyzer.analyze_brand("A shop sells blue-light glasses.", None)
+    finally:
+        analyzer.close()
+
+    assert profile.category == "blue-light glasses"
+    assert len(queue.requests) == 2
+    assert analyzer._chat.retry_count == 1
+
+
+def test_429_and_503_use_doubling_backoff():
+    sleeps: list[float] = []
+    fake = _ScriptedCompletions(
+        [
+            _status_error(429),
+            _status_error(503),
+            _fake_completion(json.dumps(_BRAND_JSON)),
+        ]
+    )
+    client = OpenAIChatClient(
+        LlmSettings(
+            api_key=_KEY,
+            base_url="https://llm.test/v1",
+            max_retries=2,
+            retry_backoff=2.0,
+        ),
+        client=fake,
+        sleep=sleeps.append,
+    )
+
+    result = client.complete([{"role": "user", "content": "hi"}])
+
+    assert json.loads(result)["category"] == "blue-light glasses"
+    assert fake.calls == 3
+    assert client.retry_count == 2
+    assert sleeps == [2.0, 4.0]
+
+
+@pytest.mark.parametrize(("header", "expected"), [("7", 7.0), ("100", 30.0)])
+def test_retry_after_header_controls_backoff(header, expected):
+    sleeps: list[float] = []
+    fake = _ScriptedCompletions(
+        [
+            _status_error(429, headers={"Retry-After": header}),
+            _fake_completion("{}"),
+        ]
+    )
+    client = OpenAIChatClient(
+        LlmSettings(
+            api_key=_KEY,
+            base_url="https://llm.test/v1",
+            retry_backoff=2.0,
+        ),
+        client=fake,
+        sleep=sleeps.append,
+    )
+
+    assert client.complete([{"role": "user", "content": "hi"}]) == "{}"
+    assert sleeps == [expected]
+
+
+def test_timeout_retries_then_raises_after_two_retries():
+    class _TimeoutWithKey(openai.APITimeoutError):
+        def __str__(self) -> str:
+            return f"timeout with {_KEY}"
+
+    request = httpx2.Request("POST", "https://llm.test/v1/chat/completions")
+    fake = _ScriptedCompletions(
+        [_TimeoutWithKey(request=request) for _ in range(3)]
+    )
+    sleeps: list[float] = []
+    client = OpenAIChatClient(
+        LlmSettings(
+            api_key=_KEY,
+            base_url="https://llm.test/v1",
+            max_retries=2,
+            retry_backoff=0.0,
+        ),
+        client=fake,
+        sleep=sleeps.append,
+    )
+
+    with pytest.raises(LlmError, match="after 2 retries") as exc:
+        client.complete([{"role": "user", "content": "hi"}])
+
+    assert fake.calls == 3
+    assert client.retry_count == 2
+    assert _KEY not in str(exc.value)
+    assert "[redacted]" in str(exc.value)
+    assert exc.value.__cause__ is None
+
+
+def test_connection_error_is_retried_then_succeeds():
+    request = httpx2.Request("POST", "https://llm.test/v1/chat/completions")
+    fake = _ScriptedCompletions(
+        [
+            openai.APIConnectionError(request=request),
+            _fake_completion("{}"),
+        ]
+    )
+    sleeps: list[float] = []
+    client = OpenAIChatClient(
+        LlmSettings(
+            api_key=_KEY,
+            base_url="https://llm.test/v1",
+            retry_backoff=0.0,
+        ),
+        client=fake,
+        sleep=sleeps.append,
+    )
+
+    assert client.complete([{"role": "user", "content": "hi"}]) == "{}"
+    assert fake.calls == 2
+    assert client.retry_count == 1
+    assert sleeps == [0.0]
+
+
+@pytest.mark.parametrize("status", [400, 401, 404, 422])
+def test_other_client_errors_are_not_retried(status):
+    queue = _Queue([(status, {"error": {"message": "no retry"}})])
+    analyzer = _analyzer(queue)
+    try:
+        with pytest.raises(LlmError, match="LLM request failed"):
+            analyzer.analyze_brand("A shop sells blue-light glasses.", None)
+    finally:
+        analyzer.close()
+
+    assert len(queue.requests) == 1
+    assert analyzer._chat.retry_count == 0
+
+
+def test_408_is_retried():
+    queue = _Queue(
+        [
+            (408, {"error": {"message": "request timeout"}}),
+            (200, _completion(json.dumps(_BRAND_JSON))),
+        ]
+    )
+    analyzer = _analyzer(queue)
+    try:
+        profile = analyzer.analyze_brand("A shop sells blue-light glasses.", None)
+    finally:
+        analyzer.close()
+
+    assert profile.category == "blue-light glasses"
+    assert len(queue.requests) == 2
+    assert analyzer._chat.retry_count == 1
+
+
+def test_zero_retries_raises_after_one_request():
+    queue = _Queue([(500, {"error": {"message": "temporary failure"}})])
+    analyzer = _analyzer(queue, max_retries=0)
+    try:
+        with pytest.raises(LlmError, match="LLM request failed") as exc:
+            analyzer.analyze_brand("A shop sells blue-light glasses.", None)
+    finally:
+        analyzer.close()
+
+    assert len(queue.requests) == 1
+    assert analyzer._chat.retry_count == 0
+    assert "after" not in str(exc.value)
+
+
+def test_retry_logs_a_warning_without_the_key(caplog):
+    caplog.set_level(logging.WARNING, logger="app.integrations.llm_live")
+    queue = _Queue(
+        [
+            (500, {"error": {"message": f"temporary failure {_KEY}"}}),
+            (200, _completion(json.dumps(_BRAND_JSON))),
+        ]
+    )
+    analyzer = _analyzer(queue)
+    try:
+        analyzer.analyze_brand("A shop sells blue-light glasses.", None)
+    finally:
+        analyzer.close()
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "app.integrations.llm_live"
+        and record.levelno == logging.WARNING
+    ]
+    assert records
+    messages = "\n".join(record.getMessage() for record in records)
+    assert "LLM request failed" in messages
+    assert "retry 1 of 2" in messages
+    assert _KEY not in messages
 
 
 @pytest.mark.parametrize(

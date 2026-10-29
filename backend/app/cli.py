@@ -199,7 +199,17 @@ def summarize_update(
         stage = update.get("stage")
         parts.append(f"stage={stage}" if stage else "ok")
 
-    return " ".join(parts)
+    summary = " ".join(parts)
+    if errors and any(
+        key not in {"errors", "stage", "cost_log"} for key in update
+    ):
+        warning = str(errors[-1])
+        if node and warning.startswith(f"{node}: "):
+            warning = warning[len(f"{node}: "):]
+        if warning.startswith("warning: "):
+            warning = warning[len("warning: "):]
+        summary += f"; warning: {warning}"
+    return summary
 
 
 def _run_pipeline(

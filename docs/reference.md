@@ -302,9 +302,12 @@ before the pipeline starts.
 - **Fallback.** When the profile run fails or returns no usable item, the page
   URL is read with the live web reader (Jina, then trafilatura, with its own
   cache), even without `--live-web`. The page name comes from the URL, the title
-  from the first heading, and the intro from the page text. If that also
+  from the first heading, and the intro from the page text. Login walls and
+  unavailable-content pages are rejected rather than accepted. If that also
   fails, `scrape_facebook` records a warning and brand analysis runs on the
-  website alone. When only the posts run fails, the page is kept with no posts.
+  website alone. When the fallback succeeds after an Apify item error, the page
+  keeps a warning naming that error. When only the posts run fails, the page is
+  kept with no posts.
 - **Cache.** Complete Apify results are stored as JSON under
   `data/cache/facebook` for 7 days. The key is the SHA-256 of the normalized
   URL. Set `KOL_CACHE_DIR` to move the root (`$KOL_CACHE_DIR/facebook`). A hit

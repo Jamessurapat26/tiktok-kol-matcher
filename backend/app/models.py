@@ -67,6 +67,8 @@ class FacebookPage(DomainModel):
     website: HttpUrl | None = None
     ad_running: bool = False
     recent_posts: list[str] = Field(default_factory=list)
+    # Set only when Apify failed and the web fallback produced the page.
+    source_warning: str | None = None
 
     @field_validator("recent_posts")
     @classmethod

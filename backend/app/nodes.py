@@ -149,8 +149,12 @@ def make_nodes(
     @_guarded("scrape_facebook", stage_on_error=False)
     def scrape_facebook(state: MatchState) -> dict[str, Any]:
         page = integrations.facebook.fetch_page(str(state.request.facebook_url))
-        # No stage update: scrape_website runs in the same superstep.
-        return {"facebook_page": page}
+        # No stage update: scrape_website runs in the same superstep. A page
+        # from the web fallback keeps Apify's error as a warning.
+        update: dict[str, Any] = {"facebook_page": page}
+        if page.source_warning:
+            update["errors"] = [f"scrape_facebook: warning: {page.source_warning}"]
+        return update
 
     @_guarded("analyze_brand")
     def analyze_brand(state: MatchState) -> dict[str, Any]:

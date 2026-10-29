@@ -8,13 +8,14 @@ from dataclasses import replace
 import pytest
 from langgraph.errors import GraphRecursionError
 
-from app.cli import main
+from app.cli import main, summarize_update
 from app.graph import build_graph
 from app.integrations import mock_integrations
 from app.integrations.kol_enricher_live import ApifyKolEnricher
 from app.integrations.kol_search_live import ApifyKolSearch
 from app.integrations.web_reader import MockWebReader
 from app.integrations.web_reader_live import CachedWebReader
+from app.models import FacebookPage
 
 _WEBSITE = "https://example-brand.co.th"
 _FACEBOOK = "https://www.facebook.com/examplebrand"
@@ -24,6 +25,32 @@ def _pretend_embed_extra_installed(monkeypatch):
     module = types.ModuleType("sentence_transformers")
     module.__spec__ = importlib.machinery.ModuleSpec("sentence_transformers", None)
     monkeypatch.setitem(sys.modules, "sentence_transformers", module)
+
+
+def test_summarize_update_shows_source_warnings_and_brand_sources():
+    page = FacebookPage(
+        page_name="ExampleBrand",
+        title="ExampleBrand",
+        url="https://www.facebook.com/examplebrand",
+        source_warning="Apify page item error not_available: gone",
+    )
+    warning = summarize_update(
+        {
+            "facebook_page": page,
+            "errors": ["scrape_facebook: warning: Apify page item error not_available: gone"],
+        },
+        node="scrape_facebook",
+    )
+    assert warning.endswith("; warning: Apify page item error not_available: gone")
+
+    sources = summarize_update(
+        {
+            "brand_profile": object(),
+            "brand_sources": ["website: skipped", "facebook: used"],
+        },
+        node="analyze_brand",
+    )
+    assert "sources: website skipped, facebook used" in sources
 
 
 def test_json_output(capsys):

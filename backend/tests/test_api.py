@@ -16,7 +16,7 @@ from app.graph import _NODE_ORDER
 from app.integrations import mock_integrations
 from app.integrations.apify import ApifyClient
 from app.integrations.web_reader import MockWebReader
-from app.models import MatchRequest
+from app.models import FacebookPage, MatchRequest
 
 _ENV_VARS = (
     "DEMO_MODE",
@@ -399,6 +399,32 @@ def test_events_stream_every_node_then_done(make_client):
     assert finished_order[2:] == list(_NODE_ORDER[2:])
     discover = next(e for e in node_events if e["node"] == "discover_kols" and e["summary"])
     assert "discovered+" in discover["summary"]
+
+
+def test_scrape_facebook_source_warning_is_a_finished_event(make_client):
+    class WarningFacebook:
+        def fetch_page(self, url: str) -> FacebookPage:
+            return FacebookPage(
+                page_name="ExampleBrand",
+                title="ExampleBrand",
+                url=url,
+                source_warning="Apify page item error not_available: gone",
+            )
+
+    integrations = replace(mock_integrations(), facebook=WarningFacebook())
+    with make_client(integrations=integrations) as client:
+        job_id = client.post("/api/jobs", json=_BODY).json()["job_id"]
+        job = client.get(f"/api/jobs/{job_id}").json()
+        events = read_events(client, job_id)
+
+    assert job["status"] == "succeeded"
+    event = next(
+        e
+        for e in events
+        if e["node"] == "scrape_facebook" and e["status"] == "finished"
+    )
+    assert "warning" in event["summary"]
+    assert "not_available" in event["summary"]
 
 
 def test_events_reconnect_replays_only_later_events(make_client):

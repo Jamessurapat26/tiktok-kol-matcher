@@ -7,8 +7,14 @@ import pytest
 from app.cli import main
 from app.integrations import ApifyConfigError, build_integrations, mock_integrations
 from app.integrations.facebook import MockFacebookScraper
-from app.integrations.facebook_live import ApifyFacebookScraper, default_facebook_cache_dir
+from app.integrations.facebook_live import (
+    ApifyFacebookScraper,
+    default_facebook_cache_dir,
+    page_from_items,
+    page_from_text,
+)
 from app.integrations.llm import MockBrandAnalyzer
+from app.integrations.apify import ApifyError
 from app.integrations.web_reader import MockWebReader, WebReadError
 from app.integrations.web_reader_live import CachedWebReader
 from app.models import MAX_POST_CHARS, MAX_RECENT_POSTS, FacebookPage, MatchRequest
@@ -104,6 +110,25 @@ _PAGE_ITEM = {
     "followers": 51000,
     "ad_status": "This Page is currently running ads.",
 }
+
+_NOT_AVAILABLE_ITEM = {
+    "url": _URL,
+    "error": "not_available",
+    "errorDescription": (
+        "This content isn't available because the owner only shared it with a "
+        "small group of people or changed who can see it, or it's been deleted."
+    ),
+}
+
+_LOGIN_WALL = (
+    "Explore the things you love.\n\n"
+    "Log into Facebook\n\n"
+    "Email or mobile number\n\n"
+    "Password\n\n"
+    "Log in\n\n"
+    "Forgot password?\n\n"
+    "Create new account"
+)
 
 
 def _post_item(n: int) -> dict:
@@ -221,6 +246,64 @@ def test_empty_or_error_dataset_falls_back_to_web_reader(tmp_path):
         page = _scraper(_Router(pages=pages), tmp_path, reader).fetch_page(_URL)
         assert reader.urls == [_URL]
         assert page.title == "ExampleBrand"
+
+
+def test_item_error_is_named_and_clipped():
+    with pytest.raises(ApifyError) as exc_info:
+        page_from_items(_URL, [_NOT_AVAILABLE_ITEM])
+
+    message = str(exc_info.value)
+    assert message.startswith("Apify page item error not_available:")
+    assert "This content isn't available" in message
+    assert len(message) < 220
+
+
+def test_page_from_text_rejects_the_login_wall():
+    with pytest.raises(WebReadError) as exc_info:
+        page_from_text(_URL, _LOGIN_WALL)
+
+    assert "login wall" in str(exc_info.value)
+
+
+def test_not_available_item_and_login_wall_report_both_reasons(tmp_path):
+    reader = _Reader(_LOGIN_WALL)
+    scraper = _scraper(_Router(pages=[_NOT_AVAILABLE_ITEM]), tmp_path, reader)
+
+    with pytest.raises(WebReadError) as exc_info:
+        scraper.fetch_page(_URL)
+
+    message = str(exc_info.value)
+    assert "not_available" in message
+    assert "login wall" in message
+    assert not (tmp_path / "facebook").exists()
+
+
+def test_fallback_after_item_error_keeps_a_warning_not_the_llm_text(tmp_path):
+    reader = _Reader("# ExampleBrand\n\nGaming glasses shop.")
+    page = _scraper(_Router(pages=[_NOT_AVAILABLE_ITEM]), tmp_path, reader).fetch_page(_URL)
+
+    assert page.title == "ExampleBrand"
+    assert page.source_warning is not None
+    assert "not_available" in page.source_warning
+    assert not (tmp_path / "facebook").exists()
+    prompt = brand_messages("site text", page)[1]["content"]
+    assert "not_available" not in prompt
+    assert "source_warning" not in prompt
+
+
+def test_scrape_facebook_surfaces_the_fallback_warning(tmp_path):
+    integrations = replace(
+        mock_integrations(),
+        facebook=_scraper(_Router(pages=[_NOT_AVAILABLE_ITEM]), tmp_path),
+    )
+    nodes = make_nodes(integrations, min_candidates=1, max_search_rounds=1)
+    request = MatchRequest(website_url="https://example-brand.co.th", facebook_url=_URL)
+
+    update = nodes["scrape_facebook"](MatchState(request=request))
+
+    assert update["facebook_page"].source_warning
+    assert update["errors"][0].startswith("scrape_facebook: warning: ")
+    assert "not_available" in update["errors"][0]
 
 
 def test_both_sources_failing_raises_with_redacted_reasons(tmp_path):

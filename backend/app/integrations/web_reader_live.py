@@ -13,7 +13,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 import trafilatura
 
-from .web_reader import WebPage, WebReadError, truncate
+from .web_reader import WebPage, WebReadError, blocked_page_reason, truncate
 
 _USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -67,6 +67,12 @@ def clean_markdown(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
+def _reject_blocked_page(url: str, text: str, reader: str) -> None:
+    reason = blocked_page_reason(text)
+    if reason is not None:
+        raise WebReadError(f"{reader} read a blocked page for {url}: {reason}")
+
+
 class JinaWebReader:
     def __init__(
         self,
@@ -105,7 +111,9 @@ class JinaWebReader:
                     # (often a CAPTCHA) is only flagged by this header line.
                     if error := _JINA_TARGET_ERROR_RE.search(header):
                         raise WebReadError(f"Jina could not read {url}: {error.group()}")
-                    return WebPage(truncate(clean_markdown(body)), "jina")
+                    content = truncate(clean_markdown(body))
+                    _reject_blocked_page(url, content, "Jina")
+                    return WebPage(content, "jina")
                 last_status = resp.status_code
                 reason = f"HTTP {resp.status_code}"
                 if not _is_jina_retryable_status(resp.status_code):
@@ -223,7 +231,9 @@ class TrafilaturaWebReader:
         text = trafilatura.extract(resp.text, output_format="markdown", include_links=False)
         if not text:
             raise WebReadError(f"no readable content extracted from {url}")
-        return WebPage(truncate(text), "trafilatura")
+        content = truncate(text)
+        _reject_blocked_page(url, content, "trafilatura")
+        return WebPage(content, "trafilatura")
 
     def read(self, url: str) -> str:
         return self.fetch(url).content
@@ -278,6 +288,8 @@ def _load_cached_page(path: Path, *, now: float, ttl_seconds: float) -> WebPage 
         return None
     if now - float(fetched_at) > ttl_seconds:
         return None
+    if blocked_page_reason(content) is not None:
+        return None
     return WebPage(content, source)
 
 
@@ -297,6 +309,7 @@ class FallbackWebReader:
     def fetch(self, url: str) -> WebPage:
         try:
             page = self._primary.fetch(url)
+            _reject_blocked_page(url, page.content, "primary reader")
         except WebReadError as exc:
             primary_reason = str(exc)
         else:
@@ -305,7 +318,9 @@ class FallbackWebReader:
             primary_reason = f"content too short ({len(page.content)} chars)"
 
         try:
-            return self._fallback.fetch(url)
+            page = self._fallback.fetch(url)
+            _reject_blocked_page(url, page.content, "fallback reader")
+            return page
         except WebReadError as exc:
             raise WebReadError(
                 f"Could not read {url}: primary failed ({primary_reason}); "
@@ -342,6 +357,7 @@ class CachedWebReader:
             return cached
 
         page = self._inner.fetch(url)
+        _reject_blocked_page(url, page.content, "web reader")
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         payload = {
             "url": url,

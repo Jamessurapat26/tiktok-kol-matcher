@@ -16,7 +16,13 @@ from app.integrations.facebook import MockFacebookScraper
 from app.integrations.kol_enricher import MockKolEnricher
 from app.integrations.kol_search import MockKolSearch
 from app.integrations.llm import MockBrandAnalyzer
-from app.integrations.web_reader import MAX_CONTENT_CHARS, MockWebReader, WebPage, WebReadError
+from app.integrations.web_reader import (
+    MAX_CONTENT_CHARS,
+    MockWebReader,
+    WebPage,
+    WebReadError,
+    blocked_page_reason,
+)
 from app.integrations.web_reader_live import (
     CachedWebReader,
     FallbackWebReader,
@@ -49,6 +55,18 @@ _CAPTCHA = (
 )
 
 
+_LOGIN_WALL = (
+    "Explore the things you love.\n\n"
+    "Log into Facebook\n\n"
+    "Email or mobile number\n\n"
+    "Password\n\n"
+    "Log in\n\n"
+    "Forgot password?\n\n"
+    "Create new account\n\n"
+    "Meta © 2026"
+)
+
+
 def _client(handler) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler))
 
@@ -57,6 +75,34 @@ def _jina_reply(body: str, *warnings: str) -> str:
     """Text reply shape from r.jina.ai (reader/snapshot-formatter.ts)."""
     mixins = "".join(f"{warning}\n\n" for warning in warnings)
     return f"Title: ExampleBrand\n\nURL Source: {_URL}\n\n{mixins}Markdown Content:\n{body}"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Log into Facebook Email or mobile number Password Log in",
+        "Log in to Facebook to continue.",
+        "You must log in to continue.",
+        "This content isn't available because the owner changed who can see it.",
+        "This content isn’t available right now.",
+        "This page isn't available.",
+        "This page isn’t available.",
+        "เข้าสู่ระบบ Facebook เพื่อดำเนินการต่อ",
+        "เนื้อหานี้ไม่พร้อมใช้งาน",
+        _LOGIN_WALL,
+    ],
+)
+def test_blocked_page_reason_flags_login_walls_and_missing_content(text):
+    assert blocked_page_reason(text) in {"login wall", "content not available"}
+
+
+def test_blocked_page_reason_ignores_a_normal_page_with_a_log_in_link():
+    text = (
+        "ExampleBrand blue-light glasses for gamers.\n\n"
+        "Shop now. Log in to your account for order tracking."
+    )
+    assert blocked_page_reason(text) is None
+
 
 
 def _article_html() -> str:
@@ -479,6 +525,47 @@ def test_failed_fetch_is_not_cached(tmp_path):
     assert calls["n"] == 2
     assert page.source == "jina"
     assert list(tmp_path.glob("*.json"))
+
+
+def test_blocked_jina_page_fails_and_is_not_cached(tmp_path):
+    def jina_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=_jina_reply(_LOGIN_WALL))
+
+    reader = CachedWebReader(
+        FallbackWebReader(
+            _jina(jina_handler),
+            _Stub(error=WebReadError("fallback down")),
+        ),
+        tmp_path,
+    )
+
+    with pytest.raises(WebReadError) as exc_info:
+        reader.fetch(_URL)
+
+    assert "login wall" in str(exc_info.value)
+    assert list(tmp_path.glob("*.json")) == []
+
+
+def test_cached_blocked_entry_is_ignored(tmp_path):
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, text="ExampleBrand recovered. " * 20)
+
+    reader = CachedWebReader(_jina(handler), tmp_path, clock=lambda: 1_000.0)
+    first = reader.fetch(_URL)
+    path = next(tmp_path.glob("*.json"))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["content"] = _LOGIN_WALL
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    page = reader.fetch(_URL)
+
+    assert calls["n"] == 2
+    assert page.content == first.content
+    assert "Log into Facebook" not in page.content
+    assert "Log into Facebook" not in path.read_text(encoding="utf-8")
 
 
 def test_default_cache_dir(monkeypatch, tmp_path):

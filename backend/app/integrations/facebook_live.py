@@ -27,7 +27,7 @@ from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from ..models import MAX_RECENT_POSTS, FacebookPage
 from .apify import ApifyBudget, ApifyBudgetExceeded, ApifyClient, ApifyError, as_count
-from .web_reader import WebReader, WebReadError
+from .web_reader import WebReader, WebReadError, blocked_page_reason
 from .web_reader_live import _DEFAULT_TTL_SECONDS, _normalize_url
 
 PAGES_ACTOR = "apify/facebook-pages-scraper"
@@ -81,6 +81,8 @@ def page_from_text(url: str, text: str) -> FacebookPage:
     """Build a minimal page from web-reader text when Apify has nothing."""
     if not text.strip():
         raise WebReadError(f"web reader returned no text for {url}")
+    if reason := blocked_page_reason(text):
+        raise WebReadError(f"web reader returned a blocked page for {url}: {reason}")
     parts = urlsplit(url)
     segment = next((s for s in parts.path.split("/") if s), "")
     page_name = segment or parts.netloc

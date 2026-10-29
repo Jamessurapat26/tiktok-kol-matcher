@@ -375,7 +375,7 @@ and the web reader checks resolved addresses before a direct fetch.
   may get login text instead of the page's "about".
 - **The ranking weights are not tuned.** 40/25/20/15 is a reasoned starting
   point, not a value fitted to labelled data.
-- **The candidate pool is measured on one brand only.** Two live runs on the
+- **The candidate pool is measured on one brand only.** Three live runs on the
   same retail brand:
   - The run in the screenshots used the first settings (10 videos per query, a
     language-and-region filter, a loop that counted every creator). It found 48
@@ -383,9 +383,20 @@ and the web reader checks resolved addresses before a direct fetch.
   - A run with 20 videos per query and the Thai-script filter found 210 and kept
     60 after two rounds. It spent $0.93 of real Apify credit, which showed that
     the cost estimates were too low. A spend guard in the test harness blocked 9
-    of the 10 profile runs, so the results had no engagement data. The current
-    defaults (15 videos per query, recalibrated estimates, the brand-name check)
-    have not been run live yet.
+    of the 10 profile runs, so the results had no engagement data.
+  - A run with the current defaults (15 videos per query, recalibrated
+    estimates, the brand-name check, LLM retries) found 81 + 57 = 138 creators
+    in two rounds and kept 33. It took 10 min 14 s and spent $0.78 of real Apify
+    credit: 10 search runs and 7 profile runs. One profile run timed out and the
+    budget skipped 2 more, so at most 6 creators got engagement data. The budget also
+    skipped the last 2 search queries to keep the enrichment reserve. Two LLM
+    calls timed out once and succeeded on retry. All 10 results name the brand,
+    so none was capped.
+- **Most results still lack engagement data.** Only the 10 largest accounts are
+  enriched, and in the run above only 2 of the top 10 were among them. The
+  other 8 share the default engagement score.
+- **The brand's own account is not excluded.** In the run above the brand's
+  official TikTok account ranked first.
 - **The brand-name check is literal.** A creator who refers to the brand only
   in video speech, an image, or an unlisted nickname counts as not naming it,
   and an alias the LLM misses is not matched.

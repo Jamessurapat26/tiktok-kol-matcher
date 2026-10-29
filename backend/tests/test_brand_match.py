@@ -99,7 +99,11 @@ def test_aliases_from_urls_ignores_reserved_facebook_paths():
     ],
 )
 def test_mentions_brand_matches_sampled_content(caption, alias):
-    assert mentions_brand(_kol("Creator", caption), [normalize_for_match(alias)])
+    assert mentions_brand(
+        _kol("Creator", caption),
+        [normalize_for_match(alias)],
+        brand_names=[alias],
+    )
 
 
 def test_mentions_brand_is_false_for_another_store_campaign():

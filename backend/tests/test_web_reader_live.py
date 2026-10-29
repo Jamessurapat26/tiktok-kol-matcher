@@ -41,9 +41,9 @@ _ARTICLE = (
 
 _CAPTCHA = (
     "Just a moment...\n\n"
-    "ophtus.com\n\n"
+    "example-brand.co.th\n\n"
     "Verifying you are human. This may take a few seconds.\n\n"
-    "ophtus.com needs to review the security of your connection before proceeding.\n\n"
+    "example-brand.co.th needs to review the security of your connection before proceeding.\n\n"
     "Ray ID: 8c1f2a3b4c5d6e7f\n\n"
     "Performance & security by Cloudflare"
 )
@@ -56,7 +56,7 @@ def _client(handler) -> httpx.Client:
 def _jina_reply(body: str, *warnings: str) -> str:
     """Text reply shape from r.jina.ai (reader/snapshot-formatter.ts)."""
     mixins = "".join(f"{warning}\n\n" for warning in warnings)
-    return f"Title: Ophtus\n\nURL Source: {_URL}\n\n{mixins}Markdown Content:\n{body}"
+    return f"Title: ExampleBrand\n\nURL Source: {_URL}\n\n{mixins}Markdown Content:\n{body}"
 
 
 def _article_html() -> str:
@@ -325,7 +325,7 @@ def test_jina_target_error_warning_falls_back_and_is_not_cached(tmp_path):
 
 
 def test_jina_header_does_not_count_toward_min_chars():
-    body = "Ophtus blue-light glasses. " * 5
+    body = "ExampleBrand blue-light glasses. " * 5
     reply = _jina_reply(body)
     assert len(body) < 200 < len(reply)
 

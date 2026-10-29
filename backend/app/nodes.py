@@ -17,6 +17,7 @@ from .integrations.llm import MockBrandAnalyzer
 from .integrations.web_reader import truncate
 from .models import KolProfile, RankedKol, normalize_handle
 from .state import MatchState
+from .thai import is_thai_creator
 
 Node = Callable[[MatchState], dict[str, Any]]
 
@@ -68,7 +69,15 @@ def _kol_from_fixture(raw: dict) -> KolProfile:
         bio=raw.get("bio"),
         language=raw.get("text_language"),
         region=raw.get("location_created"),
+        content_summary=raw.get("content_summary"),
         source=raw["source"],
+    )
+
+
+def _thai_creator_count(kols: list[KolProfile]) -> int:
+    """Count unique discovered creators that pass the Thai filter."""
+    return len(
+        {normalize_handle(kol.handle) for kol in kols if is_thai_creator(kol)}
     )
 
 
@@ -174,15 +183,17 @@ def make_nodes(
         return update
 
     def route_after_discover(state: MatchState) -> str:
-        """Loop for more queries until enough KOLs or the round cap is hit.
+        """Loop for more queries until enough Thai KOLs or the round cap is hit.
 
+        The target counts unique discovered creators that already pass the Thai
+        filter, so a round full of non-Thai accounts does not stop discovery.
         ``stage == "failed"`` (search raised or nothing valid was found, and
         no KOLs were discovered yet) stops the graph instead of retrying.
         """
         if state.stage == "failed":
             return END
         if (
-            len(state.discovered) < min_candidates
+            _thai_creator_count(state.discovered) < min_candidates
             and state.search_rounds < max_search_rounds
         ):
             return "generate_queries"
@@ -190,13 +201,8 @@ def make_nodes(
 
     @_guarded("filter_thai")
     def filter_thai(state: MatchState) -> dict[str, Any]:
-        """Keep KOLs whose content is Thai or whose account region is Thailand."""
-        candidates = [
-            kol
-            for kol in state.discovered
-            if (kol.language or "").casefold() in {"th", "thai"}
-            or (kol.region or "").upper() == "TH"
-        ]
+        """Keep creators whose language, region, or profile text is Thai."""
+        candidates = [kol for kol in state.discovered if is_thai_creator(kol)]
         if not candidates:
             raise ValueError("no Thai KOLs found")
         return {"candidates": candidates, "stage": "filtering_thai"}

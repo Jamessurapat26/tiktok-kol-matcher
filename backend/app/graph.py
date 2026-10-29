@@ -5,8 +5,9 @@ from .models import MatchRequest
 from .nodes import make_nodes
 from .state import MatchState
 
+# Discovery keeps searching until this many Thai creators are found.
 MIN_CANDIDATES = 30
-MAX_SEARCH_ROUNDS = 2
+MAX_SEARCH_ROUNDS = 3
 PREFILTER_N = 25
 
 _NODE_ORDER = (

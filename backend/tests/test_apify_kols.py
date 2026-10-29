@@ -112,6 +112,42 @@ def test_search_fixture_maps_authors_and_keeps_bad_rows():
     assert [row["errorCode"] for row in errors] == ["MISSING_AUTHOR", "PROFILE_PRIVATE"]
 
 
+def test_search_captions_are_kept_joined_and_capped():
+    rows = map_search_items(_search_sample())
+    greta = next(row for row in rows if row.get("handle") == "gretalynnhihi")
+    shaiie = next(row for row in rows if row.get("handle") == "shaiie_foeva")
+
+    assert greta["content_summary"] == "ootd #foruyou #outfit | second look #outfit"
+    assert "content_summary" not in shaiie
+
+    def item(handle: str, text: str) -> dict:
+        return {"authorMeta": {"name": handle, "fans": 10}, "text": text}
+
+    single = map_search_items([item("long_caption", "a" * 400)])[0]
+    assert single["content_summary"] == "a" * 300
+
+    joined = map_search_items(
+        [
+            item("caption_kol", "a" * 400),
+            item("caption_kol", "b" * 400),
+            item("caption_kol", "c" * 400),
+        ]
+    )[0]["content_summary"]
+    assert joined == " | ".join(["a" * 300, "b" * 300, "c" * 300])[:500]
+    assert len(joined) == 500
+
+    distinct = map_search_items(
+        [
+            item("duplicate_captions", " same "),
+            item("duplicate_captions", "same"),
+            item("duplicate_captions", "next"),
+            item("duplicate_captions", "third"),
+            item("duplicate_captions", "fourth"),
+        ]
+    )[0]["content_summary"]
+    assert distinct == "same | next | third"
+
+
 def test_flat_author_meta_keys_are_mapped():
     row = map_search_items(
         [

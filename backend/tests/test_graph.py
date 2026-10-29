@@ -77,8 +77,8 @@ def test_loop_stops_at_max_rounds_even_with_too_few_candidates():
 
     names, final = run_stream(graph, make_request())
 
-    assert final["search_rounds"] == 2
-    assert names.count("generate_queries") == 2
+    assert final["search_rounds"] == 3
+    assert names.count("generate_queries") == 3
     assert final["stage"] == "done"
 
     queries = final["search_queries"]
@@ -92,6 +92,63 @@ def test_loop_stops_early_when_enough_candidates():
     final = build_graph(min_candidates=5).invoke(initial_state(make_request()))
 
     assert final["search_rounds"] == 1
+    assert final["stage"] == "done"
+
+
+def non_thai_fixture(handle: str, group: int) -> dict:
+    return make_fixture(
+        handle,
+        group,
+        text_language="en",
+        location_created="US",
+        bio="English gaming creator.",
+    )
+
+
+def test_discovery_keeps_searching_while_thai_creators_are_short():
+    # Round 1 is mostly non-Thai: 5 Thai out of 40 must not stop discovery.
+    fixtures = [make_fixture(f"thai-1-{index}", 1) for index in range(5)]
+    fixtures += [non_thai_fixture(f"foreign-1-{index}", 1) for index in range(35)]
+    fixtures += [make_fixture(f"thai-2-{index}", 2) for index in range(30)]
+
+    graph = build_graph(mock_integrations(kol_fixtures=fixtures), min_candidates=30)
+    names, final = run_stream(graph, make_request())
+
+    assert final["search_rounds"] == 2
+    assert names.count("generate_queries") == 2
+    assert len(final["candidates"]) >= 30
+    assert final["stage"] == "done"
+
+
+def test_discovery_stops_after_one_round_when_thai_target_is_met():
+    fixtures = [make_fixture(f"thai-{index}", 1) for index in range(30)]
+
+    graph = build_graph(mock_integrations(kol_fixtures=fixtures), min_candidates=30)
+    names, final = run_stream(graph, make_request())
+
+    assert final["search_rounds"] == 1
+    assert names.count("generate_queries") == 1
+    assert final["stage"] == "done"
+
+
+def test_discovery_never_exceeds_max_search_rounds():
+    fixtures = [make_fixture(f"thai-1-{index}", 1) for index in range(5)]
+    fixtures += [non_thai_fixture(f"foreign-1-{index}", 1) for index in range(35)]
+    fixtures += [
+        non_thai_fixture(f"foreign-{group}-{index}", group)
+        for group in (2, 3)
+        for index in range(10)
+    ]
+
+    graph = build_graph(
+        mock_integrations(kol_fixtures=fixtures),
+        min_candidates=30,
+        max_search_rounds=3,
+    )
+    names, final = run_stream(graph, make_request())
+
+    assert final["search_rounds"] == 3
+    assert names.count("generate_queries") == 3
     assert final["stage"] == "done"
 
 
@@ -216,9 +273,11 @@ def test_search_failure_after_a_successful_round_is_a_warning():
     base = mock_integrations()
     search = FailSecondRound(base.kol_search)
     integrations = replace(base, kol_search=search)
-    final = build_graph(integrations, min_candidates=30).invoke(
-        initial_state(make_request())
-    )
+    final = build_graph(
+        integrations,
+        min_candidates=30,
+        max_search_rounds=2,
+    ).invoke(initial_state(make_request()))
 
     assert search.calls == 2
     assert final["stage"] == "done"
@@ -255,9 +314,11 @@ def test_discover_searches_only_the_latest_round_queries():
     base = mock_integrations()
     search = RecordingSearch(base.kol_search)
     integrations = replace(base, kol_search=search)
-    final = build_graph(integrations, min_candidates=30).invoke(
-        initial_state(make_request())
-    )
+    final = build_graph(
+        integrations,
+        min_candidates=30,
+        max_search_rounds=2,
+    ).invoke(initial_state(make_request()))
 
     assert [round_no for round_no, _ in search.calls] == [1, 2]
     round_1 = search.calls[0][1]

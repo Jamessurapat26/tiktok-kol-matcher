@@ -59,7 +59,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--min-candidates",
         type=int,
         default=MIN_CANDIDATES,
-        help=f"discovery target before filtering (default: {MIN_CANDIDATES})",
+        help=f"discovery target of Thai creators (default: {MIN_CANDIDATES})",
     )
     match.add_argument(
         "--max-rounds",

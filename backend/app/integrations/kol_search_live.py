@@ -10,7 +10,9 @@ sent as ``hashtags``. Every other query is sent as ``searchQueries`` with
 ``authorMeta`` (handle, profile URL, ``fans``, ``signature``).
 
 Videos are deduped by author. The higher follower count wins; empty bio,
-nickname, language, and region are filled from the other video. Items with an
+nickname, language, and region are filled from the other video. Up to three
+distinct captions are kept as ``content_summary`` so Thai script in a video can
+identify a creator before enrichment replaces the summary. Items with an
 ``errorCode``, and videos with no author handle, are returned as error records
 so ``discover_kols`` skips and records them.
 """
@@ -39,6 +41,9 @@ _HASHTAG_TOKEN = re.compile(r"#([\w\u0E00-\u0E7F]+)")
 _TIKTOK_WORD = re.compile(r"tiktok", re.IGNORECASE)
 _UNKNOWN_LANG = frozenset({"un", "und", "unknown", "none", "null"})
 _PROFILE_FIELDS = ("nickname", "bio", "text_language", "location_created")
+_CAPTION_CHARS = 300
+_SUMMARY_CHARS = 500
+_MAX_CAPTIONS = 3
 
 # Charged add-ons stay off. ``resultsPerPage`` is filled per call.
 _QUIET_INPUT: dict[str, Any] = {
@@ -142,6 +147,9 @@ def map_search_item(item: Any) -> dict[str, Any]:
     region = _region(item)
     if region:
         row["location_created"] = region
+    caption = _caption(item.get("text"))
+    if caption:
+        row["content_summary"] = caption
     return row
 
 
@@ -175,7 +183,36 @@ def _prefer_profile(current: dict[str, Any], new: dict[str, Any]) -> dict[str, A
     for field in _PROFILE_FIELDS:
         if not merged.get(field) and secondary.get(field):
             merged[field] = secondary[field]
+    summary = _merge_captions(current, new)
+    if summary:
+        merged["content_summary"] = summary
     return merged
+
+
+def _caption(value: object) -> str | None:
+    """Collapse whitespace in one video caption, or None when it is blank."""
+    if not isinstance(value, str):
+        return None
+    text = re.sub(r"\s+", " ", value).strip()
+    return text[:_CAPTION_CHARS].rstrip() or None
+
+
+def _merge_captions(current: dict[str, Any], new: dict[str, Any]) -> str | None:
+    """Join up to three distinct captions, first-seen first, capped for prompts."""
+    captions: list[str] = []
+    seen: set[str] = set()
+    for row in (current, new):
+        summary = row.get("content_summary")
+        if not isinstance(summary, str):
+            continue
+        for caption in summary.split(" | "):
+            key = caption.casefold()
+            if caption and key not in seen:
+                seen.add(key)
+                captions.append(caption)
+    if not captions:
+        return None
+    return " | ".join(captions[:_MAX_CAPTIONS])[:_SUMMARY_CHARS].rstrip()
 
 
 def _language(value: object) -> str | None:

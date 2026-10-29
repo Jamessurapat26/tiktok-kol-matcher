@@ -195,8 +195,8 @@ flowchart TD
     F --> A
     A --> Q["generate_queries<br/>LLM: Thai and English TikTok queries"]
     Q --> D["discover_kols<br/>Apify clockworks/tiktok-scraper"]
-    D -->|"under 30 creators and under 2 rounds"| Q
-    D -->|"enough creators or 2 rounds"| T["filter_thai<br/>language th or region TH"]
+    D -->|"under 30 Thai creators and under 3 rounds"| Q
+    D -->|"enough Thai creators or 3 rounds"| T["filter_thai<br/>Thai language, region TH, or Thai script"]
     T --> E["enrich_kols<br/>Apify clockworks/tiktok-profile-scraper<br/>largest accounts first"]
     E --> P["embed_and_prefilter<br/>embeddinggemma cosine, keep top 25"]
     P --> R["llm_rerank<br/>LLM relevance + reason, heuristic scores"]
@@ -213,10 +213,10 @@ flowchart TD
    200 characters each, go in as weak signals for tone. `tidy_brand_profile`
    then drops sentence-like keywords, caps list lengths, and fixes age bounds.
 3. **Discovery loop.** Query generation and TikTok search repeat until 30
-   unique creators are found or two rounds have run. Each round asks the LLM
-   only for queries it has not tried yet.
-4. **Thai filter.** Keeps creators whose content language is Thai or whose
-   account region is Thailand.
+   unique Thai creators are found or three rounds have run. Each round asks the
+   LLM only for queries it has not tried yet.
+4. **Thai filter.** Keeps creators whose language is Thai, whose account region
+   is Thailand, or whose profile text or search captions use Thai script.
 5. **Enrichment.** Fetches recent videos for the largest accounts (10 by
    default), then computes the median engagement rate and posts per week.
 6. **Prefilter.** Embeds the brand text and every creator's bio, captions, and
@@ -324,7 +324,7 @@ and the web reader checks resolved addresses before a direct fetch.
   may get login text instead of the page's "about".
 - **The ranking weights are not tuned.** 40/25/20/15 is a reasoned starting
   point, not a value fitted to labelled data.
-- **The candidate pool is small.** Two search rounds with 10 videos per query
+- **The candidate pool is small.** Three search rounds with 10 videos per query
   give tens of creators. In the live run above, 48 were discovered and 12 were
   left after the Thai filter.
 - **Audience fit is a proxy.** It uses the creator's language and region, not
@@ -355,8 +355,8 @@ embedder. They need real keys, and the Apify one spends credit.
 1. **Evaluation set and weight tuning.** Label a few brands with creators a
    marketer would and would not pick, measure precision at k and NDCG, then
    tune the weights and the prefilter width against that set.
-2. **A larger candidate pool.** More results per query, a third round when the
-   Thai filter leaves too few creators, and hashtag-based discovery.
+2. **A larger candidate pool.** More results per query and hashtag-based
+   discovery when the Thai filter leaves too few creators.
 3. **Better signals.** Read the Facebook login wall as a failure, add a budget
    warning for skipped Facebook runs, and use comment language as an audience
    signal.

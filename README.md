@@ -173,6 +173,7 @@ messages, and `/api/health` reports each one only as set or missing.
 | `DISCOVERY_MIN_THAI_CANDIDATES` | Thai creators discovery aims for before it stops | `30` |
 | `DISCOVERY_MAX_ROUNDS` | Most query and search rounds, 1-5 | `3` |
 | `JINA_API_KEY` | Optional Jina Reader key for a higher rate limit | unset |
+| `WEB_FETCH_ALLOW_PROXY_RANGE` | Allow the direct web fetch guard to reach exactly 198.18.0.0/15 (fake-IP proxy range for some sandboxes; weakens the private-address guard) | off |
 | `LLM_BASE_URL` | OpenAI-compatible API root | `https://integrate.api.nvidia.com/v1` |
 | `LLM_MODEL` | Chat model id | `nvidia/nemotron-3.5-lightning-30b-a3b` |
 | `LLM_API_KEY`, `NVIDIA_API_KEY`, `OPENAI_API_KEY` | LLM bearer token, first non-empty wins | unset |

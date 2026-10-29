@@ -258,6 +258,14 @@ embeddings, and the LLM mocked:
   `Accept`, `Accept-Language`, and `Accept-Encoding` headers and HTTP/2, because
   some storefronts answer 200 to curl and 429 to a bare
   HTTP/1.1 client.
+- Login walls and unavailable-content pages are rejected as failed reads, so
+  they are never used as website content or cached. A cached entry with blocked
+  content is treated as a miss.
+- **Direct-fetch guard.** The direct fetch refuses hosts that resolve to
+  loopback, private, link-local, multicast, or other non-public addresses.
+  `WEB_FETCH_ALLOW_PROXY_RANGE` (`1` or `true`) additionally allows exactly
+  198.18.0.0/15, the fake-IP range some sandbox DNS servers return. It is off by
+  default because it weakens the private-address guard.
 - Successful pages are cached as JSON under `data/cache/web` for 7 days. The cache
   key is the SHA-256 of the normalized URL. Set `KOL_CACHE_DIR` to move the cache
   root (`$KOL_CACHE_DIR/web`). A cache hit skips the network.

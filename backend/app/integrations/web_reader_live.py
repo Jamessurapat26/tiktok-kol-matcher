@@ -123,30 +123,45 @@ class JinaWebReader:
 Resolver = Callable[[str], list[str]]
 
 _MAX_REDIRECTS = 10
+# Fake-IP range some sandbox proxies return for every host. Only the direct
+# fetch guard can optionally allow it, via WEB_FETCH_ALLOW_PROXY_RANGE.
+_PROXY_RANGE = ipaddress.ip_network("198.18.0.0/15")
 
 
 def resolve_host(host: str) -> list[str]:
     return [info[4][0] for info in socket.getaddrinfo(host, None)]
 
 
-def is_public_address(address: str) -> bool:
+def is_public_address(address: str, *, allow_proxy_range: bool = False) -> bool:
     # is_global alone still says yes to multicast ranges.
     ip = ipaddress.ip_address(address)
+    if allow_proxy_range and ip in _PROXY_RANGE:
+        return True
     return ip.is_global and not ip.is_multicast
 
 
-def _assert_public(host: str, resolve: Resolver) -> None:
+def _assert_public(
+    host: str,
+    resolve: Resolver,
+    *,
+    allow_proxy_range: bool = False,
+) -> None:
     """Refuse hosts that resolve to loopback, private, link-local, or other non-public addresses.
 
     The job URL comes from the API caller, so a direct fetch of it must not reach
     this machine or its network. The check resolves separately from the connect,
     so a host whose DNS answer flips between the two (rebinding) is not covered.
+    ``allow_proxy_range`` additionally permits exactly the fake-IP range some
+    sandboxes use; it is explicit and off unless the live reader enables it.
     """
     try:
         addresses = resolve(host)
     except OSError as exc:
         raise WebReadError(f"Could not resolve {host}") from exc
-    if not addresses or not all(is_public_address(address) for address in addresses):
+    if not addresses or not all(
+        is_public_address(address, allow_proxy_range=allow_proxy_range)
+        for address in addresses
+    ):
         raise WebReadError(f"Refused to fetch {host}: not a public address")
 
 
@@ -158,17 +173,23 @@ class TrafilaturaWebReader:
         max_retries: int = 2,
         backoff: float = 1.0,
         resolve: Resolver = resolve_host,
+        allow_proxy_range: bool = False,
     ) -> None:
         self._client = client or httpx.Client(timeout=timeout, http2=True)
         self._max_retries = max_retries
         self._backoff = backoff
         self._resolve = resolve
+        self._allow_proxy_range = allow_proxy_range
 
     def _send(self, url: str) -> httpx.Response:
         """One GET, following redirects by hand so every hop's host is checked."""
         request = self._client.build_request("GET", url, headers=_BROWSER_HEADERS)
         for _ in range(_MAX_REDIRECTS + 1):
-            _assert_public(request.url.host, self._resolve)
+            _assert_public(
+                request.url.host,
+                self._resolve,
+                allow_proxy_range=self._allow_proxy_range,
+            )
             resp = self._client.send(request, follow_redirects=False)
             if resp.next_request is None:
                 return resp

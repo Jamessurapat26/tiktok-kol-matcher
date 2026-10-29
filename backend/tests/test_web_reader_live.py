@@ -576,6 +576,48 @@ def test_public_addresses_are_allowed():
     assert is_public_address("2606:4700::1111")
 
 
+def test_proxy_range_is_opt_in_only():
+    assert not is_public_address("198.18.0.1")
+    assert is_public_address("198.18.0.1", allow_proxy_range=True)
+
+    for address in ("10.0.0.1", "127.0.0.1"):
+        assert not is_public_address(address, allow_proxy_range=True)
+
+
+def test_trafilatura_refuses_proxy_range_by_default():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=_article_html())
+
+    reader = _trafilatura(handler, resolve=lambda host: ["198.18.0.1"])
+
+    with pytest.raises(WebReadError):
+        reader.fetch(_URL)
+
+
+def test_trafilatura_can_allow_only_the_proxy_range():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=_article_html())
+
+    reader = _trafilatura(
+        handler,
+        resolve=lambda host: ["198.18.0.1"],
+        allow_proxy_range=True,
+    )
+    page = reader.fetch(_URL)
+
+    assert page.source == "trafilatura"
+    assert "blue-light glasses" in page.content
+
+
+def test_live_reader_reads_the_proxy_switch_from_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("KOL_CACHE_DIR", str(tmp_path))
+    monkeypatch.delenv("WEB_FETCH_ALLOW_PROXY_RANGE", raising=False)
+    assert real_integrations().web_reader._inner._fallback._allow_proxy_range is False
+
+    monkeypatch.setenv("WEB_FETCH_ALLOW_PROXY_RANGE", "true")
+    assert real_integrations().web_reader._inner._fallback._allow_proxy_range is True
+
+
 def test_trafilatura_never_connects_to_a_loopback_server():
     hits = []
 

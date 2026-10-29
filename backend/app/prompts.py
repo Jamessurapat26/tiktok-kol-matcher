@@ -173,7 +173,11 @@ def rerank_messages(
     check_mentions = bool(brand.brand_names)
 
     def card(kol: KolProfile, similarity: float | None = None) -> str:
-        mentions = mentions_brand(kol, aliases) if check_mentions else None
+        mentions = (
+            mentions_brand(kol, aliases, brand_names=brand.brand_names)
+            if check_mentions
+            else None
+        )
         return _kol_card(kol, similarity, mentions=mentions)
 
     if similarities is None:

@@ -379,19 +379,19 @@ def test_graph_loop_accumulates_discovered_and_filter_can_shrink():
             "errors": [f"discover round {round_no}"],
         }
 
-    def filter_thai(state: MatchState) -> dict:
+    def hard_filter(state: MatchState) -> dict:
         kept = [kol for kol in state.discovered if kol.followers >= 500]
-        return {"candidates": kept, "errors": ["filter_thai"]}
+        return {"candidates": kept, "errors": ["hard_filter"]}
 
     def next_node(state: MatchState) -> str:
-        return "discover" if state.search_rounds < 2 else "filter_thai"
+        return "discover" if state.search_rounds < 2 else "hard_filter"
 
     graph = StateGraph(MatchState)
     graph.add_node("discover", discover)
-    graph.add_node("filter_thai", filter_thai)
+    graph.add_node("hard_filter", hard_filter)
     graph.add_edge(START, "discover")
-    graph.add_conditional_edges("discover", next_node, ["discover", "filter_thai"])
-    graph.add_edge("filter_thai", END)
+    graph.add_conditional_edges("discover", next_node, ["discover", "hard_filter"])
+    graph.add_edge("hard_filter", END)
 
     result = graph.compile().invoke({"request": make_request()})
 
@@ -409,7 +409,7 @@ def test_graph_loop_accumulates_discovered_and_filter_can_shrink():
     assert result["errors"] == [
         "discover round 1",
         "discover round 2",
-        "filter_thai",
+        "hard_filter",
     ]
 
 

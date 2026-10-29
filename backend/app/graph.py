@@ -16,7 +16,7 @@ _NODE_ORDER = (
     "analyze_brand",
     "generate_queries",
     "discover_kols",
-    "filter_thai",
+    "hard_filter",
     "enrich_kols",
     "embed_and_prefilter",
     "llm_rerank",
@@ -88,11 +88,11 @@ def build_graph(
         nodes["route_after_discover"],
         {
             "generate_queries": "generate_queries",
-            "filter_thai": "filter_thai",
+            "hard_filter": "hard_filter",
             END: END,
         },
     )
-    _edge("filter_thai", "enrich_kols")
+    _edge("hard_filter", "enrich_kols")
     _edge("enrich_kols", "embed_and_prefilter")
     _edge("embed_and_prefilter", "llm_rerank")
     _edge("llm_rerank", "rank_and_output")

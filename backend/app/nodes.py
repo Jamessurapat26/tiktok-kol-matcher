@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
 
@@ -11,7 +12,9 @@ from .brand_match import (
     brand_aliases,
     mentions_brand,
     normalize_for_match,
+    normalized_aliases,
 )
+from .filters import hard_filter as apply_hard_filter
 from .integrations import Integrations
 from .integrations.apify import ApifyBudgetExceeded
 from .integrations.embeddings import (
@@ -22,6 +25,7 @@ from .integrations.embeddings import (
 )
 from .integrations.llm import MockBrandAnalyzer
 from .integrations.web_reader import truncate
+from .matching_config import DEFAULT_CONFIG
 from .models import BrandProfile, KolProfile, RankedKol, normalize_handle
 from .state import MatchState
 from .thai import is_thai_creator
@@ -170,11 +174,35 @@ def make_nodes(
             state.search_queries,
             state.search_rounds + 1,
         )
-        return {
-            "search_queries": new_queries,
-            "last_queries": new_queries,
+        # Recall guard: a brand name in a query returns the brand's own account
+        # and shops, not the creators the brief is looking for.
+        blocked = [
+            alias
+            for alias in brand_aliases(
+                state.brand_profile,
+                str(state.request.website_url),
+                str(state.request.facebook_url),
+            )
+            if len(alias) >= 5
+        ]
+        kept_queries: list[str] = []
+        dropped = 0
+        for query in new_queries:
+            normalized_query = normalize_for_match(query)
+            if any(alias in normalized_query for alias in blocked):
+                dropped += 1
+                continue
+            kept_queries.append(query)
+        update: dict[str, Any] = {
+            "search_queries": kept_queries,
+            "last_queries": kept_queries,
             "stage": "generating_queries",
         }
+        if dropped:
+            update["errors"] = [
+                f"generate_queries: dropped {dropped} brand-name queries"
+            ]
+        return update
 
     @_guarded("discover_kols")
     def discover_kols(state: MatchState) -> dict[str, Any]:
@@ -229,15 +257,42 @@ def make_nodes(
             and state.search_rounds < max_search_rounds
         ):
             return "generate_queries"
-        return "filter_thai"
+        return "hard_filter"
 
-    @_guarded("filter_thai")
-    def filter_thai(state: MatchState) -> dict[str, Any]:
-        """Keep creators whose language, region, or profile text is Thai."""
-        candidates = [kol for kol in state.discovered if is_thai_creator(kol)]
+    @_guarded("hard_filter")
+    def hard_filter(state: MatchState) -> dict[str, Any]:
+        """Keep creators that pass every hard rule and count each rejection."""
+        if state.brand_profile is None:
+            raise ValueError("brand_profile is required before hard filtering")
+        now = datetime.now(UTC)
+        brand_alias_list = brand_aliases(
+            state.brand_profile,
+            str(state.request.website_url),
+            str(state.request.facebook_url),
+        )
+        competitor_alias_list = normalized_aliases(state.brand_profile.competitors)
+        candidates: list[KolProfile] = []
+        rejected: dict[str, int] = {}
+        for kol in state.discovered:
+            reason = apply_hard_filter(
+                kol,
+                state.brand_profile,
+                brand_alias_list,
+                competitor_alias_list,
+                DEFAULT_CONFIG,
+                now,
+            )
+            if reason is None:
+                candidates.append(kol)
+            else:
+                rejected[reason] = rejected.get(reason, 0) + 1
         if not candidates:
-            raise ValueError("no Thai KOLs found")
-        return {"candidates": candidates, "stage": "filtering_thai"}
+            raise ValueError("no candidates passed the hard filters")
+        return {
+            "candidates": candidates,
+            "rejected": rejected,
+            "stage": "filtering",
+        }
 
     @_guarded("enrich_kols")
     def enrich_kols(state: MatchState) -> dict[str, Any]:
@@ -358,7 +413,11 @@ def make_nodes(
             capped: list[RankedKol] = []
             for item in ranked:
                 if (
-                    not mentions_brand(item.kol, aliases)
+                    not mentions_brand(
+                        item.kol,
+                        aliases,
+                        brand_names=state.brand_profile.brand_names,
+                    )
                     and item.scores.relevance > BRAND_UNMENTIONED_RELEVANCE_CAP
                 ):
                     scores = item.scores.model_copy(
@@ -403,7 +462,7 @@ def make_nodes(
         "generate_queries": generate_queries,
         "discover_kols": discover_kols,
         "route_after_discover": route_after_discover,
-        "filter_thai": filter_thai,
+        "hard_filter": hard_filter,
         "enrich_kols": enrich_kols,
         "embed_and_prefilter": embed_and_prefilter,
         "llm_rerank": llm_rerank,

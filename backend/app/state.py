@@ -102,7 +102,7 @@ class MatchState(BaseModel):
         "analyzing_brand",
         "generating_queries",
         "discovering_kols",
-        "filtering_thai",
+        "filtering",
         "enriching_kols",
         "embedding_prefilter",
         "reranking",
@@ -127,8 +127,11 @@ class MatchState(BaseModel):
     # dedupes by normalized handle (strip whitespace, lowercase, drop leading "@")
     # with priority apify > seed > cache. None fields are filled from lower-priority rows.
     discovered: Annotated[list[KolProfile], merge_kols] = Field(default_factory=list)
-    # filter_thai output. Plain overwrite (not reducer-backed) so the list can shrink.
+    # hard_filter output. Plain overwrite (not reducer-backed) so the list can shrink.
     candidates: list[KolProfile] = Field(default_factory=list)
+    # hard_filter rejection counts by stable reason. Plain overwrite; expected
+    # rejections are not errors.
+    rejected: dict[str, int] = Field(default_factory=dict)
     # embed_and_prefilter output: candidates sent to llm_rerank.
     # The list is at least the prefilter width and at least top_k.
     shortlisted: list[KolProfile] = Field(default_factory=list)

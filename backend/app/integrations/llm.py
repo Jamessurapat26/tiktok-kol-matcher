@@ -201,7 +201,6 @@ class MockBrandAnalyzer:
                 "ถนอมสายตา",
                 "เกมเมอร์",
                 "เทคโนโลยี",
-                "ไลฟ์สไตล์",
             ],
             topic_keywords_en=[
                 "blue light glasses",
@@ -211,7 +210,6 @@ class MockBrandAnalyzer:
                 "gaming",
                 "tech",
                 "esports",
-                "lifestyle",
             ],
             competitors=["OtherLens", "FocusGear"],
             brand_handles=["@ExampleBrand", "examplebrand"],

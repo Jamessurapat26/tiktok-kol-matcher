@@ -2,6 +2,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+from app.brand_match import normalize_for_match
 from app.graph import build_graph, initial_state
 from app.integrations import mock_integrations
 from app.integrations.kol_enricher import MockKolEnricher
@@ -11,6 +12,16 @@ from app.nodes import make_nodes
 from app.state import MatchState
 
 _KOL_FIXTURE = Path(__file__).resolve().parents[1] / "app" / "fixtures" / "kols.json"
+_HARD_FILTERED_HANDLES = {
+    "examplebrand.th",
+    "otherlens_official",
+    "gadgetshop_bkk",
+    "gamernews.th",
+    "inactivegamer.tan",
+    "tinycreator.num",
+    "megastar.gamer",
+    "screenreview.joe",
+}
 
 
 def make_request(top_k: int = 10) -> MatchRequest:
@@ -171,7 +182,7 @@ def test_parallel_scrapers_both_populate_state():
     assert ("scrape_facebook", "analyze_brand") in edges
 
 
-def test_filter_thai_shrinks_discovered():
+def test_hard_filter_shrinks_discovered():
     final = build_graph().invoke(initial_state(make_request()))
 
     assert len(final["candidates"]) < len(final["discovered"])
@@ -184,6 +195,7 @@ def test_filter_thai_shrinks_discovered():
         and (kol.region or "").upper() != "TH"
         for kol in final["discovered"]
     )
+    assert final["rejected"]
 
 
 def test_dedupe_across_sources():
@@ -258,7 +270,7 @@ def test_search_failure_stops_without_retrying():
         "discover_kols: search failed: search down" in error
         for error in final["errors"]
     )
-    assert "filter_thai" not in names
+    assert "hard_filter" not in names
 
 
 def test_search_failure_after_a_successful_round_is_a_warning():
@@ -435,7 +447,10 @@ def test_no_thai_kols_is_fatal():
     )
 
     assert final["stage"] == "failed"
-    assert any("filter_thai: no Thai KOLs found" in error for error in final["errors"])
+    assert any(
+        "hard_filter: no candidates passed the hard filters" in error
+        for error in final["errors"]
+    )
     assert "enrich_kols" not in names
 
 
@@ -610,3 +625,43 @@ def test_llm_rerank_caps_relevance_when_the_brand_is_not_named():
         "ExampleCreator",
         "OtherMartCreator",
     ]
+
+
+def test_generate_queries_drops_brand_name_queries():
+    class _BrandQueryAnalyzer(MockBrandAnalyzer):
+        def generate_queries(self, brand, previous_queries, round):
+            return [
+                "gaming glasses thailand",
+                "ExampleBrand review",
+                "example-brand unboxing",
+            ]
+
+    integrations = replace(mock_integrations(), llm=_BrandQueryAnalyzer())
+    nodes = make_nodes(integrations, min_candidates=1, max_search_rounds=1)
+    state = MatchState(
+        request=make_request(),
+        brand_profile=MockBrandAnalyzer().analyze_brand("website", None),
+    )
+
+    update = nodes["generate_queries"](state)
+
+    assert update["search_queries"] == ["gaming glasses thailand"]
+    assert update["last_queries"] == ["gaming glasses thailand"]
+    assert update["errors"] == [
+        "generate_queries: dropped 2 brand-name queries"
+    ]
+
+
+def test_demo_graph_hard_filters_and_recall_guard():
+    final = build_graph().invoke(initial_state(make_request(top_k=50)))
+
+    assert final["stage"] == "done"
+    result_handles = {item.kol.handle for item in final["results"]}
+    assert result_handles.isdisjoint(_HARD_FILTERED_HANDLES)
+    assert _HARD_FILTERED_HANDLES.isdisjoint(
+        {kol.handle for kol in final["candidates"]}
+    )
+    assert final["rejected"]
+
+    for query in final["search_queries"]:
+        assert "examplebrand" not in normalize_for_match(query)

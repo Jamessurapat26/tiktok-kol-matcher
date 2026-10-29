@@ -11,6 +11,7 @@ from app.integrations.apify import (
     ApifyBudget,
     ApifyBudgetExceeded,
     ApifyClient,
+    ApifyConfigError,
     ApifyError,
     ApifyLimits,
     estimate_run_cost,
@@ -220,7 +221,7 @@ def test_limits_from_env_rejects_invalid_values(monkeypatch, name, value):
     _clear_limit_env(monkeypatch)
     monkeypatch.setenv(name, value)
 
-    with pytest.raises(ValueError, match=name):
+    with pytest.raises(ApifyConfigError, match=name):
         ApifyLimits.from_env()
 
 
@@ -237,7 +238,7 @@ def test_limits_from_env_rejects_a_tiktok_cap_below_the_actor_minimum(
     _clear_limit_env(monkeypatch)
     monkeypatch.setenv(name, "0.49")
 
-    with pytest.raises(ValueError, match="must be at least 0.50"):
+    with pytest.raises(ApifyConfigError, match="must be at least 0.50"):
         ApifyLimits.from_env()
 
 

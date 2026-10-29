@@ -301,6 +301,49 @@ def test_live_kols_without_token_exits_2(monkeypatch, capsys):
     assert "APIFY_TOKEN" in captured.err
 
 
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    [
+        ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0.30", "must be at least 0.50"),
+        ("APIFY_JOB_BUDGET_USD", "not-a-number", "must be a positive number"),
+    ],
+)
+def test_live_kols_rejects_invalid_apify_limits(
+    monkeypatch, capsys, name, value, message
+):
+    monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
+    for variable in (
+        "APIFY_JOB_BUDGET_USD",
+        "APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD",
+        "APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD",
+        "APIFY_FACEBOOK_MAX_CHARGE_USD",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setenv(name, value)
+
+    def fail_build(*args, **kwargs):
+        raise AssertionError("graph should not run")
+
+    monkeypatch.setattr("app.cli.build_graph", fail_build)
+    exit_code = main(
+        [
+            "match",
+            "--website",
+            _WEBSITE,
+            "--facebook",
+            _FACEBOOK,
+            "--live-kols",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert name in captured.err
+    assert message in captured.err
+    assert "Traceback" not in captured.err
+    assert captured.out == ""
+
+
 def test_live_kols_rejects_non_positive_max_results(monkeypatch, capsys):
     monkeypatch.setenv("APIFY_TOKEN", "cli-test-token")
 

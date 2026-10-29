@@ -48,7 +48,7 @@ class ApifyAuthError(ApifyError):
 
 
 class ApifyConfigError(ApifyError):
-    """Live Apify was requested without ``APIFY_TOKEN``."""
+    """Live Apify configuration is missing or invalid."""
 
 
 class ApifyBudgetExceeded(ApifyError):
@@ -139,9 +139,9 @@ def _positive_env(name: str, default: float) -> float:
     try:
         value = float(raw)
     except ValueError:
-        raise ValueError(f"{name} must be a positive number") from None
+        raise ApifyConfigError(f"{name} must be a positive number") from None
     if not math.isfinite(value) or value <= 0:
-        raise ValueError(f"{name} must be a positive number")
+        raise ApifyConfigError(f"{name} must be a positive number")
     return value
 
 
@@ -165,7 +165,7 @@ class ApifyLimits:
             ("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", tiktok_profile),
         ):
             if value < 0.50:
-                raise ValueError(
+                raise ApifyConfigError(
                     f"{name} must be at least 0.50, the minimum the TikTok "
                     "actors accept"
                 )

@@ -14,6 +14,7 @@ from app.api.settings import LiveFlags, Settings
 from app.api.store import JobStore
 from app.graph import _NODE_ORDER
 from app.integrations import mock_integrations
+from app.integrations.apify import ApifyClient
 from app.integrations.web_reader import MockWebReader
 from app.models import MatchRequest
 
@@ -31,6 +32,10 @@ _ENV_VARS = (
     "EMBED_MODEL",
     "JOB_WORKERS",
     "MAX_QUEUED_JOBS",
+    "APIFY_JOB_BUDGET_USD",
+    "APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD",
+    "APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD",
+    "APIFY_FACEBOOK_MAX_CHARGE_USD",
 )
 _BODY = {
     "website_url": "https://example-brand.co.th",
@@ -245,6 +250,41 @@ def test_live_mode_rejects_flag_without_credential(make_client, monkeypatch):
     assert llm.status_code == 400
     assert "LLM_API_KEY" in llm.json()["detail"]
     assert listed == []
+
+
+def _live_app_without_factory(tmp_path, submitted):
+    # No integrations_factory, so live jobs build the real bundle and read the
+    # Apify limit variables.
+    return create_app(
+        Settings(jobs_db=tmp_path / "jobs.db"),
+        submit=lambda work: submitted.append(work),
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0.30"),
+        ("APIFY_JOB_BUDGET_USD", "not-a-number"),
+    ],
+)
+def test_live_mode_rejects_invalid_apify_limits(tmp_path, monkeypatch, name, value):
+    monkeypatch.setenv("APIFY_TOKEN", "dummy-token")
+    monkeypatch.setenv(name, value)
+    submitted = []
+
+    def fail_run(*args, **kwargs):
+        raise AssertionError("Apify should not be called")
+
+    monkeypatch.setattr(ApifyClient, "run_sync_get_items", fail_run)
+    with TestClient(_live_app_without_factory(tmp_path, submitted)) as client:
+        response = client.post("/api/jobs", json=_BODY)
+        listed = client.get("/api/jobs").json()
+
+    assert response.status_code == 400
+    assert name in response.json()["detail"]
+    assert listed == []
+    assert submitted == []
 
 
 def test_demo_mode_forces_live_flags_off(make_client, monkeypatch):

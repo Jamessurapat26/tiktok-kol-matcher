@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from .brand_match import account_matches, normalize_for_match
 from .matching_config import MatchingConfig
 from .models import BrandProfile, KolProfile
-from .thai import has_thai_script, is_thai_creator
+from .thai import has_thai_script, is_lao_creator, is_thai_creator
 
 OWN_BRAND_ACCOUNT = "own_brand_account"
 COMPETITOR_ACCOUNT = "competitor_account"
@@ -75,6 +75,8 @@ def _is_thai(kol: KolProfile) -> bool:
     Captions are often templated or quoted, so they do not override a creator
     whose language and region both explicitly say they are not Thai.
     """
+    if is_lao_creator(kol):
+        return False
     if is_thai_creator(kol):
         return True
     language_is_thai = (kol.language or "").casefold() in _THAI_LANGUAGES

@@ -1,5 +1,5 @@
 from app.models import KolProfile
-from app.thai import has_thai_script, is_thai_creator
+from app.thai import has_thai_script, is_lao_creator, is_thai_creator
 
 
 def _kol(handle: str = "creator", **overrides) -> KolProfile:
@@ -69,3 +69,35 @@ def test_a_single_stray_thai_character_is_not_enough():
 
     assert not has_thai_script(kol.bio)
     assert not is_thai_creator(kol)
+
+
+def test_lao_script_creator_tagged_as_thai_is_not_thai():
+    # TikTok often tags Lao text as Thai; the script itself decides.
+    kol = _kol(
+        nickname="ນ້ອງແກ້ວ",
+        bio="ຣີວິວເຄື່ອງສຳອາງ ສົ່ງທົ່ວລາວ",
+        language="th",
+        region=None,
+    )
+
+    assert is_lao_creator(kol)
+    assert not is_thai_creator(kol)
+
+
+def test_lao_region_without_thai_text_is_not_thai():
+    kol = _kol(language="en", region="LA", bio="Beauty reviews")
+
+    assert not is_thai_creator(kol)
+
+
+def test_mostly_thai_text_outweighs_a_lao_region():
+    kol = _kol(language="th", region="LA", bio="รีวิวเครื่องสำอาง ส่งทั่วไทย")
+
+    assert not is_lao_creator(kol)
+    assert is_thai_creator(kol)
+
+
+def test_a_few_lao_characters_do_not_reject_a_thai_creator():
+    kol = _kol(language="th", region="TH", bio="รีวิวเครื่องสำอางทุกวัน ສະບາຍດີ")
+
+    assert is_thai_creator(kol)

@@ -237,3 +237,23 @@ def test_activity_can_be_left_for_after_enrichment():
         )
         is None
     )
+
+
+def test_lao_creator_is_rejected_as_not_thai():
+    brief = _brief()
+    kol = _kol(
+        "laobeauty",
+        nickname="ນ້ອງແກ້ວ",
+        bio="ຣີວິວແວ່ນຕາ",
+        language="th",
+        region="TH",
+        videos=[_video(5, "ແວ່ນກັນແສງສີຟ້າ ສຳລັບເກມເມີ")],
+    )
+
+    assert _filter(kol, brief) == NOT_THAI
+
+
+def test_retailer_account_is_not_a_competitor():
+    brief = _brief(retailers=["ExampleMart"])
+
+    assert _filter(_kol("examplemart"), brief) is None

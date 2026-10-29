@@ -503,6 +503,7 @@ def _has_reasoning(message: Any) -> bool:
 
 
 _BRAND_LIST_FIELDS = (
+    "brand_names",
     "products",
     "keywords_th",
     "keywords_en",

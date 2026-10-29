@@ -9,6 +9,11 @@ from dataclasses import replace
 
 import pytest
 
+from app.brand_match import (
+    BRAND_UNMENTIONED_RELEVANCE_CAP,
+    brand_aliases,
+    mentions_brand,
+)
 from app.graph import build_graph, initial_state
 from app.integrations import build_integrations, mock_integrations
 from app.integrations.embeddings import (
@@ -336,8 +341,19 @@ def test_prefilter_order_matches_cosine_and_mock_relevance():
         again = embedder.similarity(brand_text, [kol_document_text(kol)])[0]
         assert score == again
         by_handle[normalize_handle(kol.handle)] = score
+    aliases = brand_aliases(
+        final["brand_profile"],
+        str(request.website_url),
+        str(request.facebook_url),
+    )
     for item in final["ranked"]:
         expected = round(clamp_unit(by_handle[normalize_handle(item.kol.handle)]), 4)
+        if (
+            aliases
+            and not mentions_brand(item.kol, aliases)
+            and expected > BRAND_UNMENTIONED_RELEVANCE_CAP
+        ):
+            expected = BRAND_UNMENTIONED_RELEVANCE_CAP
         assert item.scores.relevance == expected
         assert item.total_score == request.weights.apply(item.scores)
 

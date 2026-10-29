@@ -556,7 +556,7 @@ def test_rerank_batches_and_keeps_heuristic_scores_in_the_total():
         assert analyzer.rerank(_brand(), []) == []
         state = MatchState(
             request=_request(),
-            brand_profile=_brand(),
+            brand_profile=_brand().model_copy(update={"brand_names": ["Alpha"]}),
             shortlisted=[kols[0]],
             stage="embedding_prefilter",
         )

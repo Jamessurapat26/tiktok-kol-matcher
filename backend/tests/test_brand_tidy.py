@@ -94,6 +94,33 @@ def test_lists_are_capped_at_the_profile_limits():
     ]
 
 
+def test_brand_names_are_cleaned_deduped_and_capped():
+    brand = _brand(
+        brand_names=[
+            " ExampleBrand ",
+            "",
+            "examplebrand",
+            "EB-24",
+            "เอ็กแซมเปิล",
+            "x" * 41,
+            *[f"Name{index}" for index in range(10)],
+        ]
+    )
+
+    tidied = tidy_brand_profile(brand)
+
+    assert tidied.brand_names == [
+        "ExampleBrand",
+        "EB-24",
+        "เอ็กแซมเปิล",
+        "Name0",
+        "Name1",
+        "Name2",
+        "Name3",
+        "Name4",
+    ]
+
+
 def test_hashtags_get_one_leading_hash_no_spaces_and_a_length_limit():
     brand = _brand(
         hashtags=[

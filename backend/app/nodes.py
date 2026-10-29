@@ -5,6 +5,13 @@ from typing import Any
 from langgraph.graph import END
 from pydantic import ValidationError
 
+from .brand_match import (
+    BRAND_UNMENTIONED_RELEVANCE_CAP,
+    aliases_from_urls,
+    brand_aliases,
+    mentions_brand,
+    normalize_for_match,
+)
 from .integrations import Integrations
 from .integrations.apify import ApifyBudgetExceeded
 from .integrations.embeddings import (
@@ -15,7 +22,7 @@ from .integrations.embeddings import (
 )
 from .integrations.llm import MockBrandAnalyzer
 from .integrations.web_reader import truncate
-from .models import KolProfile, RankedKol, normalize_handle
+from .models import BrandProfile, KolProfile, RankedKol, normalize_handle
 from .state import MatchState
 from .thai import is_thai_creator
 
@@ -81,6 +88,23 @@ def _thai_creator_count(kols: list[KolProfile]) -> int:
     )
 
 
+def _with_url_aliases(
+    profile: BrandProfile,
+    website_url: str,
+    facebook_url: str,
+) -> BrandProfile:
+    """Append URL-derived brand aliases, keeping the model's names first."""
+    names = list(profile.brand_names)
+    seen = {normalize_for_match(name) for name in names}
+    for alias in aliases_from_urls(website_url, facebook_url):
+        key = normalize_for_match(alias)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        names.append(alias)
+    return profile.model_copy(update={"brand_names": names})
+
+
 def make_nodes(
     integrations: Integrations,
     *,
@@ -120,6 +144,11 @@ def make_nodes(
         profile = integrations.llm.analyze_brand(
             state.website_content,
             state.facebook_page,
+        )
+        profile = _with_url_aliases(
+            profile,
+            str(state.request.website_url),
+            str(state.request.facebook_url),
         )
         update: dict[str, Any] = {
             "brand_profile": profile,
@@ -317,6 +346,32 @@ def make_nodes(
                 similarities=similarities,
             )
         ]
+        aliases = brand_aliases(
+            state.brand_profile,
+            str(state.request.website_url),
+            str(state.request.facebook_url),
+        )
+        if aliases:
+            capped: list[RankedKol] = []
+            for item in ranked:
+                if (
+                    not mentions_brand(item.kol, aliases)
+                    and item.scores.relevance > BRAND_UNMENTIONED_RELEVANCE_CAP
+                ):
+                    scores = item.scores.model_copy(
+                        update={"relevance": BRAND_UNMENTIONED_RELEVANCE_CAP}
+                    )
+                    item = item.model_copy(
+                        update={
+                            "scores": scores,
+                            "total_score": state.request.weights.apply(scores),
+                            "reason": (
+                                f"{item.reason} Brand not named in sampled posts."
+                            ),
+                        }
+                    )
+                capped.append(item)
+            ranked = capped
         ranked.sort(
             key=lambda item: (
                 -item.total_score,

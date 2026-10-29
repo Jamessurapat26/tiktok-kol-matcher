@@ -83,8 +83,8 @@ curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
     "llm: generate_queries round 1 1 call",
     "search round 1: est $0.52 (8 queries)",
     "llm: generate_queries round 2 1 call",
-    "search round 2: est $0.33 (5 queries)",
-    "enrich: est $0.87 (25 profiles)",
+    "search round 2: est $0.13 (2 queries)",
+    "enrich: est $0.70 (20 profiles)",
     "llm: judge 1 call (15 creators)"
   ],
   "results": [
@@ -316,7 +316,8 @@ uv run python -m app.cli match \
 
 The default run uses the offline KOL fixtures and does not call Apify.
 `--live-kols` searches TikTok and enriches the first-pass leaders through Apify
-(at most `--max-enrich`, default 10, one paid run each). Combine it with
+(one paid run each, up to `--max-enrich`, which overrides
+`MatchingConfig.enrich_top_n`, default 20). Combine it with
 `--live-web` when both the site and the creator data should be live.
 
 `APIFY_TOKEN` is read from the environment and sent only as an `Authorization`
@@ -339,8 +340,9 @@ exits with code 2 before the pipeline starts.
   sample. `content_summary` is a short line of captions and hashtags.
 - **Cost controls.** `--max-results-per-query` overrides
   `TIKTOK_RESULTS_PER_QUERY` (default 15) for search only; profile enrichment
-  always uses `TIKTOK_PROFILE_VIDEOS` (default 10). `--max-enrich` (default 10)
-  caps how many first-pass leaders are enriched. Video, cover, subtitle, and
+  always uses `TIKTOK_PROFILE_VIDEOS` (default 10). `--max-enrich` overrides
+  `MatchingConfig.enrich_top_n` (default 20), which caps how many first-pass
+  leaders are enriched. Video, cover, subtitle, and
   avatar downloads stay off, and comment scraping stays at zero. Each run sets
   `maxItems`, `limit`, and `maxTotalChargeUsd` (default $0.50) on the sync
   endpoint. Transport errors and HTTP 429/5xx are retried once. Timeouts and
@@ -366,7 +368,7 @@ uv run python -m app.cli match \
   --top-k 5 \
   --live-kols \
   --max-results-per-query 5 \
-  --max-enrich 10
+  --max-enrich 20
 ```
 
 `backend/scripts/apify_smoke.py` runs one search query with a maximum of 5

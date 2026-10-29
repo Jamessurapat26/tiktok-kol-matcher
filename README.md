@@ -134,8 +134,8 @@ T, A_eff, their confidences, flags, and the profile URL. It also prints the
 rejected counts and the per-stage cost log. `--json` prints one JSON object
 instead. Add `--live-web`, `--live-fb`, `--live-kols`, `--live-llm`, or
 `--live-embed` to run that service for real. Cost flags:
-`--max-results-per-query`, `--max-enrich`, `--min-candidates`, and
-`--max-rounds`.
+`--max-results-per-query`, `--max-enrich` (overrides the config's
+`enrich_top_n`, default 20), `--min-candidates`, and `--max-rounds`.
 
 ## Configuration
 
@@ -163,11 +163,11 @@ messages, and `/api/health` reports each one only as set or missing.
 | --- | --- | --- |
 | `DEMO_MODE` | `1` forces demo, `0` forces live | unset: live only when `APIFY_TOKEN` is set |
 | `APIFY_TOKEN` | Apify, for Facebook, TikTok search, and enrichment | unset |
-| `APIFY_JOB_BUDGET_USD` | Estimated Apify budget for one job or CLI run | `1.00` |
+| `APIFY_JOB_BUDGET_USD` | Estimated Apify budget for one job or CLI run | `1.50` |
 | `APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD` | Per-run cap for each TikTok search, at least 0.50 | `0.50` |
 | `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD` | Per-run cap for each profile enrichment, at least 0.50 | `0.50` |
 | `APIFY_FACEBOOK_MAX_CHARGE_USD` | Per-run cap for each Facebook page or posts run | `0.50` |
-| `APIFY_ENRICH_RESERVE_USD` | Budget TikTok search must leave for enrichment, below the job budget | `0.35` |
+| `APIFY_ENRICH_RESERVE_USD` | Budget TikTok search must leave for enrichment, below the job budget | `0.70` |
 | `TIKTOK_RESULTS_PER_QUERY` | Videos per TikTok search query, 1-50 | `15` |
 | `TIKTOK_PROFILE_VIDEOS` | Recent videos fetched per enriched profile, 1-30 | `10` |
 | `DISCOVERY_MIN_THAI_CANDIDATES` | Thai creators discovery aims for before it stops | `30` |
@@ -193,7 +193,8 @@ Apify or discovery value, such as a TikTok cap below 0.50 or a non-numeric
 budget, makes `POST /api/jobs` return 400 naming the variable, and makes the
 CLI exit with code 2, before any Apify run starts. `--max-results-per-query`,
 `--min-candidates`, and `--max-rounds` override the matching variables for one
-CLI run. `--max-enrich` caps how many profiles that run may enrich.
+CLI run. `--max-enrich` is optional and overrides
+`MatchingConfig.enrich_top_n` (default 20).
 
 ## Architecture
 
@@ -219,7 +220,7 @@ flowchart TD
     D -->|"under target Thai creators and rounds left"| Q
     D -->|"enough Thai creators or round cap"| HF["hard_filter<br/>rules only, counts rejections"]
     HF --> FP["first_pass_rank<br/>score with data already in hand"]
-    FP --> E["enrich_kols<br/>first-pass top 25, not the largest accounts"]
+    FP --> E["enrich_kols<br/>first-pass top 20, not the largest accounts"]
     E --> J["judge_and_rank<br/>one batched LLM judge call on the top 15"]
     J --> O(["rank_and_output<br/>MMR lambda 0.7, top k"])
 ```
@@ -250,10 +251,11 @@ flowchart TD
    judge has not run yet, so `judge = sim percentile` and `A_eff = 0.5`. The
    result decides which creators are worth paying to enrich.
 6. **Enrichment.** Fetches recent videos for the first-pass leaders, the top
-   25 in that ranking rather than the largest accounts. The live job budget
-   and the API/CLI cap normally allow about 10, so the rest keep their
-   search-derived stats, get lower engagement confidence, and carry the
-   `search_stats_only` flag.
+   20 in that ranking rather than the largest accounts. At the estimated rates,
+   the `$0.70` reserve and the job budget allow 20 profile runs, matching
+   `MatchingConfig.enrich_top_n`. Leaders beyond that keep their search-derived
+   stats, get lower engagement confidence, and carry the `search_stats_only`
+   flag.
 7. **Judge.** The top 15 go to one batched LLM call. It returns `judge`, `A`,
    and a confidence `c` per creator. The rubric checks category match, tone
    match, and no risky content. Audience is estimated from text, captions, and
@@ -376,7 +378,7 @@ clamped to 10k–2M and shown with `tier_label`, `tier_confidence`, and
 
 **Judge before stage 6.** Until the batched judge call runs, `judge = sim` and
 `A_eff = 0.5`. That keeps first-pass ranking cheap and confirmatory: it only
-decides which 25 candidates deserve profile enrichment. The judge then changes
+decides which 20 candidates deserve profile enrichment. The judge then changes
 F for the top 15, and the final ranking is recomputed for everyone.
 
 **Every tuning value lives in `MatchingConfig`.** The score weighting, shrinkage `k`,
@@ -405,22 +407,24 @@ sync endpoint returns dataset items but not usage, so these are estimates.
 | Facebook posts, 20 items | `0.005 + 20 × 0.005` = $0.105 |
 | Facebook subtotal | $0.125 |
 | TikTok search, 15 videos per query | `0.005 + 15 × 0.004` = $0.065 per run |
-| Search runs | 8 runs = $0.52 |
+| Search runs | 10 runs = $0.65 |
 | Profile enrichment, 10 videos per profile | `0.005 + 10 × 0.003` = $0.035 per run |
-| Profile runs | 10 runs = $0.35 |
-| **Total at the conservative estimate** | **$0.995 of $1.00** |
+| Profile runs | 20 runs = $0.70 |
+| **Total at the conservative estimate** | **$1.475 of $1.50** |
 
-A ninth search run would need `$0.645 + $0.35 + $0.065 = $1.06`, so the budget
-guard skips it and records a warning. `estimate_default_job_usd` reproduces
-this table.
+`MatchingConfig.max_search_queries` caps search at 10 queries per job, so an
+eleventh search run is not allowed. Raising `--max-enrich` above 20 would
+need `$1.475 + $0.035 = $1.51` for a 21st profile, over the `$1.50` budget, so
+the budget guard would skip it. `estimate_default_job_usd` reproduces this table.
 
-The reserve matters for enrichment. At $0.035 per profile, the `$1.00` budget
-with the `$0.35` enrich reserve leaves about 10 profile runs, and the API and
-CLI also cap live enrichment at 10 by default (`_MAX_ENRICH`, `--max-enrich`).
-The matching config asks for the first-pass top 25, so in a live job roughly 10
-of those 25 leaders get profile stats. The rest keep stats from their search
-videos, score E with lower confidence, and carry `search_stats_only`. They are
-not dropped.
+These are estimates from the code's own per-item rates; the `$1.50` default has
+not been verified with a live v2 run.
+
+The reserve matters for enrichment. The `$0.70` reserve guarantees room for 20
+profile runs, which equals `MatchingConfig.enrich_top_n` (default 20), so every
+first-pass leader the config asks for gets profile stats. Leaders outside the
+top 20 keep stats from their search videos, score E with lower confidence, and
+carry `search_stats_only`. They are not dropped.
 
 LLM calls per job are one brand brief, one per query round (usually two or
 three), and one judge call: four or five calls in total. The CLI prints a cost
@@ -431,7 +435,9 @@ cost log:
   llm: analyze_brand 1 call
   llm: generate_queries round 1 1 call
   search round 1: est $0.52 (8 queries)
-  enrich: est $0.35 (10 profiles)
+  llm: generate_queries round 2 1 call
+  search round 2: est $0.13 (2 queries)
+  enrich: est $0.70 (20 profiles)
   llm: judge 1 call (15 creators)
 ```
 
@@ -459,17 +465,17 @@ rubric consistent across candidates.
 `maxItems`, `limit`, and `maxTotalChargeUsd`. The TikTok actors reject a cap
 below $0.50, so the TikTok caps default to that minimum and a lower value is
 rejected with an error before any run starts. On top of that,
-`APIFY_JOB_BUDGET_USD` (default $1.00) covers the whole job. A run starts only
+`APIFY_JOB_BUDGET_USD` (default $1.50) covers the whole job. A run starts only
 if its worst-case estimate, from the item count it asks for, still fits in the
 budget. Runs that do not fit are skipped and recorded as warnings, and the job
 still finishes with what it has. The cost table is in
 [Cost per job](#cost-per-job).
 
 **A reserve so search cannot starve enrichment.** A search run starts only if
-the estimated spend, plus that run, plus `APIFY_ENRICH_RESERVE_USD` ($0.35)
+the estimated spend, plus that run, plus `APIFY_ENRICH_RESERVE_USD` ($0.70)
 fits in the budget, so profile runs always have room. With the defaults this
-means 8 search runs and 10 profile runs, not the 25 profiles the config asks
-for.
+means at most 10 search runs (the query cap) and 20 profile runs, matching
+`MatchingConfig.enrich_top_n`.
 
 **SSE instead of polling from the browser.** Progress is a one-way stream of
 small events, which is what server-sent events are for. `EventSource`
@@ -509,10 +515,10 @@ and the web reader checks resolved addresses before a direct fetch.
 - **The Apify budget is an estimate.** It is computed from item counts and
   per-item rates measured on this account, not from Apify's billing. If Apify's
   prices rise, real spend can pass the budget until the rates are updated.
-- **The live budget caps enrichment.** The `$1.00` guard plus the reserve
-  allows about 10 profile runs, so most candidates keep search-derived stats
-  and the `search_stats_only` flag. The matching config's 25-profile target is
-  not reached in a live job.
+- **The live budget caps enrichment.** The 20-profile default fits only at the
+  estimated rates. If real prices are higher, the guard skips the last
+  profiles, and they keep `search_stats_only` stats. This has not been verified
+  on a live v2 run.
 - **TikTok search is not cached.** Web pages, Facebook pages, profile
   enrichment, and embeddings are cached, but every search query is a paid run.
   Repeating a job without changing the brand still pays for search.

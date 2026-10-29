@@ -6,19 +6,27 @@ shortlist of Thai TikTok creators who fit the brand.
 ![Ranked results from a live run](docs/screenshots/live-results.png)
 
 KOL Matcher is a LangGraph pipeline behind a FastAPI service and a React web
-app. It reads the brand's own pages, has an LLM build a structured brand
-profile, searches TikTok for creators, keeps the Thai ones, and scores each
-creator on four signals:
+app. It reads the brand's own pages, has an LLM build a structured brand brief,
+searches TikTok for creators, removes accounts that cannot fit, and scores each
+survivor on four signals:
 
-| Signal | Weight | How it is scored |
+| Score | Meaning | How it is computed |
 | --- | --- | --- |
-| Relevance | 40% | LLM rerank of each creator against the brand profile, with the embedding cosine as a hint |
-| Engagement | 25% | Median `(likes + comments + shares) / views` over recent videos |
-| Audience fit | 20% | Thai language and Thailand region signals |
-| Follower tier | 15% | nano, micro, macro, or mega against the tiers the brand profile prefers |
+| F | Fit | `0.4·sim + 0.3·on_topic + 0.3·judge`, plus a `0.05` mention bonus (F capped at 1). `sim` is the brief-to-caption embedding cosine as a pool percentile, `on_topic` the share of recent videos that name a topic keyword, and `judge` the LLM rubric score. |
+| E | Engagement quality | Median per-video `(likes + comments + shares) / views`, shrunk toward the same-tier median (`k = 3`), then ranked within the follower tier. `E = 0.8·ER percentile + 0.2·reach percentile`, where reach is median views divided by followers. |
+| T | Tier fit | `exp(−\|log10(followers) − log10(target_followers)\| / σ)` with `σ = 0.5 + 0.5·(1 − tier_confidence)`. |
+| A_eff | Audience fit (estimate) | The judge's text-based audience estimate `A`, shrunk toward neutral by its confidence `c`: `A_eff = c·A + (1 − c)·0.5`. Before judging, `A_eff = 0.5`. |
 
-Every result shows its component scores, the weighted total, and a one-line
-reason. The whole pipeline also runs offline in demo mode, with no keys.
+`Final = F × Quality` and `Quality = 0.45·E + 0.30·T + 0.25·A_eff`.
+
+Scoring runs only after hard filters remove the brand's own accounts,
+competitor accounts, shop and media accounts, creators who are not Thai,
+creators outside 1k–5M followers, and creators whose latest post is over 60
+days old.
+
+Every result shows F, E, T, A_eff, their confidences, flags, quality, final, a
+one-line reason, up to three evidence video links, and the profile URL. The
+whole pipeline also runs offline in demo mode, with no keys.
 
 ## Contents
 
@@ -26,6 +34,7 @@ reason. The whole pipeline also runs offline in demo mode, with no keys.
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
 - [Architecture](#architecture)
+- [Scoring](#scoring)
 - [Design decisions and trade-offs](#design-decisions-and-trade-offs)
 - [Known limitations](#known-limitations)
 - [Testing](#testing)
@@ -36,8 +45,9 @@ reason. The whole pipeline also runs offline in demo mode, with no keys.
 ## Screenshots
 
 These come from one live run with every integration on (website, Facebook,
-TikTok search, LLM, and embeddings). The brand URL is only sample input. The
-run took about three minutes for a top 10.
+TikTok search, LLM, and embeddings). The brand URL is only sample input. That
+run used 10 videos per query, found 48 creators, and took about three minutes
+for a top 10; it predates matching v2. No live run has used matching v2 yet.
 
 | Brand form | Live progress |
 | --- | --- |
@@ -119,11 +129,13 @@ uv run python -m app.cli match \
   --top-k 10
 ```
 
-Progress goes to stderr and the ranked table to stdout. `--json` prints one
-JSON object instead. Add `--live-web`, `--live-fb`, `--live-kols`,
-`--live-llm`, or `--live-embed` to run that service for real. Cost flags:
-`--max-results-per-query`, `--max-enrich`, `--min-candidates`, `--max-rounds`,
-and `--prefilter-limit`.
+Progress goes to stderr and the ranked table to stdout. The table shows F, E,
+T, A_eff, their confidences, flags, and the profile URL. It also prints the
+rejected counts and the per-stage cost log. `--json` prints one JSON object
+instead. Add `--live-web`, `--live-fb`, `--live-kols`, `--live-llm`, or
+`--live-embed` to run that service for real. Cost flags:
+`--max-results-per-query`, `--max-enrich`, `--min-candidates`, and
+`--max-rounds`.
 
 ## Configuration
 
@@ -166,13 +178,11 @@ messages, and `/api/health` reports each one only as set or missing.
 | `LLM_API_KEY`, `NVIDIA_API_KEY`, `OPENAI_API_KEY` | LLM bearer token, first non-empty wins | unset |
 | `LLM_TIMEOUT`, `LLM_MAX_TOKENS`, `LLM_TEMPERATURE` | Request limits (timeout is per attempt) | `60`, `4096`, `0.2` |
 | `LLM_MAX_RETRIES`, `LLM_RETRY_BACKOFF` | Retries for timeouts, connection errors, 408, 429, and 5xx, with doubling backoff | `2`, `2` |
-| `LLM_RERANK_BATCH_SIZE` | Creators per rerank request | `5` |
 | `LLM_DISABLE_REASONING`, `LLM_NO_THINK_MESSAGE` | How to turn model thinking off | `extra_body` for the default model only |
 | `EMBED_MODEL` | Local sentence-transformers model | `google/embeddinggemma-2` |
 | `EMBED_DEVICE`, `EMBED_DIM`, `EMBED_DTYPE`, `EMBED_BATCH_SIZE` | Embedder settings | `cpu`, `768`, `float32`, `32` |
 | `HF_TOKEN` | Hugging Face token, only for a gated model | unset |
-| `PREFILTER_LIMIT` | CLI only: creators kept by the embedding prefilter | `25` |
-| `KOL_CACHE_DIR` | Cache root for web, Facebook, Apify, and embeddings | `data/cache` at the repo root |
+| `KOL_CACHE_DIR` | Cache root for web, Facebook, profile enrichment, and embeddings; TikTok search is not cached | `data/cache` at the repo root |
 | `JOBS_DB` | SQLite job store | `data/jobs.db` |
 | `CORS_ORIGINS` | Allowed browser origins, comma-separated | `http://localhost:5173` |
 | `JOB_WORKERS` | Jobs that run at once | `2` |
@@ -183,7 +193,7 @@ Apify or discovery value, such as a TikTok cap below 0.50 or a non-numeric
 budget, makes `POST /api/jobs` return 400 naming the variable, and makes the
 CLI exit with code 2, before any Apify run starts. `--max-results-per-query`,
 `--min-candidates`, and `--max-rounds` override the matching variables for one
-CLI run.
+CLI run. `--max-enrich` caps how many profiles that run may enrich.
 
 ## Architecture
 
@@ -202,48 +212,57 @@ flowchart TD
         F["scrape_facebook<br/>Apify page + posts actors"]
     end
 
-    W --> A["analyze_brand<br/>LLM brand profile, then tidy_brand_profile"]
+    W --> A["analyze_brand<br/>one LLM call, structured brief"]
     F --> A
-    A --> Q["generate_queries<br/>LLM: Thai and English TikTok queries"]
-    Q --> D["discover_kols<br/>Apify clockworks/tiktok-scraper"]
-    D -->|"under 30 Thai creators and under 3 rounds"| Q
-    D -->|"enough Thai creators or 3 rounds"| T["filter_thai<br/>Thai language, region TH, or Thai script"]
-    T --> E["enrich_kols<br/>Apify clockworks/tiktok-profile-scraper<br/>largest accounts first"]
-    E --> P["embed_and_prefilter<br/>embeddinggemma cosine, keep top 25"]
-    P --> R["llm_rerank<br/>LLM relevance + reason, heuristic scores"]
-    R --> O(["rank_and_output<br/>weighted total, top k"])
+    A --> Q["generate_queries<br/>topic keywords plus competitors"]
+    Q --> D["discover_kols<br/>Apify TikTok search, per-video stats"]
+    D -->|"under target Thai creators and rounds left"| Q
+    D -->|"enough Thai creators or round cap"| HF["hard_filter<br/>rules only, counts rejections"]
+    HF --> FP["first_pass_rank<br/>score with data already in hand"]
+    FP --> E["enrich_kols<br/>first-pass top 25, not the largest accounts"]
+    E --> J["judge_and_rank<br/>one batched LLM judge call on the top 15"]
+    J --> O(["rank_and_output<br/>MMR lambda 0.7, top k"])
 ```
 
 1. **Brand ingest.** The website and Facebook nodes run in the same
    superstep. The website is required. A missing Facebook page is only a
    warning, and brand analysis runs on the website alone.
-2. **Brand profile.** The LLM returns category, products, target audience,
-   tone, content style, Thai and English keywords, hashtags, and preferred
-   tiers as JSON, validated with Pydantic. The website and the Facebook
-   "about" text are the main evidence. At most the three newest posts, cut to
-   200 characters each, go in as weak signals for tone. `tidy_brand_profile`
-   then drops sentence-like keywords, caps list lengths, and fixes age bounds.
+2. **Structured brief.** One LLM call returns category, key products, price
+   tier, target audience, tone, Thai and English topic keywords, competitors,
+   `brand_handles`, and a tier guess: `target_followers`, `tier_label`,
+   `tier_confidence`, and `tier_reason`. The tier guess maps an SME or small
+   online shop to micro (~30k), a nationwide brand to mid (~150k), and a
+   multinational to macro (~800k), and clamps `target_followers` to the
+   10k–2M range. `tidy_brand_profile` then cleans the lists, and the output
+   shows `tier_label` and `tier_reason`.
 3. **Discovery loop.** Query generation and TikTok search repeat until 30
    unique creators that pass the Thai filter are found, or three rounds have
-   run. Each round asks the LLM only for 6-10 queries it has not tried yet, and
-   each query returns up to 15 videos. Videos are deduped by author, and up to
-   three captions per author are kept.
-4. **Thai filter.** Keeps a creator when the video language is Thai, the
-   account region is Thailand, or the nickname, bio, or search captions contain
-   Thai script (at least two Thai characters, so one stray character does not
-   count). An English-only creator outside Thailand is still dropped.
-5. **Enrichment.** Fetches recent videos for the largest accounts (10 by
-   default), then computes the median engagement rate and posts per week.
-6. **Prefilter.** Embeds the brand text and every creator's bio, captions, and
-   hashtags with a local model, and keeps the closest 25 (or `top_k` if that is
-   larger) by cosine similarity.
-7. **Rerank.** The LLM scores relevance from 0 to 1 with a short reason, in
-   batches of 5. Each creator card says whether the creator's nickname, bio, or
-   captions name the brand (`mentions_brand`), and the prompt forbids crediting
-   another store's campaign to the brand. After the model replies, a creator who
-   never names the brand has relevance capped at 0.6 and the reason says so.
-   Engagement, audience fit, and tier fit are deterministic heuristics. The total is the weighted sum, with ties broken by engagement,
-   then followers.
+   run. Each round asks for 6-10 new queries built from topic keywords and
+   competitors, never the brand name. Each query is one paid Apify run and
+   returns up to 15 videos. Creators are deduped, and every video's views,
+   likes, comments, shares, date, caption, and URL are kept.
+4. **Hard filters.** Free rules drop the brand's own accounts, competitor
+   accounts, shop and media accounts, creators who are not Thai, creators
+   outside 1k–5M followers, and creators whose latest post is over 60 days
+   old. Each rejection is counted by reason for the CLI and API output.
+5. **First-pass rank.** Every survivor is scored with data already in hand:
+   embedding similarity, on-topic share, and search-derived engagement. The
+   judge has not run yet, so `judge = sim percentile` and `A_eff = 0.5`. The
+   result decides which creators are worth paying to enrich.
+6. **Enrichment.** Fetches recent videos for the first-pass leaders, the top
+   25 in that ranking rather than the largest accounts. The live job budget
+   and the API/CLI cap normally allow about 10, so the rest keep their
+   search-derived stats, get lower engagement confidence, and carry the
+   `search_stats_only` flag.
+7. **Judge.** The top 15 go to one batched LLM call. It returns `judge`, `A`,
+   and a confidence `c` per creator. The rubric checks category match, tone
+   match, and no risky content. Audience is estimated from text, captions, and
+   bio only, never from faces. Risky content becomes a flag.
+8. **Output.** Every candidate is scored again now that judged values exist.
+   The top k is selected with MMR over `Final`, using caption similarity, so
+   near-duplicate creators do not fill the list. Each row carries the scores,
+   confidences, flags, `tier_reason`, reason, up to three evidence video links,
+   and the profile URL.
 
 A fatal node error sets `stage` to `failed` and ends the graph. A partial
 failure, such as one profile that fails to enrich, is recorded in `errors` and
@@ -272,9 +291,149 @@ a finished job all use the same code. Jobs left running by a previous process
 are marked failed on startup.
 
 Every external service in `backend/app/integrations/` is a `Protocol` with a
-mock and a live implementation, selected per job by the live flags. Each live
-integration caches its results on disk (7 days for web, Facebook, and
-enrichment), so a repeated run costs nothing.
+mock and a live implementation, selected per job by the live flags. Web pages,
+Facebook pages, profile enrichment, and embedding vectors are cached on disk.
+TikTok search is not cached: every query is a paid Apify run, so a repeated run
+still pays for search.
+
+## Scoring
+
+Every score is in `[0, 1]` except the MMR term. The functions live in
+`backend/app/scoring.py`, the selection in `backend/app/ranking.py`, and every
+tuning value in `backend/app/matching_config.py` (`MatchingConfig`).
+
+```text
+F       = 0.4·sim + 0.3·on_topic + 0.3·judge (+0.05 mention bonus, cap 1)
+E       = 0.8·percentile_in_tier(ER*) + 0.2·percentile_in_tier(reach)
+T       = exp(−|log10(followers) − log10(target_followers)| / σ)
+σ       = 0.5 + 0.5·(1 − tier_confidence)
+A_eff   = c·A + (1 − c)·0.5
+Quality = 0.45·E + 0.30·T + 0.25·A_eff
+Final   = F × Quality
+MMR     = argmax λ·Final − (1 − λ)·max_similarity_to_selected, λ = 0.7
+```
+
+**F — fit.** `sim` is the cosine between the brief and the creator's recent
+captions, converted to a percentile within the candidate pool. `on_topic` is
+the share of up to 10 recent videos whose caption contains a brief topic term.
+`judge` is the LLM rubric score. Before the judge stage, `judge` is the `sim`
+percentile, so the first pass and the final pass use the same formula.
+
+**E — engagement quality.** For each recent video, `ER = (likes + comments +
+shares) / views`, skipping videos with zero views. The median over the videos
+is shrunk toward the median ER of the same follower tier:
+`ER* = (n·median + k·prior_tier) / (n + k)` with `k = 3`, falling back to the
+global pool median when a tier is empty. `ER*` is then ranked within the tier,
+because engagement naturally falls as followers grow. The second term is reach,
+`median views / followers`, also ranked within the tier; a creator with no
+views or followers gets the neutral `0.5`. Engagement confidence is
+`n/(n+3)` times `0.6` for search-derived stats or `1.0` for profile stats.
+Search results skew viral, so a creator seen only in search is trusted less.
+
+**T — tier fit.** A creator exactly at `target_followers` scores 1. The
+distance is measured in log10 followers, and `σ` widens when the brief's tier
+guess is unsure.
+
+**A_eff — audience fit.** The judge returns `A` and a confidence `c`, and
+`A_eff` shrinks the estimate toward `0.5` when `c` is low. This is an
+estimate, not measured demographics.
+
+**Quality and Final.** Quality is a weighted blend of the three non-fit
+signals, and Final multiplies it by F.
+
+**Diversity.** The top k is chosen greedily with MMR. The first pick has the
+highest `Final`; each later pick maximizes `0.7·Final − 0.3·max similarity to
+an already selected creator`. The aim is a mix of tiers and styles rather than
+near-duplicates.
+
+### Why these choices
+
+**Why F is multiplicative.** A creator with excellent engagement but the wrong
+niche should not outrank an on-niche creator with average engagement. Making F
+a multiplier means the fit score acts as a gate on Quality; an off-niche
+creator can only rank on engagement if F is not near zero. The tests include
+that case.
+
+**Why A is an estimate.** TikTok does not expose audience demographics to
+scrapers, so there is no measured age or gender split to use. The judge reads
+the creator's text, captions, and bio and returns a guess plus a confidence.
+`A_eff` shrinks a low-confidence guess toward neutral instead of pretending it
+is precise. Age and gender are never inferred from faces, both for ethics and
+for PDPA reasons.
+
+**Why a mention bonus instead of a cap.** A creator who names the brand or a
+competitor in their recent text gets `+0.05` on F, capped at 1. Creators who
+have never mentioned the brand are not penalized; most good creators for a new
+campaign have not. Recent competitor sponsorship is only a flag
+(`competitor_sponsored`), not a score penalty.
+
+**How the tier is guessed.** The brief prompt asks the model to use price tier,
+sales channels, local versus multinational reach, and the brand page's follower
+count. An SME or small online shop maps to micro (~30k), a nationwide Thai
+brand to mid (~150k), and a multinational to macro (~800k). The result is
+clamped to 10k–2M and shown with `tier_label`, `tier_confidence`, and
+`tier_reason`.
+
+**Judge before stage 6.** Until the batched judge call runs, `judge = sim` and
+`A_eff = 0.5`. That keeps first-pass ranking cheap and confirmatory: it only
+decides which 25 candidates deserve profile enrichment. The judge then changes
+F for the top 15, and the final ranking is recomputed for everyone.
+
+**Every tuning value lives in `MatchingConfig`.** The score weighting, shrinkage `k`,
+reach blend, tier bounds, stage sizes, MMR lambda, and confidence values are
+frozen dataclass fields, validated at construction, instead of numbers spread
+through the code.
+
+**The eval harness.** [`eval/README.md`](eval/README.md) documents an offline
+NDCG@10 harness over cached candidate pools, with `--ablate F|E|T|A`. It needs
+no network. The labels in `eval/golden/` are drafts, not human-checked. On the
+example pool, ablating A raises mean NDCG@10 from 0.9113 to 0.9558, so the
+current A term is not yet justified by that set. The harness is the tool for
+tuning once real labels exist.
+
+### Cost per job
+
+`estimate_run_cost` in `backend/app/integrations/apify.py` charges `$0.005`
+per run plus a per-item rate, and caps the result at the run's own
+`maxTotalChargeUsd`. The rates are TikTok search `$0.004`, profile enrichment
+`$0.003`, Facebook page `$0.015`, and Facebook posts `$0.005` per item. The
+sync endpoint returns dataset items but not usage, so these are estimates.
+
+| Step | Estimate |
+| --- | --- |
+| Facebook page, 1 item | `0.005 + 0.015` = $0.020 |
+| Facebook posts, 20 items | `0.005 + 20 × 0.005` = $0.105 |
+| Facebook subtotal | $0.125 |
+| TikTok search, 15 videos per query | `0.005 + 15 × 0.004` = $0.065 per run |
+| Search runs | 8 runs = $0.52 |
+| Profile enrichment, 10 videos per profile | `0.005 + 10 × 0.003` = $0.035 per run |
+| Profile runs | 10 runs = $0.35 |
+| **Total at the conservative estimate** | **$0.995 of $1.00** |
+
+A ninth search run would need `$0.645 + $0.35 + $0.065 = $1.06`, so the budget
+guard skips it and records a warning. `estimate_default_job_usd` reproduces
+this table.
+
+The reserve matters for enrichment. At $0.035 per profile, the `$1.00` budget
+with the `$0.35` enrich reserve leaves about 10 profile runs, and the API and
+CLI also cap live enrichment at 10 by default (`_MAX_ENRICH`, `--max-enrich`).
+The matching config asks for the first-pass top 25, so in a live job roughly 10
+of those 25 leaders get profile stats. The rest keep stats from their search
+videos, score E with lower confidence, and carry `search_stats_only`. They are
+not dropped.
+
+LLM calls per job are one brand brief, one per query round (usually two or
+three), and one judge call: four or five calls in total. The CLI prints a cost
+log with one line per stage, for example:
+
+```text
+cost log:
+  llm: analyze_brand 1 call
+  llm: generate_queries round 1 1 call
+  search round 1: est $0.52 (8 queries)
+  enrich: est $0.35 (10 profiles)
+  llm: judge 1 call (15 creators)
+```
 
 ## Design decisions and trade-offs
 
@@ -286,60 +445,31 @@ and retries once with the validation error in the prompt. The default model is
 a reasoning model, so thinking is turned off through `chat_template_kwargs`.
 That cut a brand-analysis call from 30-45 seconds to about 3.
 
-**Local embeddings as a cheap prefilter.** embeddinggemma runs on CPU through
-sentence-transformers, with no per-call cost and no data leaving the machine.
-It narrows the candidates before the slower, paid LLM rerank. The trade-off is
-a heavy optional dependency (torch), so it sits behind the `embed` extra and
-the default install and tests stay light.
+**Local embeddings as a free similarity term.** embeddinggemma runs on CPU
+through sentence-transformers, with no per-call cost and no data leaving the
+machine. It supplies `sim` for F and the document similarity that MMR uses.
+The trade-off is a heavy optional dependency (torch), so it sits behind the
+`embed` extra and the default install and tests stay light.
 
-**LLM for relevance only, heuristics for the rest.** Engagement, audience fit,
-and tier fit come from numbers the scraper returns, so they are cheap,
-repeatable, and easy to explain. Only relevance, which needs judgement, goes to
-the model. The weights are part of the request model (`weights` in
-`POST /api/jobs`) and are normalised to sum to 1.
+**One judge, not one call per creator.** Only the top 15 see the LLM judge, and
+they share one request. That keeps the expensive stage small and makes the
+rubric consistent across candidates.
 
-**An estimated Apify budget plus per-run caps.** Every Apify run sets `maxItems`,
-`limit`, and `maxTotalChargeUsd`. The TikTok actors reject a cap below $0.50,
-so the TikTok caps default to that minimum and a lower value is rejected
-with an error before any run starts. On top of that, `APIFY_JOB_BUDGET_USD` (default $1.00) covers the
-whole job. The sync endpoint returns items but not usage, so spend is
-estimated from the items returned. A run starts only if its worst-case
-estimate, from the item count it asks for, still fits in the budget. Runs that
-do not fit are skipped and recorded as warnings, and the job still finishes
-with what it has. Enrichment goes to the largest accounts first, so
-the budget is spent on the creators most likely to matter.
+**An estimated Apify budget plus per-run caps.** Every Apify run sets
+`maxItems`, `limit`, and `maxTotalChargeUsd`. The TikTok actors reject a cap
+below $0.50, so the TikTok caps default to that minimum and a lower value is
+rejected with an error before any run starts. On top of that,
+`APIFY_JOB_BUDGET_USD` (default $1.00) covers the whole job. A run starts only
+if its worst-case estimate, from the item count it asks for, still fits in the
+budget. Runs that do not fit are skipped and recorded as warnings, and the job
+still finishes with what it has. The cost table is in
+[Cost per job](#cost-per-job).
 
-**A reserve so search cannot starve enrichment.** A search run starts only
-if the estimated spend, plus that run, plus `APIFY_ENRICH_RESERVE_USD` ($0.35)
-fits in the budget, so the 10 profile runs always have room. Each estimate is
-$0.005 per run plus a per-item rate (TikTok search $0.004, profile $0.003,
-Facebook page $0.015, Facebook posts $0.005), so it follows
-`TIKTOK_RESULTS_PER_QUERY` and `TIKTOK_PROFILE_VIDEOS`. The rates sit a little
-above measured live costs: a 20-video search cost $0.075 (estimate $0.085), and
-a 10-video profile run cost $0.03 (estimate $0.035). With the defaults, the
-worst case is:
-
-| Step | Estimate |
-| --- | --- |
-| Facebook page (1 item) and posts (20 items), uncached | 0.02 + 0.105 = $0.125 |
-| TikTok search, 15 videos per run: 0.005 + 15 × 0.004 = $0.065; 8 runs fit (0.125 + 8 × 0.065 + 0.35 = 0.995) | $0.52 |
-| Profile enrichment, 10 videos: 0.005 + 10 × 0.003 = $0.035, 10 runs | $0.35 |
-| **Total** | **$0.995**, within $1.00 |
-
-A ninth search run would bring it to $1.06, so it is skipped. At measured
-prices the same job costs about $0.86: up to $0.11 for Facebook, about $0.45
-for search, and $0.30 for enrichment. `estimate_default_job_usd` in
-`backend/app/integrations/apify.py` reproduces the table.
-
-**A brand-name check on relevance.** In one live run the model scored a
-creator 0.95 for "collecting the brand's stamps" when the caption was about a
-different retailer's stamp campaign. The brand profile now carries
-`brand_names` (names and aliases in Latin and Thai script from the LLM, plus
-the website's domain label and the Facebook page slug). Matching ignores case,
-spaces, and punctuation, so `Example-Brand`, `#ExampleBrandThailand`, and `examplebrand` are
-one name. A creator whose nickname, bio, and sampled captions never name the
-brand keeps a relevance of at most 0.6. Creators who are a good fit without
-having posted about the brand still rank, just below those who have.
+**A reserve so search cannot starve enrichment.** A search run starts only if
+the estimated spend, plus that run, plus `APIFY_ENRICH_RESERVE_USD` ($0.35)
+fits in the budget, so profile runs always have room. With the defaults this
+means 8 search runs and 10 profile runs, not the 25 profiles the config asks
+for.
 
 **SSE instead of polling from the browser.** Progress is a one-way stream of
 small events, which is what server-sent events are for. `EventSource`
@@ -356,7 +486,8 @@ time. Several API replicas would need a shared database and a real queue.
 **Demo mode by default.** Without an `APIFY_TOKEN`, the service runs the full
 graph on fixtures, so anyone can clone the repo and see the product in a minute
 without spending money. The fixtures cover the awkward cases: duplicate handles
-with different casing, non-Thai creators, and a second discovery round.
+with different casing, non-Thai creators, the brand's own account, shop and
+media accounts, and a second discovery round.
 
 **Guarding a public-URL fetcher.** The API only accepts Facebook URLs on
 facebook.com or fb.com, rejects website URLs on local or private addresses,
@@ -364,83 +495,91 @@ and the web reader checks resolved addresses before a direct fetch.
 
 ## Known limitations
 
+- **The tuning values are not fitted.** The score weighting, the shrinkage constant,
+  and the MMR lambda are reasoned starting points. The eval labels are drafts,
+  and on the example pool ablating A does not lower NDCG@10, so that term is
+  not yet supported by evidence.
+- **Shop and media detection can misfire.** It matches tokens such as `shop`,
+  `store`, `official`, `news`, `media`, and `tv` inside handle segments and the
+  nickname, so a legitimate creator with `official` or `tv` in the name can be
+  dropped.
+- **`on_topic` is keyword-based.** It counts a video only when a brief topic
+  term appears in the caption, so a relevant video described in different
+  words is missed, and a passing mention counts as a hit.
 - **The Apify budget is an estimate.** It is computed from item counts and
   per-item rates measured on this account, not from Apify's billing. If Apify's
   prices rise, real spend can pass the budget until the rates are updated.
+- **The live budget caps enrichment.** The `$1.00` guard plus the reserve
+  allows about 10 profile runs, so most candidates keep search-derived stats
+  and the `search_stats_only` flag. The matching config's 25-profile target is
+  not reached in a live job.
+- **TikTok search is not cached.** Web pages, Facebook pages, profile
+  enrichment, and embeddings are cached, but every search query is a paid run.
+  Repeating a job without changing the brand still pays for search.
 - **No warning when the budget skips the Facebook run.** If the budget stops a
   Facebook run, the reader quietly falls back to the web reader, or keeps the
   page without posts, and the job shows no warning about it.
 - **The Facebook web fallback can accept a login wall.** When it reads the page
   through Jina, it does not detect Facebook's login page, so the brand profile
   may get login text instead of the page's "about".
-- **The ranking weights are not tuned.** 40/25/20/15 is a reasoned starting
-  point, not a value fitted to labelled data.
-- **The candidate pool is measured on one brand only.** Three live runs on the
-  same retail brand:
-  - The run in the screenshots used the first settings (10 videos per query, a
-    language-and-region filter, a loop that counted every creator). It found 48
-    creators and kept 12.
-  - A run with 20 videos per query and the Thai-script filter found 210 and kept
-    60 after two rounds. It spent $0.93 of real Apify credit, which showed that
-    the cost estimates were too low. A spend guard in the test harness blocked 9
-    of the 10 profile runs, so the results had no engagement data.
-  - A run with the current defaults (15 videos per query, recalibrated
-    estimates, the brand-name check, LLM retries) found 81 + 57 = 138 creators
-    in two rounds and kept 33. It took 10 min 14 s and spent $0.78 of real Apify
-    credit: 10 search runs and 7 profile runs. One profile run timed out and the
-    budget skipped 2 more, so at most 6 creators got engagement data. The budget also
-    skipped the last 2 search queries to keep the enrichment reserve. Two LLM
-    calls timed out once and succeeded on retry. All 10 results name the brand,
-    so none was capped.
-- **Most results still lack engagement data.** Only the 10 largest accounts are
-  enriched, and in the run above only 2 of the top 10 were among them. The
-  other 8 share the default engagement score.
-- **The brand's own account is not excluded.** In the run above the brand's
-  official TikTok account ranked first.
-- **The brand-name check is literal.** A creator who refers to the brand only
-  in video speech, an image, or an unlisted nickname counts as not naming it,
-  and an alias the LLM misses is not matched.
+- **The candidate pool is measured on one brand.** Three live runs on the same
+  retail brand, all before matching v2. The run in the screenshots used the
+  first settings (10 videos per query, a language-and-region filter, a loop
+  that counted every creator); it found 48 creators and kept 12. A run with 20
+  videos per query and the Thai-script filter found 210 and kept 60 after two
+  rounds, and spent $0.93 of real Apify credit. A run with 15 videos per query,
+  recalibrated estimates, and LLM retries found 138 creators in two rounds and
+  kept 33. It took 10 min 14 s and spent $0.78 of real Apify credit: 10 search
+  runs and 7 profile runs. One profile run timed out and the budget skipped 2
+  more, so at most 6 creators got profile stats. No live run has used matching
+  v2, so the current recall, runtime, and spend are unmeasured.
+- **The brand mention check is literal.** A creator who refers to the brand
+  only in speech, an image, or an unlisted nickname does not get the bonus, and
+  an alias the LLM misses is not matched.
 - **The Thai filter is a heuristic.** A Thai creator with English-only text and
   no TH region is missed, and a non-Thai account that writes in Thai is kept.
-- **Audience fit is a proxy.** It uses the creator's language and region, not
-  real audience demographics, which TikTok does not expose to scrapers.
+- **Audience fit is an estimate.** It comes from the judge reading text, not
+  from audience demographics, which TikTok does not expose to scrapers. It is
+  never inferred from faces.
 - **The API has no authentication.** It is built for local use and binds to
   localhost in Compose.
 
 ## Testing
 
 ```bash
-cd backend && uv run pytest          # 352 tests
+cd backend && uv run pytest          # 384 tests
+cd backend && uv run python ../eval/run_eval.py   # NDCG@10, no network
 cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 41 Vitest tests
 ```
 
 The tests make no network calls. The backend suite covers the graph routing and
 fail-fast behaviour, every live integration against mocked HTTP (Jina and
 captcha replies, Apify errors and budgets, LLM JSON repair and retries, and
-the embedder), the API and SSE resume, and brand-profile cleanup. The frontend
-suite covers the step reducer, the SSE follower's retry and stop rules, the
-job-progress hook, the API client, formatting, the CSV export, and the app
-flow.
+the embedder), the API and SSE resume, brand-profile cleanup, the new scores,
+the hard filters, and MMR. The frontend suite covers the step reducer, the SSE
+follower's retry and stop rules, the job-progress hook, the API client,
+formatting, the CSV export, and the app flow.
 
 `backend/scripts/` has small live smoke checks for Apify, the LLM, and the
 embedder. They need real keys, and the Apify one spends credit.
 
 ## Next steps
 
-1. **Evaluation set and weight tuning.** Label a few brands with creators a
-   marketer would and would not pick, measure precision at k and NDCG, then
-   tune the weights and the prefilter width against that set.
-2. **A larger candidate pool.** Measure the new defaults on live jobs, try
-   Apify's Thai proxy for search, add hashtag-based discovery, and enrich by
-   relevance instead of follower count.
-3. **Better signals.** Read the Facebook login wall as a failure, add a budget
-   warning for skipped Facebook runs, and use comment language as an audience
-   signal.
-4. **Real spend tracking.** Read `usageTotalUsd` from Apify's run API after each
+1. **Human labels and tuning.** Replace the draft eval labels with a marketer's
+   labels for a few brands, then use [`eval/README.md`](eval/README.md) to
+   tune the scoring values and confirm that each term earns its place.
+2. **A live run with matching v2.** Measure recall, runtime, enriched profiles,
+   and spend on the current pipeline; the current figures predate it.
+3. **More enrichment within budget.** Raise the profile cap only when the
+   estimated spend allows it, and measure whether profile stats change the top
+   10 enough to justify the cost.
+4. **Better signals.** Add comment language as a weak audience signal, detect
+   the Facebook login wall, and warn when the budget skips a Facebook run.
+5. **Real spend tracking.** Read `usageTotalUsd` from Apify's run API after each
    run instead of estimating.
-5. **CI.** Run the backend and frontend suites and the Docker build on every
+6. **CI.** Run the backend and frontend suites and the Docker build on every
    pull request.
-6. **Production shape.** Authentication, a shared database, and a job queue if
+7. **Production shape.** Authentication, a shared database, and a job queue if
    it ever needs more than one node.
 
 ## Repo layout
@@ -450,15 +589,20 @@ backend/
   app/
     graph.py          # graph wiring, parallel fan-in, discovery loop
     nodes.py          # the pipeline nodes
-    models.py         # MatchRequest, BrandProfile, KolProfile, RankedKol, weights
+    matching_config.py # every tuning value for matching v2
+    filters.py        # free hard filters and rejection reasons
+    scoring.py        # F, E, T, A_eff, Quality, Final, flags, MMR helper
+    ranking.py        # first pass, judge pass, RankedKol, MMR selection
+    models.py         # MatchRequest, BrandProfile, KolProfile, RankedKol
     brand_tidy.py     # cleanup of the LLM brand profile
-    prompts.py        # prompts for brand analysis, queries, and rerank
+    prompts.py        # prompts for the brief, queries, and judge
     cli.py            # CLI (table or JSON)
     api/              # FastAPI app, settings, SQLite store, job runner
     integrations/     # Protocol + mock + live client per service, with caches
     fixtures/         # demo website, Facebook page, creators, Apify samples
   scripts/            # live smoke checks
   tests/
+eval/                 # offline NDCG@10 harness, golden labels, cached pools
 frontend/
   src/
     api/              # wire types, fetch client, query hooks, SSE follower

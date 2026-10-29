@@ -133,6 +133,13 @@ def make_nodes(
         competitors = normalized_aliases(state.brand_profile.competitors)
         return brand, competitors
 
+    def _scrape_reason(errors: list[str], node: str) -> str:
+        prefix = f"{node}: "
+        for error in reversed(errors):
+            if error.startswith(prefix):
+                return error[len(prefix):] or "missing"
+        return "missing"
+
     @_guarded("scrape_website", stage_on_error=False)
     def scrape_website(state: MatchState) -> dict[str, Any]:
         content = truncate(integrations.web_reader.read(str(state.request.website_url)))
@@ -147,10 +154,13 @@ def make_nodes(
 
     @_guarded("analyze_brand")
     def analyze_brand(state: MatchState) -> dict[str, Any]:
-        # The website is the primary source. Missing it is fatal so the
-        # fail-fast router ends the graph. A missing Facebook page is a warning.
-        if not state.website_content:
-            raise ValueError("missing website_content")
+        # Either source is enough. Only a run with neither is fatal.
+        if not state.website_content and state.facebook_page is None:
+            raise ValueError(
+                "no usable brand source "
+                f"(website: {_scrape_reason(state.errors, 'scrape_website')}, "
+                f"facebook: {_scrape_reason(state.errors, 'scrape_facebook')})"
+            )
 
         profile = integrations.llm.analyze_brand(
             state.website_content,
@@ -163,11 +173,20 @@ def make_nodes(
         )
         update: dict[str, Any] = {
             "brand_profile": profile,
+            "brand_sources": [
+                "website: used" if state.website_content else "website: skipped",
+                "facebook: used" if state.facebook_page is not None else "facebook: skipped",
+            ],
             "stage": "analyzing_brand",
             "cost_log": ["llm: analyze_brand 1 call"],
         }
+        warnings: list[str] = []
+        if not state.website_content:
+            warnings.append("analyze_brand: missing website_content")
         if state.facebook_page is None:
-            update["errors"] = ["analyze_brand: missing facebook_page"]
+            warnings.append("analyze_brand: missing facebook_page")
+        if warnings:
+            update["errors"] = warnings
         return update
 
     @_guarded("generate_queries")

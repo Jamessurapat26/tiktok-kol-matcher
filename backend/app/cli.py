@@ -184,6 +184,12 @@ def summarize_update(
         parts.append(f"facebook={name}" if name else "facebook=ok")
     if "brand_profile" in update:
         parts.append("brand=profile")
+    if "brand_sources" in update:
+        sources = [
+            str(source).replace(": ", " ")
+            for source in update["brand_sources"] or []
+        ]
+        parts.append(f"sources: {', '.join(sources)}")
 
     errors = update.get("errors") or []
     if errors:

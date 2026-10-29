@@ -253,7 +253,7 @@ def test_ranked_contains_every_scored_candidate_and_is_deterministic():
     ]
 
 
-def test_failing_integration_is_reported_not_raised():
+def test_website_failure_uses_facebook_and_does_not_fail_the_job():
     class BoomReader:
         def read(self, url: str) -> str:
             raise RuntimeError("boom")
@@ -261,9 +261,36 @@ def test_failing_integration_is_reported_not_raised():
     integrations = replace(mock_integrations(), web_reader=BoomReader())
     names, final = run_stream(build_graph(integrations), make_request())
 
-    assert final["stage"] == "failed"
+    assert final["stage"] == "done"
     assert "scrape_website: boom" in final["errors"]
     assert "analyze_brand: missing website_content" in final["errors"]
+    assert final["brand_sources"] == ["website: skipped", "facebook: used"]
+    assert final["brand_profile"] is not None
+    assert "analyze_brand" in names
+    assert "generate_queries" in names
+
+
+def test_both_brand_sources_failing_is_fatal():
+    class BoomReader:
+        def read(self, url: str) -> str:
+            raise RuntimeError("website down")
+
+    class BoomFacebook:
+        def fetch_page(self, url: str):
+            raise RuntimeError("facebook down")
+
+    integrations = replace(
+        mock_integrations(),
+        web_reader=BoomReader(),
+        facebook=BoomFacebook(),
+    )
+    names, final = run_stream(build_graph(integrations), make_request())
+
+    assert final["stage"] == "failed"
+    assert (
+        "analyze_brand: no usable brand source "
+        "(website: website down, facebook: facebook down)"
+    ) in final["errors"]
     assert names[-1] == "analyze_brand"
     assert "generate_queries" not in names
 

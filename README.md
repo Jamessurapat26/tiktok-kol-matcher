@@ -227,8 +227,9 @@ flowchart TD
 ```
 
 1. **Brand ingest.** The website and Facebook nodes run in the same
-   superstep. The website is required. A missing Facebook page is only a
-   warning, and brand analysis runs on the website alone.
+   superstep. Either source is enough: brand analysis runs when at least one of
+   the website text or the Facebook page is available, and fails only when both
+   are missing. A missing source is a warning that names the failed scrape.
 2. **Structured brief.** One LLM call returns category, key products, price
    tier, target audience, tone, Thai and English topic keywords, competitors,
    `brand_handles`, and a tier guess: `target_followers`, `tier_label`,

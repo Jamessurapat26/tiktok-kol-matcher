@@ -181,7 +181,7 @@ def test_search_failure_exits_1_without_traceback(monkeypatch, capsys):
     assert "Traceback" not in captured.out
 
 
-def test_website_scrape_failure_exits_1(monkeypatch, capsys):
+def test_website_scrape_failure_warns_and_uses_facebook(monkeypatch, capsys):
     class BoomReader:
         def read(self, url: str) -> str:
             raise RuntimeError("boom")
@@ -203,8 +203,9 @@ def test_website_scrape_failure_exits_1(monkeypatch, capsys):
     )
 
     captured = capsys.readouterr()
-    assert exit_code == 1
+    assert exit_code == 0
     assert "scrape_website: boom" in captured.err
+    assert "analyze_brand: missing website_content" in captured.err
     assert "Traceback" not in captured.err
     assert "Traceback" not in captured.out
 

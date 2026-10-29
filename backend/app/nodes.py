@@ -7,30 +7,48 @@ from langgraph.graph import END
 from pydantic import ValidationError
 
 from .brand_match import (
-    BRAND_UNMENTIONED_RELEVANCE_CAP,
     aliases_from_urls,
     brand_aliases,
-    mentions_brand,
     normalize_for_match,
     normalized_aliases,
 )
 from .filters import hard_filter as apply_hard_filter
 from .integrations import Integrations
-from .integrations.apify import ApifyBudgetExceeded
+from .integrations.apify import (
+    ApifyBudgetExceeded,
+    ApifyLimits,
+    estimate_run_cost,
+)
 from .integrations.embeddings import (
-    MockEmbedder,
     brand_query_text,
     kol_document_text,
     kol_title,
 )
-from .integrations.llm import MockBrandAnalyzer
 from .integrations.web_reader import truncate
-from .matching_config import DEFAULT_CONFIG
-from .models import BrandProfile, KolProfile, RankedKol, normalize_handle
+from .matching_config import DEFAULT_CONFIG, MatchingConfig
+from .models import (
+    BrandProfile,
+    Judgement,
+    KolProfile,
+    RankedKol,
+    Scores,
+    normalize_handle,
+)
+from .scoring import (
+    mmr_select,
+    recent_videos,
+    score_pool,
+    tier_of,
+    video_matches_brief,
+)
 from .state import MatchState
 from .thai import is_thai_creator
 
 Node = Callable[[MatchState], dict[str, Any]]
+
+_SEARCH_ACTOR = "clockworks/tiktok-scraper"
+_PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
+_MAX_EVIDENCE_URLS = 3
 
 
 def _guarded(name: str, *, stage_on_error: bool = True) -> Callable[[Node], Node]:
@@ -112,22 +130,70 @@ def _with_url_aliases(
     return profile.model_copy(update={"brand_names": names})
 
 
+def _evidence_urls(
+    kol: KolProfile,
+    brief: BrandProfile,
+    cfg: MatchingConfig,
+) -> list[str]:
+    """Up to three high-view URLs, preferring on-topic recent videos."""
+    videos = [
+        video
+        for video in recent_videos(kol, cfg)
+        if video.url is not None
+    ]
+    on_topic = [
+        video for video in videos if video_matches_brief(video, brief)
+    ]
+    chosen = sorted(on_topic or videos, key=lambda video: -video.views)
+    return [str(video.url) for video in chosen[:_MAX_EVIDENCE_URLS]]
+
+
+def _unjudged_reason(
+    scores: Scores,
+    kol: KolProfile,
+    cfg: MatchingConfig,
+) -> str:
+    return (
+        f"On-topic in {scores.on_topic:.0%} of recent videos; "
+        f"engagement percentile {scores.E:.2f} in "
+        f"{tier_of(kol.followers, cfg)} tier; not judged."
+    )
+
+
 def make_nodes(
     integrations: Integrations,
     *,
     min_candidates: int,
     max_search_rounds: int,
-    prefilter_n: int = 25,
+    cfg: MatchingConfig = DEFAULT_CONFIG,
     enrich_limit: int | None = None,
 ) -> dict[str, Node]:
     """Build the graph nodes with integrations and tuning closed over."""
+    if enrich_limit is not None and enrich_limit < 1:
+        raise ValueError("enrich_limit must be at least 1")
 
-    def _similarities(brand, kols: list[KolProfile]) -> list[float]:
+    def _similarities(
+        brand: BrandProfile,
+        kols: list[KolProfile],
+    ) -> list[float]:
+        if not kols:
+            return []
         return integrations.embedder.similarity(
             brand_query_text(brand),
             [kol_document_text(kol) for kol in kols],
             titles=[kol_title(kol) for kol in kols],
         )
+
+    def _alias_sets(state: MatchState) -> tuple[list[str], list[str]]:
+        if state.brand_profile is None:
+            raise ValueError("brand_profile is required")
+        brand = brand_aliases(
+            state.brand_profile,
+            str(state.request.website_url),
+            str(state.request.facebook_url),
+        )
+        competitors = normalized_aliases(state.brand_profile.competitors)
+        return brand, competitors
 
     @_guarded("scrape_website", stage_on_error=False)
     def scrape_website(state: MatchState) -> dict[str, Any]:
@@ -160,6 +226,7 @@ def make_nodes(
         update: dict[str, Any] = {
             "brand_profile": profile,
             "stage": "analyzing_brand",
+            "cost_log": ["llm: analyze_brand 1 call"],
         }
         if state.facebook_page is None:
             update["errors"] = ["analyze_brand: missing facebook_page"]
@@ -169,10 +236,11 @@ def make_nodes(
     def generate_queries(state: MatchState) -> dict[str, Any]:
         if state.brand_profile is None:
             raise ValueError("brand_profile is required before generating queries")
+        round_no = state.search_rounds + 1
         new_queries = integrations.llm.generate_queries(
             state.brand_profile,
             state.search_queries,
-            state.search_rounds + 1,
+            round_no,
         )
         # Recall guard: a brand name in a query returns the brand's own account
         # and shops, not the creators the brief is looking for.
@@ -197,6 +265,9 @@ def make_nodes(
             "search_queries": kept_queries,
             "last_queries": kept_queries,
             "stage": "generating_queries",
+            "cost_log": [
+                f"llm: generate_queries round {round_no} 1 call"
+            ],
         }
         if dropped:
             update["errors"] = [
@@ -207,6 +278,20 @@ def make_nodes(
     @_guarded("discover_kols")
     def discover_kols(state: MatchState) -> dict[str, Any]:
         next_round = state.search_rounds + 1
+        queries = list(state.last_queries)
+        cost_log: list[str] = []
+        if queries:
+            limits = ApifyLimits.from_env()
+            per_run = estimate_run_cost(
+                _SEARCH_ACTOR,
+                limits.tiktok_results_per_query,
+                limits.tiktok_search_max_charge_usd,
+            )
+            cost_log.append(
+                f"search round {next_round}: est "
+                f"${per_run * len(queries):.2f} ({len(queries)} queries)"
+            )
+
         errors: list[str] = []
         kols: list[KolProfile] = []
         try:
@@ -240,6 +325,8 @@ def make_nodes(
             update["discovered"] = kols
         if errors:
             update["errors"] = errors
+        if cost_log:
+            update["cost_log"] = cost_log
         return update
 
     def route_after_discover(state: MatchState) -> str:
@@ -265,12 +352,7 @@ def make_nodes(
         if state.brand_profile is None:
             raise ValueError("brand_profile is required before hard filtering")
         now = datetime.now(UTC)
-        brand_alias_list = brand_aliases(
-            state.brand_profile,
-            str(state.request.website_url),
-            str(state.request.facebook_url),
-        )
-        competitor_alias_list = normalized_aliases(state.brand_profile.competitors)
+        brand_alias_list, competitor_alias_list = _alias_sets(state)
         candidates: list[KolProfile] = []
         rejected: dict[str, int] = {}
         for kol in state.discovered:
@@ -279,7 +361,7 @@ def make_nodes(
                 state.brand_profile,
                 brand_alias_list,
                 competitor_alias_list,
-                DEFAULT_CONFIG,
+                cfg,
                 now,
             )
             if reason is None:
@@ -294,21 +376,48 @@ def make_nodes(
             "stage": "filtering",
         }
 
+    @_guarded("first_pass_rank")
+    def first_pass_rank(state: MatchState) -> dict[str, Any]:
+        """Rank every hard-filter survivor using data already in hand."""
+        if state.brand_profile is None:
+            raise ValueError("brand_profile is required before first-pass ranking")
+        brand_alias_list, competitor_alias_list = _alias_sets(state)
+        sims = _similarities(state.brand_profile, state.candidates)
+        scored = score_pool(
+            state.candidates,
+            state.brand_profile,
+            sims,
+            None,
+            brand_alias_list,
+            competitor_alias_list,
+            cfg,
+            datetime.now(UTC),
+        )
+        scored.sort(
+            key=lambda item: (-item.final, normalize_handle(item.kol.handle))
+        )
+        return {
+            "candidates": [item.kol for item in scored],
+            "stage": "first_pass",
+        }
+
     @_guarded("enrich_kols")
     def enrich_kols(state: MatchState) -> dict[str, Any]:
         enriched: list[KolProfile] = []
         errors: list[str] = []
-        # Live enrichment is one paid actor run per profile, so only the
-        # largest accounts (by followers, then handle) are enriched when capped.
+        limit = (
+            cfg.enrich_top_n
+            if enrich_limit is None
+            else min(cfg.enrich_top_n, enrich_limit)
+        )
+        # Enrich the first-pass leaders, not the largest accounts.
         to_enrich = {
             normalize_handle(kol.handle)
-            for kol in sorted(
-                state.candidates,
-                key=lambda k: (-k.followers, normalize_handle(k.handle)),
-            )[:enrich_limit]
+            for kol in state.candidates[:limit]
         }
         budget_reached = False
         skipped = 0
+        attempted = 0
         for kol in state.candidates:
             if normalize_handle(kol.handle) not in to_enrich:
                 enriched.append(kol)
@@ -317,6 +426,7 @@ def make_nodes(
                 enriched.append(kol)
                 skipped += 1
                 continue
+            attempted += 1
             try:
                 # model_validate re-checks enrichment. model_dump() leaves url
                 # as an HttpUrl; model_validate accepts that.
@@ -348,108 +458,131 @@ def make_nodes(
             "candidates": enriched,
             "stage": "enriching_kols",
         }
+        if attempted:
+            limits = ApifyLimits.from_env()
+            per_profile = estimate_run_cost(
+                _PROFILE_ACTOR,
+                limits.tiktok_profile_videos,
+                limits.tiktok_profile_max_charge_usd,
+            )
+            update["cost_log"] = [
+                f"enrich: est ${per_profile * attempted:.2f} "
+                f"({attempted} profiles)"
+            ]
         if errors:
             update["errors"] = errors
         return update
 
-    @_guarded("embed_and_prefilter")
-    def embed_and_prefilter(state: MatchState) -> dict[str, Any]:
+    @_guarded("judge_and_rank")
+    def judge_and_rank(state: MatchState) -> dict[str, Any]:
+        """Judge the first-pass leaders once, then score every candidate."""
         if state.brand_profile is None:
-            raise ValueError("brand_profile is required before prefiltering")
-        if prefilter_n < 1:
-            raise ValueError("prefilter_n must be at least 1")
-        scores = _similarities(state.brand_profile, state.candidates)
-        ranked_pairs = sorted(
-            zip(state.candidates, scores, strict=True),
-            key=lambda pair: (-pair[1], normalize_handle(pair[0].handle)),
-        )
-        # A top_k above the configured width used to return only the width.
-        limit = max(prefilter_n, state.request.top_k)
-        kept = ranked_pairs[:limit]
-        return {
-            "shortlisted": [kol for kol, _score in kept],
-            "prefilter_scores": [score for _kol, score in kept],
-            "stage": "embedding_prefilter",
-        }
+            raise ValueError("brand_profile is required before judging")
+        brief = state.brand_profile
+        brand_alias_list, competitor_alias_list = _alias_sets(state)
+        now = datetime.now(UTC)
+        sims = _similarities(brief, state.candidates)
 
-    @_guarded("llm_rerank")
-    def llm_rerank(state: MatchState) -> dict[str, Any]:
-        if state.brand_profile is None:
-            raise ValueError("brand_profile is required before reranking")
-        if state.prefilter_scores and len(state.prefilter_scores) != len(state.shortlisted):
-            raise ValueError("prefilter_scores must have one score per shortlisted creator")
-        # MockEmbedder scores are hashed bag-of-words noise. The mock reranker
-        # needs them as its deterministic relevance; a live model must not be
-        # told they are evidence.
-        mock_scores_for_live_model = isinstance(
-            integrations.embedder, MockEmbedder
-        ) and not isinstance(integrations.llm, MockBrandAnalyzer)
-        similarities: list[float] | None
-        if mock_scores_for_live_model:
-            similarities = None
-        elif len(state.prefilter_scores) == len(state.shortlisted):
-            similarities = list(state.prefilter_scores)
-        else:
-            similarities = _similarities(state.brand_profile, state.shortlisted)
-        ranked = [
-            RankedKol(
-                kol=kol,
-                scores=scores,
-                total_score=state.request.weights.apply(scores),
-                reason=reason,
-            )
-            for kol, scores, reason in integrations.llm.rerank(
-                state.brand_profile,
-                state.shortlisted,
-                similarities=similarities,
-            )
-        ]
-        aliases = brand_aliases(
-            state.brand_profile,
-            str(state.request.website_url),
-            str(state.request.facebook_url),
+        first_pass = score_pool(
+            state.candidates,
+            brief,
+            sims,
+            None,
+            brand_alias_list,
+            competitor_alias_list,
+            cfg,
+            now,
         )
-        if aliases:
-            capped: list[RankedKol] = []
-            for item in ranked:
-                if (
-                    not mentions_brand(
-                        item.kol,
-                        aliases,
-                        brand_names=state.brand_profile.brand_names,
-                    )
-                    and item.scores.relevance > BRAND_UNMENTIONED_RELEVANCE_CAP
-                ):
-                    scores = item.scores.model_copy(
-                        update={"relevance": BRAND_UNMENTIONED_RELEVANCE_CAP}
-                    )
-                    item = item.model_copy(
-                        update={
-                            "scores": scores,
-                            "total_score": state.request.weights.apply(scores),
-                            "reason": (
-                                f"{item.reason} Brand not named in sampled posts."
-                            ),
-                        }
-                    )
-                capped.append(item)
-            ranked = capped
+        first_pass.sort(
+            key=lambda item: (-item.final, normalize_handle(item.kol.handle))
+        )
+        to_judge = [item.kol for item in first_pass[: cfg.judge_top_n]]
+
+        errors: list[str] = []
+        cost_log: list[str] = []
+        judgements: dict[str, Judgement] = {}
+        if to_judge:
+            cost_log.append(
+                f"llm: judge 1 call ({len(to_judge)} creators)"
+            )
+            try:
+                for judgement in integrations.llm.judge(brief, to_judge):
+                    judgements[normalize_handle(judgement.handle)] = judgement
+            except Exception as exc:  # noqa: BLE001 - judging is an optional stage
+                errors.append(f"judge: {exc}")
+
+        scored = score_pool(
+            state.candidates,
+            brief,
+            sims,
+            judgements,
+            brand_alias_list,
+            competitor_alias_list,
+            cfg,
+            now,
+        )
+        ranked: list[RankedKol] = []
+        for item in scored:
+            judgement = judgements.get(normalize_handle(item.kol.handle))
+            reason = (
+                judgement.reason
+                if judgement is not None
+                else _unjudged_reason(item.scores, item.kol, cfg)
+            )
+            ranked.append(
+                RankedKol(
+                    kol=item.kol,
+                    scores=item.scores,
+                    quality=item.quality,
+                    final=item.final,
+                    flags=item.flags,
+                    reason=reason,
+                    evidence_urls=_evidence_urls(item.kol, brief, cfg),
+                    profile_url=(
+                        str(item.kol.url)
+                        or f"https://www.tiktok.com/@{normalize_handle(item.kol.handle)}"
+                    ),
+                )
+            )
         ranked.sort(
-            key=lambda item: (
-                -item.total_score,
-                -(item.kol.median_engagement_rate or 0.0),
-                -item.kol.followers,
-                normalize_handle(item.kol.handle),
-            )
+            key=lambda item: (-item.final, normalize_handle(item.kol.handle))
         )
-        return {"ranked": ranked, "stage": "reranking"}
+        update: dict[str, Any] = {
+            "ranked": ranked,
+            "stage": "judging",
+        }
+        if cost_log:
+            update["cost_log"] = cost_log
+        if errors:
+            update["errors"] = errors
+        return update
 
     @_guarded("rank_and_output")
     def rank_and_output(state: MatchState) -> dict[str, Any]:
-        # Fail-fast routing should not reach this node after a failure. Never
-        # rewrite a failed run as done if it does.
+        # Bound the MMR similarity work to a small pool around the requested k.
+        pool = state.ranked[: max(3 * state.request.top_k, 30)]
+        docs = [kol_document_text(item.kol) for item in pool]
+        rows: dict[int, list[float]] = {}
+
+        def row(index: int) -> list[float]:
+            if index not in rows:
+                rows[index] = integrations.embedder.similarity(
+                    docs[index],
+                    docs,
+                )
+            return rows[index]
+
+        def sim(left: int, right: int) -> float:
+            return row(left)[right]
+
+        selected = mmr_select(
+            [item.final for item in pool],
+            sim,
+            state.request.top_k,
+            cfg.mmr_lambda,
+        )
         update: dict[str, Any] = {
-            "results": state.ranked[: state.request.top_k],
+            "results": [pool[index] for index in selected],
         }
         if state.stage != "failed":
             update["stage"] = "done"
@@ -463,8 +596,8 @@ def make_nodes(
         "discover_kols": discover_kols,
         "route_after_discover": route_after_discover,
         "hard_filter": hard_filter,
+        "first_pass_rank": first_pass_rank,
         "enrich_kols": enrich_kols,
-        "embed_and_prefilter": embed_and_prefilter,
-        "llm_rerank": llm_rerank,
+        "judge_and_rank": judge_and_rank,
         "rank_and_output": rank_and_output,
     }

@@ -1,4 +1,4 @@
-"""Offline embedder, cache, prefilter width, and a mocked local model."""
+"""Offline embedder, cache, and a mocked local model."""
 
 from __future__ import annotations
 
@@ -9,11 +9,6 @@ from dataclasses import replace
 
 import pytest
 
-from app.brand_match import (
-    BRAND_UNMENTIONED_RELEVANCE_CAP,
-    brand_aliases,
-    mentions_brand,
-)
 from app.graph import build_graph, initial_state
 from app.integrations import build_integrations, mock_integrations
 from app.integrations.embeddings import (
@@ -39,8 +34,7 @@ from app.integrations.embeddings_live import (
     clear_sentence_transformer_cache,
 )
 from app.integrations.llm import MockBrandAnalyzer
-from app.models import KolProfile, MatchRequest, normalize_handle
-from app.prompts import rerank_messages
+from app.models import KolProfile, MatchRequest
 
 
 @pytest.fixture(autouse=True)
@@ -277,39 +271,7 @@ def test_cache_hit_miss_and_atomic_write(tmp_path):
     assert cache.get("embeddinggemma-2", QUERY_PREFIX, "hello", 768) is None
 
 
-def test_mock_rerank_uses_embedding_similarity_and_keeps_weights():
-    brand = MockBrandAnalyzer().analyze_brand("website", None)
-    kol = KolProfile(
-        handle="Alpha",
-        url="https://www.tiktok.com/@Alpha",
-        nickname="Alpha",
-        bio="gaming glasses",
-        followers=20_000,
-        language="th",
-        region="TH",
-        median_engagement_rate=0.05,
-        source="seed",
-    )
-    scored = MockBrandAnalyzer().rerank(brand, [kol], similarities=[0.42])
-    assert scored[0][1].relevance == 0.42
-    assert scored[0][2].startswith("Embedding similarity 0.42")
-    weights = _request().weights
-    assert (weights.relevance, weights.engagement, weights.audience, weights.tier) == (
-        0.4,
-        0.25,
-        0.2,
-        0.15,
-    )
-    with pytest.raises(ValueError, match="similarities"):
-        MockBrandAnalyzer().rerank(brand, [kol], similarities=[0.1, 0.2])
-
-    messages = rerank_messages(brand, [kol], [0.42])
-    assert "embedding_similarity: 0.4200" in messages[1]["content"]
-    assert "embedding_similarity" in messages[0]["content"]
-    assert "embedding_similarity" not in rerank_messages(brand, [kol])[1]["content"]
-
-
-def test_prefilter_order_matches_cosine_and_mock_relevance():
+def test_first_pass_similarity_orders_creators():
     fixtures = [
         _fixture(
             "aaa_far",
@@ -324,73 +286,38 @@ def test_prefilter_order_matches_cosine_and_mock_relevance():
             topics=["gaming", "eyewear", "blue light glasses"],
         ),
     ]
-    request = _request(top_k=2)
     final = build_graph(
         mock_integrations(fixtures),
         min_candidates=1,
-        prefilter_n=25,
-    ).invoke(initial_state(request))
+    ).invoke(initial_state(_request(top_k=2)))
 
     assert final["stage"] == "done"
-    assert [kol.handle for kol in final["shortlisted"]][0] == "zzz_near"
-    assert final["prefilter_scores"] == sorted(final["prefilter_scores"], reverse=True)
-    embedder = MockEmbedder()
-    brand_text = brand_query_text(final["brand_profile"])
-    by_handle = {}
-    for kol, score in zip(final["shortlisted"], final["prefilter_scores"], strict=True):
-        again = embedder.similarity(brand_text, [kol_document_text(kol)])[0]
-        assert score == again
-        by_handle[normalize_handle(kol.handle)] = score
-    aliases = brand_aliases(
-        final["brand_profile"],
-        str(request.website_url),
-        str(request.facebook_url),
-    )
+    by_handle = {item.kol.handle: item for item in final["ranked"]}
+    assert by_handle["zzz_near"].scores.sim > by_handle["aaa_far"].scores.sim
+    assert final["ranked"][0].kol.handle == "zzz_near"
     for item in final["ranked"]:
-        expected = round(clamp_unit(by_handle[normalize_handle(item.kol.handle)]), 4)
-        if (
-            aliases
-            and not mentions_brand(item.kol, aliases)
-            and expected > BRAND_UNMENTIONED_RELEVANCE_CAP
-        ):
-            expected = BRAND_UNMENTIONED_RELEVANCE_CAP
-        assert item.scores.relevance == expected
-        assert item.total_score == request.weights.apply(item.scores)
+        assert item.final == pytest.approx(item.scores.F * item.quality)
 
 
-def test_top_k_above_prefilter_limit_is_not_capped():
-    fixtures = [_fixture(f"kol{index:02d}", followers=1_000 + index) for index in range(40)]
+def test_top_k_above_enrich_cap_is_not_capped():
+    fixtures = [
+        _fixture(f"kol{index:02d}", followers=1_000 + index)
+        for index in range(40)
+    ]
     request = _request(top_k=30)
     final = build_graph(
         mock_integrations(fixtures),
         min_candidates=1,
-        prefilter_n=25,
     ).invoke(initial_state(request))
 
     assert final["stage"] == "done"
-    assert len(final["shortlisted"]) == 30
-    assert len(final["prefilter_scores"]) == 30
-    assert len(final["ranked"]) == 30
+    assert len(final["ranked"]) == 40
     assert len(final["results"]) == 30
 
 
-def test_prefilter_wider_than_top_k_keeps_extra_candidates_for_rerank():
-    fixtures = [_fixture(f"kol{index:02d}") for index in range(40)]
-    request = _request(top_k=10)
-    final = build_graph(
-        mock_integrations(fixtures),
-        min_candidates=1,
-        prefilter_n=15,
-    ).invoke(initial_state(request))
-
-    assert len(final["shortlisted"]) == 15
-    assert len(final["ranked"]) == 15
-    assert len(final["results"]) == 10
-
-
-def test_prefilter_n_must_be_positive():
-    with pytest.raises(ValueError, match="prefilter_n"):
-        build_graph(prefilter_n=0)
+def test_enrich_limit_must_be_positive():
+    with pytest.raises(ValueError, match="enrich_limit"):
+        build_graph(enrich_limit=0)
 
 
 def test_prompt_name_encode_normalizes_and_truncates(tmp_path):
@@ -506,7 +433,7 @@ def test_missing_extra_and_load_failure_are_clear(monkeypatch, tmp_path):
     assert "license" not in message.lower()
 
 
-def test_unreachable_embedder_stops_before_rerank(monkeypatch, tmp_path):
+def test_unreachable_embedder_stops_before_judging(monkeypatch, tmp_path):
     _block_sentence_transformers(monkeypatch)
     integrations = replace(
         mock_integrations(),
@@ -519,10 +446,11 @@ def test_unreachable_embedder_stops_before_rerank(monkeypatch, tmp_path):
 
     assert final["stage"] == "failed"
     assert any(
-        error.startswith("embed_and_prefilter:") and "sentence-transformers" in error
+        error.startswith("first_pass_rank:") and "sentence-transformers" in error
         for error in final["errors"]
     )
-    assert "llm_rerank" not in names
+    assert "enrich_kols" not in names
+    assert "judge_and_rank" not in names
     assert "rank_and_output" not in names
 
 

@@ -104,8 +104,8 @@ class MatchState(BaseModel):
         "discovering_kols",
         "filtering",
         "enriching_kols",
-        "embedding_prefilter",
-        "reranking",
+        "first_pass",
+        "judging",
         "outputting",
         "done",
         "failed",
@@ -132,15 +132,13 @@ class MatchState(BaseModel):
     # hard_filter rejection counts by stable reason. Plain overwrite; expected
     # rejections are not errors.
     rejected: dict[str, int] = Field(default_factory=dict)
-    # embed_and_prefilter output: candidates sent to llm_rerank.
-    # The list is at least the prefilter width and at least top_k.
-    shortlisted: list[KolProfile] = Field(default_factory=list)
-    # Cosine similarities in the same order as ``shortlisted``.
-    prefilter_scores: list[float] = Field(default_factory=list)
 
-    # Every candidate scored by llm_rerank, sorted by total_score.
+    # Every candidate after judge_and_rank, sorted by final score descending.
     ranked: list[RankedKol] = Field(default_factory=list)
-    # Top-k slice of ranked, returned to the caller.
+    # MMR-selected top-k slice of ranked, returned to the caller.
     results: list[RankedKol] = Field(default_factory=list)
+
+    # Estimated cost line per paid stage, appended by the node that spends it.
+    cost_log: Annotated[list[str], operator.add] = Field(default_factory=list)
 
     errors: Annotated[list[str], operator.add] = Field(default_factory=list)

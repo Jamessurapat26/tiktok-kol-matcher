@@ -106,6 +106,14 @@ def _topic_terms(brief: BrandProfile) -> list[str]:
     )
 
 
+def video_matches_brief(video: VideoStats, brief: BrandProfile) -> bool:
+    """True when one video's caption names a brief topic term."""
+    return any(
+        term in normalize_for_match(video.caption)
+        for term in _topic_terms(brief)
+    )
+
+
 def on_topic_share(
     kol: KolProfile,
     brief: BrandProfile,

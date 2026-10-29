@@ -45,7 +45,7 @@ def build_integrations(
 
     Web reading is live only when ``live_web`` is true. TikTok search and
     enrichment are live only when ``live_kols`` is true (requires
-    ``APIFY_TOKEN``). Brand analysis, query generation, and reranking are
+    ``APIFY_TOKEN``). Brand analysis, query generation, and judging are
     live only when ``live_llm`` is true (requires ``LLM_API_KEY``,
     ``NVIDIA_API_KEY``, or ``OPENAI_API_KEY``). Embeddings are live only when
     ``live_embed`` is true. That loads ``google/embeddinggemma-2`` through

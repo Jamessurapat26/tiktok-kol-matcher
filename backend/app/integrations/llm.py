@@ -1,35 +1,11 @@
-import re
-from typing import Literal, Protocol
+from typing import Protocol
 
-from ..models import BrandProfile, FacebookPage, KolProfile, ScoreBreakdown, TargetAudience
+from ..brand_match import normalize_for_match
+from ..models import BrandProfile, FacebookPage, Judgement, KolProfile, TargetAudience
 
-_TOKEN_RE = re.compile(r"[\w\u0E00-\u0E7F]+")
-_TIER_ORDER: tuple[str, ...] = ("nano", "micro", "mid", "macro")
-# Engagement rates at or above this fraction score 1.0. 0.15 keeps a 9% rate
-# and a 14% rate from both saturating, which a 0.08 ceiling used to do.
-ENGAGEMENT_CEILING = 0.15
-
-
-def _tokens(text: str) -> set[str]:
-    return {match.group(0).casefold() for match in _TOKEN_RE.finditer(text)}
-
-
-def _kol_topics(kol: KolProfile) -> set[str]:
-    summary = kol.content_summary or ""
-    if summary.casefold().startswith("topics:"):
-        raw_topics = summary.split(":", 1)[1]
-        return {topic.strip().casefold() for topic in raw_topics.split(",") if topic.strip()}
-    return _tokens(summary)
-
-
-def _tier_for(followers: int) -> str:
-    if followers >= 500_000:
-        return "macro"
-    if followers >= 100_000:
-        return "mid"
-    if followers >= 10_000:
-        return "micro"
-    return "nano"
+_RISKY_WORDS = ("gambling", "พนัน", "casino", "บาคาร่า")
+_AUDIENCE_HITS_FOR_ONE = 2
+_TOPIC_HITS_FOR_ONE = 3
 
 
 class BrandAnalyzer(Protocol):
@@ -50,18 +26,15 @@ class BrandAnalyzer(Protocol):
         """Return only queries that were not used in earlier rounds."""
         ...
 
-    def rerank(
+    def judge(
         self,
-        brand: BrandProfile,
+        brief: BrandProfile,
         kols: list[KolProfile],
-        *,
-        similarities: list[float] | None = None,
-    ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
-        """Score each KOL and return a short reason for the match.
+    ) -> list[Judgement]:
+        """Judge all given creators in one batched call.
 
-        ``similarities`` are cosine scores from the embedder, aligned with
-        ``kols``. The mock uses them as relevance. A live model still scores
-        relevance itself and can read the same scores in its prompt.
+        The returned list contains only creators the model judged. A missing
+        creator is unjudged, not an error.
         """
         ...
 
@@ -78,84 +51,38 @@ class ChatClient(Protocol):
         ...
 
 
-def heuristic_score(
-    brand: BrandProfile,
-    kol: KolProfile,
-    *,
-    relevance: float | None = None,
-) -> tuple[ScoreBreakdown, str]:
-    """Score one KOL with the offline engagement, audience, and tier rules.
+def _brief_terms(brief: BrandProfile) -> list[str]:
+    category_parts = brief.category.replace("/", ",").split(",")
+    terms: list[str] = []
+    seen: set[str] = set()
+    for raw in (
+        *brief.topic_keywords_th,
+        *brief.topic_keywords_en,
+        *brief.key_products,
+        *category_parts,
+    ):
+        term = normalize_for_match(str(raw))
+        if len(term) < 2 or term in seen:
+            continue
+        seen.add(term)
+        terms.append(term)
+    return terms
 
-    When ``relevance`` is omitted, relevance is the offline topic overlap.
-    When the embedder passes a cosine score, that score is the relevance so
-    the prefilter and the mock reranker agree. The live reranker still
-    replaces relevance and the reason. Engagement, audience fit, and tier fit
-    stay on this breakdown so the 0.4/0.25/0.2/0.15 weights still apply.
-    """
-    brand_tokens = _tokens(
-        " ".join(
-            [
-                *brand.topic_keywords_en,
-                *brand.topic_keywords_th,
-                *brand.key_products,
-                brand.category,
-            ]
-        )
-    )
-    matched = sorted(_kol_topics(kol) & brand_tokens)
-    relevance_from_embedding = relevance is not None
-    if relevance is None:
-        relevance = min(1.0, 0.2 + 0.2 * len(matched)) if matched else 0.05
-    else:
-        relevance = min(1.0, max(0.0, float(relevance)))
-        matched = []
 
-    engagement_rate = kol.median_engagement_rate or 0.02
-    engagement = min(1.0, engagement_rate / ENGAGEMENT_CEILING)
+def _matches(text: str, terms: list[str]) -> list[str]:
+    return [term for term in terms if term in text]
 
-    thai_language = (kol.language or "").casefold() in {"th", "thai"}
-    thai_region = (kol.region or "").upper() == "TH"
-    if thai_language and thai_region:
-        audience_fit: float = 1.0
-        confidence: Literal["low", "medium", "high"] = "high"
-    elif thai_language or thai_region:
-        audience_fit = 0.75
-        confidence = "medium"
-    else:
-        audience_fit = 0.35
-        confidence = "low"
 
-    tier = _tier_for(kol.followers)
-    preferred = brand.tier_label
-    if tier == preferred:
-        tier_fit = 1.0
-    else:
-        distance = abs(_TIER_ORDER.index(tier) - _TIER_ORDER.index(preferred))
-        tier_fit = 0.5 if distance == 1 else 0.15
-
-    scores = ScoreBreakdown(
-        relevance=round(relevance, 4),
-        engagement=round(engagement, 4),
-        audience_fit=round(audience_fit, 4),
-        tier_fit=round(tier_fit, 4),
-        audience_confidence=confidence,
-    )
-    if relevance_from_embedding:
-        reason = (
-            f"Embedding similarity {relevance:.2f}. "
-            f"Tier: {tier}; audience fit: {confidence}."
-        )
-    elif matched:
-        reason = (
-            f"Matched topics: {', '.join(matched[:4])}. "
-            f"Tier: {tier}; audience fit: {confidence}."
-        )
-    else:
-        reason = (
-            "No direct topic overlap; broad creator fit. "
-            f"Tier: {tier}; audience fit: {confidence}."
-        )
-    return scores, reason
+def _judgement_reason(matched: list[str], audience_hits: list[str]) -> str:
+    if matched:
+        topics = ", ".join(matched[:3])
+        reason = f"Matched brief topics: {topics}."
+        if audience_hits:
+            reason += f" Audience cues: {', '.join(audience_hits[:2])}."
+        return reason
+    if audience_hits:
+        return f"Audience cues: {', '.join(audience_hits[:2])}."
+    return "No brief topic terms found in the creator's text."
 
 
 class MockBrandAnalyzer:
@@ -252,18 +179,41 @@ class MockBrandAnalyzer:
                 new_queries.append(query)
         return new_queries
 
-    def rerank(
+    def judge(
         self,
-        brand: BrandProfile,
+        brief: BrandProfile,
         kols: list[KolProfile],
-        *,
-        similarities: list[float] | None = None,
-    ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
-        if similarities is not None and len(similarities) != len(kols):
-            raise ValueError("similarities must have one score per creator")
-        results: list[tuple[KolProfile, ScoreBreakdown, str]] = []
-        for index, kol in enumerate(kols):
-            override = None if similarities is None else similarities[index]
-            scores, reason = heuristic_score(brand, kol, relevance=override)
-            results.append((kol, scores, reason))
-        return results
+    ) -> list[Judgement]:
+        terms = _brief_terms(brief)
+        interests = [
+            term
+            for term in (
+                normalize_for_match(str(interest))
+                for interest in brief.target_audience.interests
+            )
+            if len(term) >= 2
+        ]
+        judgements: list[Judgement] = []
+        for kol in kols:
+            captions = " ".join(video.caption for video in kol.videos)
+            profile_text = " ".join(
+                part for part in (kol.nickname, kol.bio, captions) if part
+            )
+            text = normalize_for_match(profile_text)
+            matched = _matches(text, terms)
+            audience_text = normalize_for_match(
+                " ".join(part for part in (kol.bio, captions) if part)
+            )
+            audience_hits = _matches(audience_text, interests)
+            risky = any(word in captions.casefold() for word in _RISKY_WORDS)
+            judgements.append(
+                Judgement(
+                    handle=kol.handle,
+                    judge=min(1.0, len(matched) / _TOPIC_HITS_FOR_ONE),
+                    audience=min(1.0, len(audience_hits) / _AUDIENCE_HITS_FOR_ONE),
+                    audience_confidence=min(0.9, len(profile_text) / 1500),
+                    reason=_judgement_reason(matched, audience_hits),
+                    risky=risky,
+                )
+            )
+        return judgements

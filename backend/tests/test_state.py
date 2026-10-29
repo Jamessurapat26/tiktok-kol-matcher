@@ -1,10 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from langgraph.graph import END, START, StateGraph
-from pydantic import ValidationError
 
-from app.models import KolProfile, MatchRequest, MatchWeights, ScoreBreakdown, VideoStats
+from app.models import KolProfile, MatchRequest, VideoStats
 from app.state import MatchState, merge_kols
 
 
@@ -91,7 +89,6 @@ def test_merge_kols_fills_missing_fields_from_lower_priority():
         nickname="Nick",
         region="TH",
         content_summary="seed topics",
-        median_engagement_rate=0.05,
     )
     apify = make_kol("Creator", "apify", followers=300)
 
@@ -107,7 +104,6 @@ def test_merge_kols_fills_missing_fields_from_lower_priority():
     assert winner.nickname == "Nick"
     assert winner.region == "TH"
     assert winner.content_summary == "seed topics"
-    assert winner.median_engagement_rate == 0.05
 
 
 def test_merge_kols_fills_when_the_lower_priority_row_arrives_later():
@@ -276,87 +272,6 @@ def test_handle_strips_at_sign_and_preserves_case():
     )
 
     assert [kol.handle for kol in merged] == ["Foo", "Bar"]
-
-
-def test_match_weights_normalize_to_one():
-    weights = MatchWeights(relevance=4, engagement=2, audience=2, tier=2)
-
-    assert weights.relevance == pytest.approx(0.4)
-    assert weights.engagement == pytest.approx(0.2)
-    assert weights.audience == pytest.approx(0.2)
-    assert weights.tier == pytest.approx(0.2)
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-
-
-@pytest.mark.parametrize("field", ["relevance", "engagement", "audience", "tier"])
-def test_match_weights_reject_negative(field):
-    values = {"relevance": 1.0, "engagement": 1.0, "audience": 1.0, "tier": 1.0}
-    values[field] = -0.1
-
-    with pytest.raises(ValidationError):
-        MatchWeights(**values)
-
-
-def test_match_weights_reject_all_zero():
-    with pytest.raises(ValidationError, match="must not all be zero"):
-        MatchWeights(relevance=0, engagement=0, audience=0, tier=0)
-
-
-def test_match_weights_defaults_fill_and_apply():
-    weights = MatchWeights()
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-
-    request = make_request()
-    assert sum(request.weights.model_dump().values()) == pytest.approx(1.0)
-
-    scores = ScoreBreakdown(
-        relevance=1,
-        engagement=1,
-        audience_fit=1,
-        tier_fit=1,
-        audience_confidence="high",
-    )
-    assert request.weights.apply(scores) == pytest.approx(1.0)
-
-
-def test_match_weights_missing_fields_get_defaults_before_normalizing():
-    weights = MatchWeights(relevance=1)
-
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-    assert weights.engagement == pytest.approx(0.25 / 1.6)
-    assert weights.audience == pytest.approx(0.2 / 1.6)
-    assert weights.tier == pytest.approx(0.15 / 1.6)
-
-
-def test_match_weights_assignment_raises():
-    weights = MatchWeights()
-
-    with pytest.raises(ValidationError):
-        weights.relevance = 1.0
-
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-
-
-def test_match_weights_model_copy_revalidates_update():
-    weights = MatchWeights()
-
-    copied = weights.model_copy(update={"relevance": 9})
-
-    assert copied is not weights
-    assert sum(copied.model_dump().values()) == pytest.approx(1.0)
-    assert copied.relevance == pytest.approx(9 / 9.6)
-
-
-def test_match_weights_model_validate_normalizes():
-    weights = MatchWeights.model_validate(
-        {"relevance": 4, "engagement": 2, "audience": 2, "tier": 2}
-    )
-
-    assert weights.relevance == pytest.approx(0.4)
-    assert weights.engagement == pytest.approx(0.2)
-    assert weights.audience == pytest.approx(0.2)
-    assert weights.tier == pytest.approx(0.2)
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
 
 
 def test_graph_loop_accumulates_discovered_and_filter_can_shrink():

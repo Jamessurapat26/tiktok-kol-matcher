@@ -7,7 +7,6 @@ the instructions say the JSON belongs in the answer itself.
 
 from __future__ import annotations
 
-from .brand_match import mentions_brand, normalize_for_match
 from .models import BrandProfile, FacebookPage, KolProfile
 
 _SOURCE_CHARS = 12_000
@@ -91,31 +90,30 @@ adjacent topics and creator-style searches that were not used yet. Return
 between 6 and {MAX_QUERIES} queries.
 """
 
-RERANK_SYSTEM = """\
-You score how relevant each TikTok creator is to a brand. Reply with one JSON
-object and nothing else, in the visible reply, not only in a reasoning trace.
-Do not wrap it in markdown.
+JUDGE_SYSTEM = """\
+You judge how well TikTok creators fit a brand. Reply with one JSON object and
+nothing else, in the visible reply, not only in a reasoning trace. Do not wrap it
+in markdown.
 
-Shape: {"scores": [{"handle": "...", "relevance": 0.0, "reason": "..."}]}
+Shape: {"creators": [{"handle": "...", "judge": 0.0, "audience": 0.0,
+"audience_confidence": 0.0, "reason": "...", "risky": false}]}
 
-relevance is a number from 0 to 1. 1 means the creator clearly covers the
-brand's products or audience. 0 means unrelated. The goal is to find creators
-who could promote the brand, so score the brand's own account, other shops, and
-competing brands low, however closely their products match. reason is one
-short sentence in Thai or English. Include every handle from the input exactly
-once. Copy each handle unchanged.
-
-Only say a creator posts about the brand when one of brand_names appears in
-their content or bio and mentions_brand is yes. A similar promotion, stamp, or
-coupon campaign from another store or brand is not about this brand; do not
-attribute it to the brand. When mentions_brand is no, score only niche and
-audience fit, at most 0.6, and do not claim brand content in the reason.
-"""
-
-_RERANK_SIMILARITY_NOTE = """
-Each creator includes embedding_similarity, the cosine similarity between the
-brand and that creator. Higher means closer. Use it as a hint and still set
-relevance from the creator's content.
+Rubric:
+- judge is 0 to 1: category match, tone match, and no risky content. 1 means the
+  creator clearly covers the brand's category in a fitting tone with no risky
+  content. 0 means unrelated or clearly unsuitable. The brand's own account,
+  other shops, and competing brands are low fits however closely their products
+  match.
+- audience is 0 to 1: does the creator's content, captions, and bio suggest an
+  audience that matches target_audience? Use text/content/bio ONLY. Never infer
+  age or gender from faces, appearance, or photos.
+- audience_confidence is 0 to 1: how much the available text supports the
+  audience estimate.
+- risky is true when the creator's content shows gambling, casino, or similar
+  unsafe content.
+- reason is one short sentence. Only say a creator posts about the brand when a
+  brand name appears in their text. Copy every handle from the input unchanged.
+  Include each creator you judge exactly once.
 """
 
 JSON_RETRY_USER = (
@@ -162,41 +160,19 @@ def query_messages(
     ]
 
 
-def rerank_messages(
-    brand: BrandProfile,
+def judge_messages(
+    brief: BrandProfile,
     kols: list[KolProfile],
-    similarities: list[float] | None = None,
 ) -> list[dict[str, str]]:
-    if similarities is not None and len(similarities) != len(kols):
-        raise ValueError("similarities must have one score per creator")
-    aliases = [normalize_for_match(name) for name in brand.brand_names]
-    check_mentions = bool(brand.brand_names)
-
-    def card(kol: KolProfile, similarity: float | None = None) -> str:
-        mentions = (
-            mentions_brand(kol, aliases, brand_names=brand.brand_names)
-            if check_mentions
-            else None
-        )
-        return _kol_card(kol, similarity, mentions=mentions)
-
-    if similarities is None:
-        cards = "\n\n".join(card(kol) for kol in kols)
-        system = RERANK_SYSTEM
-    else:
-        cards = "\n\n".join(
-            card(kol, similarity)
-            for kol, similarity in zip(kols, similarities, strict=True)
-        )
-        system = RERANK_SYSTEM + _RERANK_SIMILARITY_NOTE
+    cards = "\n\n".join(_kol_card(kol) for kol in kols)
     user = (
         "Brand:\n"
-        f"{_brand_summary(brand)}\n\n"
+        f"{_brand_summary(brief)}\n\n"
         "Creators:\n"
         f"{cards}"
     )
     return [
-        {"role": "system", "content": system},
+        {"role": "system", "content": JUDGE_SYSTEM},
         {"role": "user", "content": user},
     ]
 
@@ -250,30 +226,24 @@ def _facebook_text(page: FacebookPage | None) -> str:
     return "\n".join(lines)
 
 
-def _kol_card(
-    kol: KolProfile,
-    similarity: float | None = None,
-    *,
-    mentions: bool | None = None,
-) -> str:
-    if kol.median_engagement_rate is None:
-        rate = "unknown"
-    else:
-        rate = f"{kol.median_engagement_rate:.4f}"
+def _kol_card(kol: KolProfile) -> str:
+    captions = [
+        _clip(video.caption, MAX_PROMPT_POST_CHARS)
+        for video in kol.videos[:3]
+        if video.caption.strip()
+    ]
     lines = [
         f"handle: {kol.handle}",
         f"nickname: {kol.nickname or ''}",
         f"followers: {kol.followers}",
         f"language: {kol.language or ''}",
         f"region: {kol.region or ''}",
-        f"engagement_rate: {rate}",
+        f"stats_source: {kol.stats_source}",
         f"bio: {_clip(kol.bio, _BIO_CHARS)}",
         f"content: {_clip(kol.content_summary, _SUMMARY_CHARS)}",
     ]
-    if mentions is not None:
-        lines.append(f"mentions_brand: {'yes' if mentions else 'no'}")
-    if similarity is not None:
-        lines.append(f"embedding_similarity: {similarity:.4f}")
+    if captions:
+        lines.append("recent_captions: " + " | ".join(captions))
     return "\n".join(lines)
 
 

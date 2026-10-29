@@ -2,12 +2,15 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from app.brand_match import normalize_for_match
 from app.graph import build_graph, initial_state
 from app.integrations import mock_integrations
 from app.integrations.kol_enricher import MockKolEnricher
 from app.integrations.llm import MockBrandAnalyzer
-from app.models import KolProfile, MatchRequest, ScoreBreakdown
+from app.matching_config import DEFAULT_CONFIG
+from app.models import KolProfile, MatchRequest
 from app.nodes import make_nodes
 from app.state import MatchState
 
@@ -70,12 +73,20 @@ def test_default_pipeline_end_to_end():
     assert final["stage"] == "done"
     assert final["errors"] == []
     assert len(final["results"]) == 10
-    assert final["results"] == final["ranked"][:10]
+    assert len(final["ranked"]) > len(final["results"])
+    assert {item.kol.handle for item in final["results"]} <= {
+        item.kol.handle for item in final["ranked"]
+    }
 
-    scores = [item.total_score for item in final["results"]]
-    assert scores == sorted(scores, reverse=True)
-    for item in final["results"]:
-        assert item.total_score == request.weights.apply(item.scores)
+    finals = [item.final for item in final["ranked"]]
+    assert finals == sorted(finals, reverse=True)
+    for item in final["ranked"]:
+        assert item.final == pytest.approx(item.scores.F * item.quality)
+        assert item.profile_url.startswith("https://www.tiktok.com/@")
+        assert item.reason
+
+    # MMR picks a diverse top-k, so the result order need not be final-desc.
+    assert len({item.kol.handle for item in final["results"]}) == 10
 
 
 def test_loop_stops_at_max_rounds_even_with_too_few_candidates():
@@ -207,15 +218,13 @@ def test_dedupe_across_sources():
     assert len(final["discovered"]) < total_records
 
 
-def test_prefilter_cuts_shortlist_and_is_deterministic():
+def test_ranked_contains_every_scored_candidate_and_is_deterministic():
     request = make_request(top_k=3)
-    graph = build_graph(prefilter_n=5)
 
-    first = graph.invoke(initial_state(request))
-    second = graph.invoke(initial_state(request))
+    first = build_graph().invoke(initial_state(request))
+    second = build_graph().invoke(initial_state(request))
 
-    assert len(first["shortlisted"]) == 5
-    assert len(first["ranked"]) == 5
+    assert len(first["ranked"]) == len(first["candidates"])
     assert len(first["results"]) == 3
     assert [item.kol.handle for item in first["results"]] == [
         item.kol.handle for item in second["results"]
@@ -352,7 +361,7 @@ def test_enricher_exception_keeps_the_kol_and_continues():
         def enrich(self, kol):
             if kol.handle == "Boom":
                 raise RuntimeError("profile down")
-            return {"median_engagement_rate": 0.04, "posts_per_week": 1.0}
+            return {"posts_per_week": 1.0}
 
     fixtures = [
         make_fixture("Boom", 1),
@@ -365,8 +374,8 @@ def test_enricher_exception_keeps_the_kol_and_continues():
 
     by_handle = {kol.handle: kol for kol in final["candidates"]}
     assert final["stage"] == "done"
-    assert by_handle["Boom"].median_engagement_rate is None
-    assert by_handle["Fine"].median_engagement_rate == 0.04
+    assert by_handle["Boom"].posts_per_week == 0
+    assert by_handle["Fine"].posts_per_week == 1.0
     assert any(
         "enrich_kols: failed for Boom: profile down" in error
         for error in final["errors"]
@@ -376,14 +385,14 @@ def test_enricher_exception_keeps_the_kol_and_continues():
 def test_invalid_enrichment_keeps_the_original_kol():
     class SelectiveEnricher:
         def enrich(self, kol):
-            if kol.handle == "BadRate":
-                return {"median_engagement_rate": 1.5}
+            if kol.handle == "BadSource":
+                return {"stats_source": "bogus"}
             if kol.handle == "BadFollowers":
                 return {"followers": -5}
-            return {"median_engagement_rate": 0.05, "posts_per_week": 2.0}
+            return {"posts_per_week": 2.0}
 
     fixtures = [
-        make_fixture("BadRate", 1, followers=10_000),
+        make_fixture("BadSource", 1, followers=10_000),
         make_fixture("BadFollowers", 1, followers=20_000),
         make_fixture("GoodKol", 1, followers=30_000),
     ]
@@ -397,13 +406,13 @@ def test_invalid_enrichment_keeps_the_original_kol():
 
     by_handle = {kol.handle: kol for kol in final["candidates"]}
     assert final["stage"] == "done"
-    assert by_handle["BadRate"].median_engagement_rate is None
-    assert by_handle["BadRate"].followers == 10_000
+    assert by_handle["BadSource"].stats_source == "search"
+    assert by_handle["BadSource"].followers == 10_000
     assert by_handle["BadFollowers"].followers == 20_000
-    assert by_handle["BadFollowers"].median_engagement_rate is None
-    assert by_handle["GoodKol"].median_engagement_rate == 0.05
+    assert by_handle["BadFollowers"].posts_per_week == 0
+    assert by_handle["GoodKol"].posts_per_week == 2.0
     assert any(
-        "enrich_kols: rejected enrichment for BadRate" in error
+        "enrich_kols: rejected enrichment for BadSource" in error
         for error in final["errors"]
     )
     assert any(
@@ -412,20 +421,33 @@ def test_invalid_enrichment_keeps_the_original_kol():
     )
 
 
-def test_higher_engagement_ranks_first_when_handles_would_not():
-    class _RateEnricher:
-        def enrich(self, kol):
-            rates = {"aaa_low": 0.09, "zzz_high": 0.14}
-            return {"median_engagement_rate": rates[kol.handle]}
-
-    fixtures = [
-        make_fixture("aaa_low", 1, followers=50_000),
-        make_fixture("zzz_high", 1, followers=50_000),
-    ]
-    integrations = replace(
-        mock_integrations(kol_fixtures=fixtures),
-        enricher=_RateEnricher(),
+def _engagement_fixture(handle: str, likes: int) -> dict:
+    return make_fixture(
+        handle,
+        1,
+        followers=50_000,
+        bio="Thai gaming creator reviewing blue-light glasses.",
+        videos=[
+            {
+                "url": f"https://www.tiktok.com/@{handle}/video/{index}",
+                "views": 10_000,
+                "likes": likes,
+                "comments": 20,
+                "shares": 5,
+                "days_ago": index + 1,
+                "caption": "รีวิวแว่นเกมมิ่ง gaming glasses #eyewear",
+            }
+            for index in range(5)
+        ],
     )
+
+
+def test_higher_engagement_ranks_first_when_handles_would_not():
+    fixtures = [
+        _engagement_fixture("aaa_low", likes=20),
+        _engagement_fixture("zzz_high", likes=900),
+    ]
+    integrations = mock_integrations(kol_fixtures=fixtures)
     final = build_graph(
         integrations,
         min_candidates=1,
@@ -433,8 +455,8 @@ def test_higher_engagement_ranks_first_when_handles_would_not():
 
     ranked = final["ranked"]
     assert [item.kol.handle for item in ranked] == ["zzz_high", "aaa_low"]
-    assert ranked[0].scores.engagement > ranked[1].scores.engagement
-    assert ranked[0].total_score > ranked[1].total_score
+    assert ranked[0].scores.E > ranked[1].scores.E
+    assert ranked[0].final > ranked[1].final
 
 
 def test_no_thai_kols_is_fatal():
@@ -502,7 +524,7 @@ class _CountingEnricher:
         return {}
 
 
-def test_enrich_limit_caps_enrichment_to_largest_accounts():
+def test_enrich_limit_enriches_the_first_pass_leaders():
     enricher = _CountingEnricher()
     integrations = replace(mock_integrations(), enricher=enricher)
     graph = build_graph(integrations, enrich_limit=3)
@@ -511,18 +533,23 @@ def test_enrich_limit_caps_enrichment_to_largest_accounts():
 
     assert final["stage"] == "done"
     assert len(enricher.calls) == 3
-    by_followers = sorted(final["candidates"], key=lambda k: -k.followers)
-    assert {h.lower() for h in enricher.calls} == {
-        k.handle.lower() for k in by_followers[:3]
-    }
+    # candidates keep the first-pass order, so the first three are the leaders.
+    assert [handle.lower() for handle in enricher.calls] == [
+        kol.handle.lower() for kol in final["candidates"][:3]
+    ]
     assert len(final["candidates"]) > 3
 
 
-def test_enrich_limit_default_enriches_everyone():
+def test_default_enrichment_is_capped_by_the_config():
     enricher = _CountingEnricher()
     integrations = replace(mock_integrations(), enricher=enricher)
     final = build_graph(integrations).invoke(initial_state(make_request()))
-    assert len(enricher.calls) == len(final["candidates"])
+
+    expected = min(len(final["candidates"]), DEFAULT_CONFIG.enrich_top_n)
+    assert len(enricher.calls) == expected
+    assert [handle.lower() for handle in enricher.calls] == [
+        kol.handle.lower() for kol in final["candidates"][:expected]
+    ]
 
 
 def test_analyze_brand_merges_url_aliases_after_model_names():
@@ -551,80 +578,83 @@ def test_analyze_brand_merges_url_aliases_after_model_names():
     ]
 
 
-def test_llm_rerank_caps_relevance_when_the_brand_is_not_named():
-    othermart_caption = (
-        "พามาล่าแสตมป์ 🎁 แลกของที่ OtherMart กันครับทุกคน!! "
-        "ช่วงนี้เค้ามีกิจกรรมสะสม E-Stamp แลกของได้เยอะมากกก "
-        "#OtherMart #ขุมทรัพย์นักช้อป2569"
-    )
+def test_judge_is_one_batched_call_on_at_most_judge_top_n():
+    class _CountingJudge(MockBrandAnalyzer):
+        def __init__(self) -> None:
+            self.calls: list[list[str]] = []
 
-    class _HighRelevanceAnalyzer(MockBrandAnalyzer):
-        def rerank(self, brand, kols, *, similarities=None):
-            scores = ScoreBreakdown(
-                relevance=0.95,
-                engagement=0.5,
-                audience_fit=1.0,
-                tier_fit=1.0,
-                audience_confidence="high",
-            )
-            return [(kol, scores, "Strong fit.") for kol in kols]
+        def judge(self, brief, kols):
+            self.calls.append([kol.handle for kol in kols])
+            return super().judge(brief, kols)
 
-    brand = MockBrandAnalyzer().analyze_brand("website", None).model_copy(
-        update={"brand_names": ["ExampleBrand", "EB-24", "เอ็กแซมเปิล"]}
-    )
-    request = MatchRequest(
-        website_url="https://www.example-brand.co.th",
-        facebook_url="https://www.facebook.com/ExampleBrandThailand",
-        top_k=2,
-    )
-    other = KolProfile(
-        handle="OtherMartCreator",
-        url="https://www.tiktok.com/@OtherMartCreator",
-        nickname="นักช้อป",
-        followers=50_000,
-        language="th",
-        region="TH",
-        median_engagement_rate=0.05,
-        content_summary=othermart_caption,
-        source="seed",
-    )
-    example = KolProfile(
-        handle="ExampleCreator",
-        url="https://www.tiktok.com/@ExampleCreator",
-        nickname="นักรีวิว",
-        followers=50_000,
-        language="th",
-        region="TH",
-        median_engagement_rate=0.05,
-        content_summary="โปร ExampleBrand ข้าว+น้ำ 69.- #รีวิวของกิน",
-        source="seed",
-    )
-    state = MatchState(
-        request=request,
-        brand_profile=brand,
-        shortlisted=[other, example],
-        stage="embedding_prefilter",
-    )
+    analyzer = _CountingJudge()
+    cfg = replace(DEFAULT_CONFIG, judge_top_n=5)
+    final = build_graph(
+        replace(mock_integrations(), llm=analyzer),
+        cfg=cfg,
+    ).invoke(initial_state(make_request()))
 
-    update = make_nodes(
-        replace(mock_integrations(), llm=_HighRelevanceAnalyzer()),
-        min_candidates=1,
-        max_search_rounds=1,
-    )["llm_rerank"](state)
+    assert final["stage"] == "done"
+    assert len(analyzer.calls) == 1
+    assert len(analyzer.calls[0]) == cfg.judge_top_n
+    assert sum(1 for item in final["ranked"] if item.scores.judged) == 5
 
-    ranked = update["ranked"]
-    by_handle = {item.kol.handle: item for item in ranked}
-    capped = by_handle["OtherMartCreator"]
-    named = by_handle["ExampleCreator"]
 
-    assert capped.scores.relevance == 0.6
-    assert capped.total_score == request.weights.apply(capped.scores)
-    assert capped.reason.endswith("Brand not named in sampled posts.")
-    assert named.scores.relevance == 0.95
-    assert [item.kol.handle for item in ranked] == [
-        "ExampleCreator",
-        "OtherMartCreator",
-    ]
+def test_judge_failure_leaves_everyone_unjudged_but_ranked():
+    class _BoomJudge(MockBrandAnalyzer):
+        def judge(self, brief, kols):
+            raise RuntimeError("judge down")
+
+    final = build_graph(
+        replace(mock_integrations(), llm=_BoomJudge())
+    ).invoke(initial_state(make_request()))
+
+    assert final["stage"] == "done"
+    assert final["ranked"]
+    assert not any(item.scores.judged for item in final["ranked"])
+    assert any("judge: judge down" in error for error in final["errors"])
+
+
+def test_cost_log_records_every_paid_stage():
+    final = build_graph().invoke(initial_state(make_request()))
+    lines = final["cost_log"]
+
+    assert "llm: analyze_brand 1 call" in lines
+    assert "llm: generate_queries round 1 1 call" in lines
+    assert any(
+        line.startswith("search round 1: est $")
+        and line.endswith("(8 queries)")
+        for line in lines
+    )
+    assert any(
+        line.startswith("enrich: est $")
+        and line.endswith("(25 profiles)")
+        for line in lines
+    )
+    assert any(
+        line.startswith("llm: judge 1 call (")
+        and line.endswith(" creators)")
+        for line in lines
+    )
+    assert sum(1 for line in lines if line.startswith("search round ")) == 2
+
+
+def test_mmr_keeps_near_duplicate_creators_out_of_the_same_top_ten():
+    final = build_graph().invoke(initial_state(make_request(top_k=10)))
+
+    handles = {item.kol.handle for item in final["results"]}
+    duplicates = {"gamingduo.peak", "gamingduo.peakteam"}
+    assert len(handles & duplicates) <= 1
+
+
+def test_demo_results_are_top_k_and_never_include_the_brand_handle():
+    final = build_graph().invoke(initial_state(make_request(top_k=10)))
+
+    assert final["stage"] == "done"
+    assert len(final["results"]) == 10
+    result_handles = {item.kol.handle for item in final["results"]}
+    assert "examplebrand.th" not in result_handles
+    assert result_handles.isdisjoint(_HARD_FILTERED_HANDLES)
 
 
 def test_generate_queries_drops_brand_name_queries():

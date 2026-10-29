@@ -44,9 +44,13 @@ def test_json_output(capsys):
     assert exit_code == 0
     assert payload["stage"] == "done"
     assert len(payload["results"]) == 5
-    assert {"discovered", "candidates", "shortlisted", "ranked"} <= set(
+    assert {"discovered", "candidates", "ranked", "results"} <= set(
         payload["counts"]
     )
+    assert payload["cost_log"]
+    first = payload["results"][0]
+    assert {"final", "F", "E", "T", "A_eff", "flags", "profile_url"} <= set(first)
+    assert first["profile_url"].startswith("https://www.tiktok.com/@")
 
 
 def test_human_output_prints_table_and_progress(capsys):
@@ -64,13 +68,18 @@ def test_human_output_prints_table_and_progress(capsys):
 
     assert exit_code == 0
     assert "rank" in captured.out
+    assert "final" in captured.out
+    assert "A_eff" in captured.out
+    assert "profile_url" in captured.out
+    assert "https://www.tiktok.com/@" in captured.out
+    assert "cost log:" in captured.out
+    assert "llm: analyze_brand 1 call" in captured.out
     assert "[ 1]" in captured.err
     assert "scrape_" in captured.err
     # Merged unique totals, not the raw row count from the node update.
     assert "discovered=25 (+25 new)" in captured.err
     assert "discovered=48 (+23 new)" in captured.err
     assert "discovered+" not in captured.err
-    assert "@" not in captured.out
 
 
 def test_invalid_url_returns_exit_code_2(capsys):
@@ -549,88 +558,28 @@ def test_help_mentions_live_embed(capsys):
     assert exc.value.code == 0
     help_text = capsys.readouterr().out
     assert "--live-embed" in help_text
-    assert "--prefilter-limit" in help_text
+    assert "--prefilter-limit" not in help_text
     assert "google/embeddinggemma-2" in help_text
     assert "Ollama" not in help_text
     assert "OLLAMA" not in help_text
 
 
-def test_prefilter_limit_validation(monkeypatch, capsys):
-    def fail_build(*args, **kwargs):
-        raise AssertionError("graph should not run")
+def test_removed_prefilter_flag_is_rejected(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(
+            [
+                "match",
+                "--website",
+                _WEBSITE,
+                "--facebook",
+                _FACEBOOK,
+                "--prefilter-limit",
+                "8",
+            ]
+        )
 
-    monkeypatch.setattr("app.cli.build_graph", fail_build)
-    exit_code = main(
-        [
-            "match",
-            "--website",
-            _WEBSITE,
-            "--facebook",
-            _FACEBOOK,
-            "--prefilter-limit",
-            "0",
-        ]
-    )
-    assert exit_code == 2
+    assert exc.value.code == 2
     assert "--prefilter-limit" in capsys.readouterr().err
-
-    monkeypatch.setenv("PREFILTER_LIMIT", "nope")
-    exit_code = main(
-        [
-            "match",
-            "--website",
-            _WEBSITE,
-            "--facebook",
-            _FACEBOOK,
-        ]
-    )
-    assert exit_code == 2
-    assert "PREFILTER_LIMIT" in capsys.readouterr().err
-
-
-def test_prefilter_limit_flag_overrides_env(monkeypatch):
-    monkeypatch.setenv("PREFILTER_LIMIT", "12")
-    captured: dict = {}
-
-    def spy(integrations=None, **kwargs):
-        captured["kwargs"] = kwargs
-
-        class _Graph:
-            def stream(self, *args, **kwargs):
-                return iter([("values", {"stage": "done", "results": [], "errors": []})])
-
-        return _Graph()
-
-    monkeypatch.setattr("app.cli.build_graph", spy)
-    exit_code = main(
-        [
-            "match",
-            "--website",
-            _WEBSITE,
-            "--facebook",
-            _FACEBOOK,
-            "--json",
-            "--prefilter-limit",
-            "8",
-            "--top-k",
-            "40",
-        ]
-    )
-    assert exit_code == 0
-    assert captured["kwargs"]["prefilter_n"] == 8
-
-    exit_code = main(
-        [
-            "match",
-            "--website",
-            _WEBSITE,
-            "--facebook",
-            _FACEBOOK,
-            "--json",
-        ]
-    )
-    assert exit_code == 0
-    assert captured["kwargs"]["prefilter_n"] == 12
 
 
 def test_live_embed_flag_does_not_load_the_model(monkeypatch, capsys):
@@ -676,7 +625,7 @@ def test_live_embed_flag_does_not_load_the_model(monkeypatch, capsys):
     assert embedder.device == "cpu"
     assert embedder.dim == 768
     assert embedder._model is None
-    assert captured["kwargs"]["prefilter_n"] == 25
+    assert "prefilter_n" not in captured["kwargs"]
     assert "OLLAMA" not in captured_io.out
     assert "OLLAMA" not in captured_io.err
 

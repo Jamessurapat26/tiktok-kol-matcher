@@ -542,7 +542,9 @@ def test_search_reserve_leaves_room_for_enrichment(tmp_path):
     update = enricher.enrich(_kol("found_creator", 1200))
 
     assert calls["profile"] == 1
-    assert update["median_engagement_rate"] == pytest.approx(0.1)
+    assert update["stats_source"] == "profile"
+    assert update["videos"]
+    assert "median_engagement_rate" not in update
     assert budget.spent == pytest.approx(0.009 + 0.008)
 
 

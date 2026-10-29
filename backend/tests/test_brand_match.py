@@ -1,4 +1,4 @@
-"""Offline tests for brand-name matching and rerank prompt hints."""
+"""Offline tests for brand-name matching and judge prompt content."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from app.brand_match import (
 )
 from app.integrations.llm import MockBrandAnalyzer
 from app.models import KolProfile
-from app.prompts import RERANK_SYSTEM, rerank_messages
+from app.prompts import JUDGE_SYSTEM, judge_messages
 
 _OTHERMART_CAPTION = (
     "พามาล่าแสตมป์ 🎁 แลกของที่ OtherMart กันครับทุกคน!! "
@@ -28,7 +28,6 @@ def _kol(handle: str, caption: str, **overrides) -> KolProfile:
         "followers": 50_000,
         "language": "th",
         "region": "TH",
-        "median_engagement_rate": 0.05,
         "content_summary": caption,
         "source": "seed",
     }
@@ -121,28 +120,32 @@ def test_mentions_brand_does_not_count_the_handle():
     assert not mentions_brand(kol, [normalize_for_match("ExampleBrand")])
 
 
-def test_rerank_messages_mark_whether_each_creator_names_the_brand():
+def test_judge_messages_include_the_brand_and_one_card_per_creator():
     brand = _brand().model_copy(
         update={"brand_names": ["ExampleBrand", "EB-24", "เอ็กแซมเปิล"]}
     )
     other = _kol("OtherMartCreator", _OTHERMART_CAPTION)
     example = _kol("ExampleCreator", "โปร ExampleBrand ข้าว+น้ำ 69.- #รีวิวของกิน")
 
-    user = rerank_messages(brand, [other, example])[1]["content"]
+    messages = judge_messages(brand, [other, example])
+    user = messages[1]["content"]
 
+    assert messages[0]["content"] == JUDGE_SYSTEM
     assert "brand_names: ExampleBrand, EB-24, เอ็กแซมเปิล" in user
-    other_card = user.split("handle: OtherMartCreator", 1)[1].split("\n\n", 1)[0]
-    example_card = user.split("handle: ExampleCreator", 1)[1].split("\n\n", 1)[0]
-    assert "mentions_brand: no" in other_card
-    assert "mentions_brand: yes" in example_card
-    assert "from another store or brand is not about this brand" in RERANK_SYSTEM
+    assert user.count("handle: OtherMartCreator") == 1
+    assert user.count("handle: ExampleCreator") == 1
+    assert "content: โปร ExampleBrand ข้าว+น้ำ 69.- #รีวิวของกิน" in user
 
 
-def test_rerank_messages_omit_the_hint_without_brand_names():
-    brand = _brand().model_copy(update={"brand_names": []})
-    kol = _kol("OtherMartCreator", _OTHERMART_CAPTION)
+def test_judge_system_requires_text_only_audience_evidence():
+    assert "Use text/content/bio ONLY" in JUDGE_SYSTEM
+    assert "Never infer" in JUDGE_SYSTEM
+    assert "brand's own account" in JUDGE_SYSTEM
+    assert "risky" in JUDGE_SYSTEM
 
-    user = rerank_messages(brand, [kol])[1]["content"]
 
-    assert "brand_names:" in user
-    assert "mentions_brand:" not in user
+def test_judge_messages_are_empty_for_no_creators():
+    messages = judge_messages(_brand(), [])
+
+    assert "Creators:\n" in messages[1]["content"]
+    assert "handle:" not in messages[1]["content"]

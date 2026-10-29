@@ -7,8 +7,6 @@ from urllib.parse import SplitResult, urlsplit
 
 from .models import BrandProfile, KolProfile
 
-BRAND_UNMENTIONED_RELEVANCE_CAP = 0.6
-
 # Suffixes that may be removed from an alias, but only when separated by "-"
 # or "." and only when the remaining alias is long enough to stand alone.
 _ALIAS_SUFFIXES = frozenset({"th", "thai", "thailand", "official", "shop", "store"})

@@ -23,7 +23,6 @@ from app.integrations.kol_enricher_live import (
     ApifyKolEnricher,
     content_summary,
     default_apify_cache_dir,
-    engagement_rate,
     enrich_from_items,
     posts_per_week,
 )
@@ -429,13 +428,12 @@ def test_discover_records_bad_rows_from_the_search_fixture():
     assert _TOKEN not in recorded
 
 
-def test_profile_fixture_engagement_median_cadence_and_summary():
-    # Unpinned videos: 0.14 (views), 0.05 (views), 852/852 followers (no views).
-    # Median is 0.14. Timestamps span 14 days, so (3 - 1) / 2 weeks = 1.
-    # The pinned store sample is excluded from the median and the summary.
+def test_profile_fixture_cadence_and_summary():
+    # Timestamps span 14 days, so (3 - 1) / 2 weeks = 1. The pinned store
+    # sample is excluded from the summary.
     update = enrich_from_items(_profile_sample(), followers=0)
 
-    assert update["median_engagement_rate"] == 0.14
+    assert "median_engagement_rate" not in update
     assert update["posts_per_week"] == 1.0
     assert "desk setup tour" in update["content_summary"]
     assert "#eyewear" in update["content_summary"]
@@ -449,68 +447,6 @@ def test_profile_fixture_engagement_median_cadence_and_summary():
     assert update["videos"][0]["caption"] == "desk setup tour #gadgets"
     assert update["videos"][0]["views"] == 1000
     assert datetime.fromisoformat(update["videos"][0]["posted_at"]).tzinfo is not None
-
-
-def test_engagement_rate_uses_views_then_followers_and_caps_the_median():
-    assert engagement_rate(
-        {"diggCount": 10, "commentCount": 0, "shareCount": 0, "playCount": 200},
-        followers=10_000,
-    ) == 0.05
-    assert (
-        engagement_rate(
-            {"diggCount": 10, "commentCount": 5, "shareCount": 5},
-            followers=100,
-        )
-        == 0.2
-    )
-    assert (
-        engagement_rate(
-            {"diggCount": 10, "commentCount": 0, "shareCount": 0, "playCount": 0},
-            followers=100,
-        )
-        == 0.1
-    )
-    assert engagement_rate({"text": "no counts"}, followers=100) is None
-
-    capped = enrich_from_items(
-        [
-            {
-                "diggCount": 50,
-                "commentCount": 0,
-                "shareCount": 0,
-                "playCount": 10,
-                "text": "viral",
-                "createTime": 1_700_000_000,
-            }
-        ],
-        followers=1,
-    )
-    assert capped["median_engagement_rate"] == 1.0
-    assert "posts_per_week" not in capped
-
-    even = enrich_from_items(
-        [
-            {
-                "diggCount": 10,
-                "commentCount": 0,
-                "shareCount": 0,
-                "playCount": 100,
-                "text": "a",
-                "createTime": 1_700_000_000,
-            },
-            {
-                "diggCount": 30,
-                "commentCount": 0,
-                "shareCount": 0,
-                "playCount": 100,
-                "text": "b",
-                "createTime": 1_700_000_000 + 7 * 24 * 60 * 60,
-            },
-        ],
-        followers=1,
-    )
-    assert even["median_engagement_rate"] == 0.2
-    assert even["posts_per_week"] == 1.0
 
 
 def test_posts_per_week_reads_iso_timestamps_and_summary_is_bounded():
@@ -561,7 +497,7 @@ def test_enricher_request_and_cache(tmp_path):
 
     assert calls["n"] == 1
     assert second == first
-    assert first["median_engagement_rate"] == 0.14
+    assert "median_engagement_rate" not in first
     assert first["stats_source"] == "profile"
     assert first["videos"]
     assert "แว่นกันแสง" in first["content_summary"]

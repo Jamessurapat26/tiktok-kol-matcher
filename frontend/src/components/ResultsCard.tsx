@@ -1,15 +1,12 @@
-import { ChevronDown, Download, ExternalLink } from 'lucide-react'
-import { useState } from 'react'
-import type { AudienceConfidence, RankedKol } from '@/api/types'
+import { Download, ExternalLink } from 'lucide-react'
+import type { RankedKol } from '@/api/types'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { downloadCsv, toCsv } from '@/lib/csv'
-import { formatCompact, formatPercent, formatScore, initials } from '@/lib/format'
-import { cn } from '@/lib/utils'
+import { formatCompact, formatScore, initials } from '@/lib/format'
 import { ScoreBar } from './ScoreBar'
-
-const CONFIDENCE: Record<AudienceConfidence, number> = { low: 1 / 3, medium: 2 / 3, high: 1 }
 
 interface Props {
   jobId: string
@@ -20,7 +17,7 @@ interface Props {
 }
 
 export function ResultsCard({ jobId, results, pending, failed }: Props) {
-  const sorted = [...results].sort((a, b) => b.total_score - a.total_score)
+  const sorted = [...results].sort((a, b) => b.final - a.final)
   return (
     <Card>
       <CardHeader>
@@ -69,9 +66,13 @@ export function ResultsCard({ jobId, results, pending, failed }: Props) {
 }
 
 function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
-  const [open, setOpen] = useState(false)
   const { kol, scores } = row
-  const detailId = `kol-${rank}-breakdown`
+  const scoreRows = [
+    { key: 'F', label: 'Fit (F)', value: scores.F, confidence: scores.F_conf },
+    { key: 'E', label: 'Engagement (E)', value: scores.E, confidence: scores.E_conf },
+    { key: 'T', label: 'Tier fit (T)', value: scores.T, confidence: scores.T_conf },
+    { key: 'A', label: 'Audience (A_eff)', value: scores.A_eff, confidence: scores.A_conf },
+  ] as const
 
   return (
     <li className="py-4 first:pt-0 last:pb-0">
@@ -89,7 +90,7 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <a
-              href={kol.url}
+              href={row.profile_url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 rounded-sm text-body-md font-bold text-ink underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring"
@@ -102,62 +103,70 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
               <span className="truncate text-body-sm text-muted-foreground">{kol.nickname}</span>
             )}
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 text-body-xs text-muted-foreground">
+
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-body-xs text-muted-foreground">
             <span>
               <strong className="font-bold text-ink">{formatCompact(kol.followers)}</strong> followers
             </span>
             <span>
-              <strong className="font-bold text-ink">{formatPercent(kol.median_engagement_rate)}</strong>{' '}
-              engagement
+              Final <strong className="font-bold text-ink">{formatScore(row.final)}</strong>
+            </span>
+            <span>
+              Quality <strong className="font-bold text-ink">{formatScore(row.quality)}</strong>
             </span>
           </div>
+
           <div className="mt-3 flex items-center gap-3">
-            <ScoreBar value={row.total_score} label="Total score" className="flex-1" />
-            <span className="w-10 text-right text-body-sm font-bold text-ink">
-              {formatScore(row.total_score)}
-            </span>
+            <ScoreBar value={row.final} label="Final score" className="flex-1" />
+            <span className="w-10 text-right text-body-sm font-bold text-ink">{formatScore(row.final)}</span>
           </div>
+
+          <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            {scoreRows.map((score) => (
+              <div key={score.key} className="grid grid-cols-[7.5rem_1fr_3.5rem] items-center gap-2">
+                <dt className="text-body-xs text-muted-foreground">{score.label}</dt>
+                <dd>
+                  <ScoreBar value={score.value} label={score.label} className="h-1.5" />
+                </dd>
+                <dd className="text-right text-body-xs text-muted-foreground">
+                  <span className="font-bold text-ink">{formatScore(score.value)}</span>
+                  <span className="block">conf {formatScore(score.confidence)}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          {row.flags.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Flags">
+              {row.flags.map((flag) => (
+                <li key={flag}>
+                  <Badge variant="outline">{flag}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+
           <p className="mt-2 text-body-sm text-ink">{row.reason}</p>
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-controls={detailId}
-            onClick={() => setOpen((o) => !o)}
-            className="mt-2 inline-flex items-center gap-1 rounded-sm text-body-xs font-bold text-muted-foreground outline-none hover:text-ink focus-visible:ring-3 focus-visible:ring-ring"
-          >
-            Score breakdown
-            <ChevronDown aria-hidden className={cn('size-4 transition-transform', open && 'rotate-180')} />
-          </button>
-          {open && (
-            <dl
-              id={detailId}
-              className="mt-3 grid grid-cols-[8rem_1fr_3rem] items-center gap-x-3 gap-y-2 text-body-xs"
-            >
-              <Breakdown label="Relevance" value={scores.relevance} />
-              <Breakdown label="Engagement" value={scores.engagement} />
-              <Breakdown label="Audience fit" value={scores.audience_fit} />
-              <Breakdown label="Tier fit" value={scores.tier_fit} />
-              <Breakdown
-                label="Audience confidence"
-                value={CONFIDENCE[scores.audience_confidence]}
-                text={scores.audience_confidence}
-              />
-            </dl>
+
+          {row.evidence_urls.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1" aria-label="Evidence videos">
+              {row.evidence_urls.slice(0, 3).map((url, index) => (
+                <li key={url}>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-sm text-body-xs font-bold text-muted-foreground underline-offset-4 outline-none hover:text-ink hover:underline focus-visible:ring-3 focus-visible:ring-ring"
+                  >
+                    Evidence {index + 1}
+                    <ExternalLink aria-hidden className="size-3" />
+                  </a>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>
     </li>
-  )
-}
-
-function Breakdown({ label, value, text }: { label: string; value: number; text?: string }) {
-  return (
-    <>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd>
-        <ScoreBar value={value} label={label} className="h-1.5" />
-      </dd>
-      <dd className="text-right font-bold text-ink">{text ?? formatScore(value)}</dd>
-    </>
   )
 }

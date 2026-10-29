@@ -129,7 +129,7 @@
     "job_id": "000e17380b8948f0bbc352a9bb66bc04",
     "seq": 15,
     "type": "node",
-    "node": "filter_thai",
+    "node": "hard_filter",
     "status": "started",
     "summary": "",
     "timestamp": "2026-10-27T07:34:40.027137+00:00"
@@ -138,7 +138,7 @@
     "job_id": "000e17380b8948f0bbc352a9bb66bc04",
     "seq": 16,
     "type": "node",
-    "node": "filter_thai",
+    "node": "hard_filter",
     "status": "finished",
     "summary": "candidates=25",
     "timestamp": "2026-10-27T07:34:40.028078+00:00"
@@ -147,6 +147,24 @@
     "job_id": "000e17380b8948f0bbc352a9bb66bc04",
     "seq": 17,
     "type": "node",
+    "node": "first_pass_rank",
+    "status": "started",
+    "summary": "",
+    "timestamp": "2026-10-27T07:34:40.032986+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 18,
+    "type": "node",
+    "node": "first_pass_rank",
+    "status": "finished",
+    "summary": "shortlisted=25",
+    "timestamp": "2026-10-27T07:34:40.035407+00:00"
+  },
+  {
+    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
+    "seq": 19,
+    "type": "node",
     "node": "enrich_kols",
     "status": "started",
     "summary": "",
@@ -154,7 +172,7 @@
   },
   {
     "job_id": "000e17380b8948f0bbc352a9bb66bc04",
-    "seq": 18,
+    "seq": 20,
     "type": "node",
     "node": "enrich_kols",
     "status": "finished",
@@ -163,27 +181,9 @@
   },
   {
     "job_id": "000e17380b8948f0bbc352a9bb66bc04",
-    "seq": 19,
-    "type": "node",
-    "node": "embed_and_prefilter",
-    "status": "started",
-    "summary": "",
-    "timestamp": "2026-10-27T07:34:40.032986+00:00"
-  },
-  {
-    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
-    "seq": 20,
-    "type": "node",
-    "node": "embed_and_prefilter",
-    "status": "finished",
-    "summary": "shortlisted=25",
-    "timestamp": "2026-10-27T07:34:40.035407+00:00"
-  },
-  {
-    "job_id": "000e17380b8948f0bbc352a9bb66bc04",
     "seq": 21,
     "type": "node",
-    "node": "llm_rerank",
+    "node": "judge_and_rank",
     "status": "started",
     "summary": "",
     "timestamp": "2026-10-27T07:34:40.036735+00:00"
@@ -192,7 +192,7 @@
     "job_id": "000e17380b8948f0bbc352a9bb66bc04",
     "seq": 22,
     "type": "node",
-    "node": "llm_rerank",
+    "node": "judge_and_rank",
     "status": "finished",
     "summary": "ranked=25",
     "timestamp": "2026-10-27T07:34:40.038119+00:00"

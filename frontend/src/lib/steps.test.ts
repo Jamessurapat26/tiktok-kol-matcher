@@ -1,12 +1,12 @@
 import type { JobEvent, NodeStatus } from '@/api/types'
 import demoEvents from '@/test/demo-events.json'
-import { applyEvent, initialProgress, NODE_ORDER, type Progress, stepDuration } from './steps'
+import { applyEvent, initialProgress, type Progress, STAGE_LABELS, STAGE_ORDER, stepDuration } from './steps'
 
 const events = demoEvents as JobEvent[]
 const fold = (list: JobEvent[], from: Progress = initialProgress()) => list.reduce(applyEvent, from)
-function step(progress: Progress, node: string) {
-  const found = progress.steps.find((s) => s.node === node)
-  if (!found) throw new Error(`no step ${node}`)
+function step(progress: Progress, stage: string) {
+  const found = progress.steps.find((s) => s.stage === stage)
+  if (!found) throw new Error(`no step ${stage}`)
   return found
 }
 
@@ -28,43 +28,69 @@ function nodeEvent(
 }
 
 describe('applyEvent', () => {
-  it('starts with every graph node pending, in graph order', () => {
+  it('starts with every pipeline stage pending, in backend order', () => {
     const progress = initialProgress()
-    expect(progress.steps.map((s) => s.node)).toEqual([...NODE_ORDER])
+    expect(STAGE_ORDER).toEqual([
+      'received',
+      'scraping',
+      'analyzing_brand',
+      'generating_queries',
+      'discovering_kols',
+      'filtering',
+      'first_pass',
+      'enriching_kols',
+      'judging',
+      'outputting',
+      'done',
+    ])
+    expect(progress.steps.map((s) => s.stage)).toEqual([...STAGE_ORDER])
     expect(progress.steps.every((s) => s.status === 'pending')).toBe(true)
   })
 
-  it('turns a full demo stream into finished steps with summaries and durations', () => {
+  it('gives every stage a readable label', () => {
+    for (const stage of STAGE_ORDER) {
+      expect(STAGE_LABELS[stage]).toBeTruthy()
+      expect(STAGE_LABELS[stage]).not.toBe(stage)
+    }
+  })
+
+  it('turns a full demo stream into finished stages with summaries and durations', () => {
     const progress = fold(events)
     expect(progress.steps.every((s) => s.status === 'finished')).toBe(true)
-    expect(step(progress, 'filter_thai').summary).toBe('candidates=25')
-    expect(step(progress, 'scrape_website').summary).toBe('website=1330 chars')
-    expect(stepDuration(step(progress, 'analyze_brand'))).toBeGreaterThanOrEqual(0)
+    expect(step(progress, 'filtering').summary).toBe('candidates=25')
+    expect(step(progress, 'scraping').summary).toBe('facebook=ExampleBrand')
+    expect(stepDuration(step(progress, 'analyzing_brand'))).toBeGreaterThanOrEqual(0)
     expect(progress.outcome).toEqual({ type: 'done', summary: 'ranked 3 KOLs' })
     expect(progress.lastSeq).toBe(25)
   })
 
-  it('shows a node as running between its started and finished events', () => {
+  it('folds both scrapers into one scraping stage', () => {
+    const progress = fold(events.slice(0, 4))
+    expect(step(progress, 'scraping')).toMatchObject({ status: 'finished', runs: 1 })
+    expect(step(progress, 'received').status).toBe('finished')
+  })
+
+  it('shows a stage as running between its started and finished events', () => {
     const progress = fold(events.slice(0, 9))
-    expect(step(progress, 'discover_kols').status).toBe('running')
-    expect(step(progress, 'filter_thai').status).toBe('pending')
-    expect(stepDuration(step(progress, 'discover_kols'))).toBeNull()
+    expect(step(progress, 'discovering_kols').status).toBe('running')
+    expect(step(progress, 'filtering').status).toBe('pending')
+    expect(stepDuration(step(progress, 'discovering_kols'))).toBeNull()
   })
 
   it('counts the discovery loop as a second round and keeps the latest summary', () => {
     const afterFirstRound = fold(events.slice(0, 10))
-    expect(step(afterFirstRound, 'discover_kols')).toMatchObject({ status: 'finished', runs: 1 })
+    expect(step(afterFirstRound, 'discovering_kols')).toMatchObject({ status: 'finished', runs: 1 })
 
     const duringSecondRound = fold(events.slice(10, 13), afterFirstRound)
-    expect(step(duringSecondRound, 'discover_kols')).toMatchObject({
+    expect(step(duringSecondRound, 'discovering_kols')).toMatchObject({
       status: 'running',
       runs: 2,
       summary: '',
     })
-    expect(step(duringSecondRound, 'generate_queries').runs).toBe(2)
+    expect(step(duringSecondRound, 'generating_queries').runs).toBe(2)
 
     const afterSecondRound = fold(events.slice(13, 14), duringSecondRound)
-    expect(step(afterSecondRound, 'discover_kols')).toMatchObject({
+    expect(step(afterSecondRound, 'discovering_kols')).toMatchObject({
       status: 'finished',
       runs: 2,
       summary: 'round=2 discovered+18',
@@ -76,11 +102,11 @@ describe('applyEvent', () => {
     // A reconnect that resends events the client already has, then continues.
     const replayed = fold([...events.slice(8, 12), ...events.slice(12)], live)
     expect(replayed).toEqual(fold(events))
-    expect(step(replayed, 'discover_kols').runs).toBe(2)
+    expect(step(replayed, 'discovering_kols').runs).toBe(2)
     expect(applyEvent(replayed, events[3])).toBe(replayed)
   })
 
-  it('marks a failed node red with its message and stops there', () => {
+  it('marks a failed stage red with its message and stops there', () => {
     const progress = fold([
       nodeEvent(1, 'scrape_website', 'started'),
       nodeEvent(2, 'scrape_website', 'finished', 'website=10 chars'),
@@ -94,15 +120,15 @@ describe('applyEvent', () => {
         summary: 'model unavailable',
       },
     ])
-    expect(step(progress, 'analyze_brand')).toMatchObject({
+    expect(step(progress, 'analyzing_brand')).toMatchObject({
       status: 'failed',
       error: 'analyze_brand: model unavailable',
     })
-    expect(step(progress, 'generate_queries').status).toBe('pending')
+    expect(step(progress, 'generating_queries').status).toBe('pending')
     expect(progress.outcome).toEqual({ type: 'failed', summary: 'model unavailable' })
   })
 
-  it('fails a still-running node when the job fails without a node event', () => {
+  it('fails a still-running stage when the job fails without a node event', () => {
     const progress = fold([
       nodeEvent(1, 'scrape_website', 'started'),
       {
@@ -113,7 +139,7 @@ describe('applyEvent', () => {
         summary: 'interrupted by restart',
       },
     ])
-    expect(step(progress, 'scrape_website')).toMatchObject({
+    expect(step(progress, 'scraping')).toMatchObject({
       status: 'failed',
       error: 'interrupted by restart',
     })

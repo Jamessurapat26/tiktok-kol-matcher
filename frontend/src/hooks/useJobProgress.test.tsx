@@ -105,7 +105,7 @@ describe('job progress over SSE', () => {
     source.emit(events.slice(9))
 
     expect(screen.getByText('Done: ranked 3 KOLs')).toBeInTheDocument()
-    expect(screen.getAllByText(', finished')).toHaveLength(10)
+    expect(screen.getAllByText(', finished')).toHaveLength(11)
     expect(row('Discover KOLs').getByText('round 2')).toBeInTheDocument()
     expect(screen.queryByText('round 3')).not.toBeInTheDocument()
     expect(source.closed).toBe(true)
@@ -136,7 +136,7 @@ describe('job progress over SSE', () => {
 
     reopened.emit(events.slice(9))
     expect(screen.getByText('Done: ranked 3 KOLs')).toBeInTheDocument()
-    expect(screen.getAllByText(', finished')).toHaveLength(10)
+    expect(screen.getAllByText(', finished')).toHaveLength(11)
     expect(screen.queryByText('round 3')).not.toBeInTheDocument()
     expect(reopened.closed).toBe(true)
   })

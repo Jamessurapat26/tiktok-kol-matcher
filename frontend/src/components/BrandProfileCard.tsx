@@ -3,6 +3,7 @@ import type { BrandProfile } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatCompact, formatPercent } from '@/lib/format'
 
 function hostOf(url: string): string {
   try {
@@ -12,11 +13,27 @@ function hostOf(url: string): string {
   }
 }
 
-function audienceText({ target_audience: a }: BrandProfile): string {
-  const ages =
-    a.age_min !== null || a.age_max !== null ? `${a.age_min ?? '?'}–${a.age_max ?? '?'}` : 'any age'
-  const gender = a.gender === 'any' ? 'any gender' : a.gender
-  return `${ages}, ${gender}, ${a.location}`
+function audienceText({ target_audience: audience }: BrandProfile): string {
+  const gender = audience.gender === 'any' ? 'any gender' : audience.gender
+  return `${audience.age_range}, ${gender}`
+}
+
+function Keywords({ words }: { words: string[] }) {
+  if (words.length === 0) return <span className="text-muted-foreground">—</span>
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {words.map((keyword) => (
+        <li key={keyword} className="min-w-0">
+          <Badge
+            variant="secondary"
+            className="h-auto max-w-full px-3 py-1 text-left text-body-xs whitespace-normal wrap-anywhere"
+          >
+            {keyword}
+          </Badge>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 interface Props {
@@ -38,6 +55,16 @@ export function BrandProfileCard({ websiteUrl, profile, unavailable }: Props) {
       <CardContent>
         {profile ? (
           <dl className="grid gap-5 sm:grid-cols-2">
+            <Item label="Tier" wide>
+              <span>
+                <strong className="font-bold text-ink">{profile.tier_label}</strong>
+                {' · '}
+                {formatCompact(profile.target_followers)} target followers
+                {' · '}
+                {formatPercent(profile.tier_confidence)} confidence
+              </span>
+              <span className="mt-1 block text-muted-foreground">{profile.tier_reason}</span>
+            </Item>
             <Item label="Target audience">
               {audienceText(profile)}
               {profile.target_audience.interests.length > 0 && (
@@ -47,19 +74,17 @@ export function BrandProfileCard({ websiteUrl, profile, unavailable }: Props) {
               )}
             </Item>
             <Item label="Tone">{profile.tone}</Item>
-            <Item label="Keywords" wide>
-              <ul className="flex flex-wrap gap-2">
-                {[...new Set([...profile.keywords_th, ...profile.keywords_en])].map((keyword) => (
-                  <li key={keyword} className="min-w-0">
-                    <Badge
-                      variant="secondary"
-                      className="h-auto max-w-full px-3 py-1 text-left text-body-xs whitespace-normal wrap-anywhere"
-                    >
-                      {keyword}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
+            <Item label="Key products" wide>
+              <Keywords words={profile.key_products} />
+            </Item>
+            <Item label="Topic keywords (TH)" wide>
+              <Keywords words={profile.topic_keywords_th} />
+            </Item>
+            <Item label="Topic keywords (EN)" wide>
+              <Keywords words={profile.topic_keywords_en} />
+            </Item>
+            <Item label="Competitors" wide>
+              <Keywords words={profile.competitors} />
             </Item>
           </dl>
         ) : unavailable ? (

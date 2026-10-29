@@ -2,21 +2,8 @@ import { Check, ChevronDown, Circle, Loader2, X } from 'lucide-react'
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDateTime, formatDuration } from '@/lib/format'
-import { type Progress, type Step, type StepStatus, stepDuration } from '@/lib/steps'
+import { type Progress, STAGE_LABELS, type Step, type StepStatus, stepDuration } from '@/lib/steps'
 import { cn } from '@/lib/utils'
-
-const LABELS: Record<Step['node'], string> = {
-  scrape_website: 'Read website',
-  scrape_facebook: 'Read Facebook page',
-  analyze_brand: 'Analyze brand',
-  generate_queries: 'Generate search queries',
-  discover_kols: 'Discover KOLs',
-  filter_thai: 'Keep Thai creators',
-  enrich_kols: 'Enrich profiles',
-  embed_and_prefilter: 'Embed and prefilter',
-  llm_rerank: 'Rerank',
-  rank_and_output: 'Rank and output',
-}
 
 export function ProgressCard({ progress, connected }: { progress: Progress; connected: boolean }) {
   const { outcome } = progress
@@ -26,7 +13,7 @@ export function ProgressCard({ progress, connected }: { progress: Progress; conn
       ? `Done: ${outcome.summary}`
       : `Failed: ${outcome.summary}`
     : running
-      ? `Running: ${LABELS[running.node]}`
+      ? `Running: ${STAGE_LABELS[running.stage]}`
       : connected
         ? 'Waiting for the pipeline to start'
         : 'Connecting…'
@@ -42,7 +29,7 @@ export function ProgressCard({ progress, connected }: { progress: Progress; conn
       <CardContent>
         <ol className="flex flex-col">
           {progress.steps.map((step, i) => (
-            <StepRow key={step.node} step={step} last={i === progress.steps.length - 1} />
+            <StepRow key={step.stage} step={step} last={i === progress.steps.length - 1} />
           ))}
         </ol>
       </CardContent>
@@ -53,7 +40,7 @@ export function ProgressCard({ progress, connected }: { progress: Progress; conn
 function StepRow({ step, last }: { step: Step; last: boolean }) {
   const [open, setOpen] = useState(false)
   const duration = stepDuration(step)
-  const detailId = `step-${step.node}-detail`
+  const detailId = `step-${step.stage}-detail`
   const hasDetail = step.runs > 0
 
   return (
@@ -77,7 +64,7 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
                 step.status === 'running' && 'text-primary',
               )}
             >
-              {LABELS[step.node]}
+              {STAGE_LABELS[step.stage]}
               {step.runs > 1 && (
                 <span className="rounded-full bg-accent-soft px-2 py-0.5 text-body-xs whitespace-nowrap text-info">
                   round {step.runs}
@@ -105,8 +92,8 @@ function StepRow({ step, last }: { step: Step; last: boolean }) {
             id={detailId}
             className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body-xs text-muted-foreground"
           >
-            <dt>Node</dt>
-            <dd className="font-mono">{step.node}</dd>
+            <dt>Stage</dt>
+            <dd className="font-mono">{step.stage}</dd>
             {step.startedAt && (
               <>
                 <dt>Started</dt>

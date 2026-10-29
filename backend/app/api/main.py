@@ -22,8 +22,6 @@ from .runner import run_job
 from .settings import FlagUnavailable, LiveFlags, Mode, Settings
 from .store import TERMINAL_EVENTS, TERMINAL_STATUSES, Job, JobStore
 
-# Same as the CLI's --max-enrich default: each enrichment is a paid Apify run.
-_MAX_ENRICH = 10
 _POLL_SECONDS = 0.25
 
 IntegrationsFactory = Callable[[LiveFlags], Integrations]
@@ -168,7 +166,6 @@ def create_app(
         except BaseException:
             slots.release()
             raise
-        enrich_limit = _MAX_ENRICH if flags.live_kols else None
 
         def work() -> None:
             try:
@@ -176,7 +173,6 @@ def create_app(
                     store,
                     job.id,
                     integrations,
-                    enrich_limit=enrich_limit,
                     discovery_limits=discovery_limits,
                 )
             finally:

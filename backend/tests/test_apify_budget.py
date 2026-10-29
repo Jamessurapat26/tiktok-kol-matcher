@@ -20,6 +20,7 @@ from app.integrations.apify import (
 )
 from app.integrations.kol_enricher_live import ApifyKolEnricher
 from app.integrations.kol_search_live import ApifyKolSearch
+from app.matching_config import DEFAULT_CONFIG
 from app.models import KolProfile, MatchRequest
 from app.nodes import make_nodes
 from app.state import MatchState
@@ -271,14 +272,14 @@ def test_limits_from_env_defaults(monkeypatch):
 
     limits = ApifyLimits.from_env()
 
-    assert limits.job_budget_usd == pytest.approx(1.00)
+    assert limits.job_budget_usd == pytest.approx(1.50)
     assert limits.tiktok_search_max_charge_usd == pytest.approx(0.50)
     assert limits.tiktok_profile_max_charge_usd == pytest.approx(0.50)
     assert limits.facebook_max_charge_usd == pytest.approx(0.50)
     assert limits.tiktok_results_per_query == 15
     assert limits.tiktok_profile_videos == 10
-    assert limits.enrich_reserve_usd == pytest.approx(0.35)
-    assert limits.budget().remaining == pytest.approx(1.00)
+    assert limits.enrich_reserve_usd == pytest.approx(0.70)
+    assert limits.budget().remaining == pytest.approx(1.50)
 
 
 def test_discovery_limits_from_env_defaults(monkeypatch):
@@ -402,7 +403,7 @@ def test_limits_from_env_rejects_a_tiktok_cap_below_the_actor_minimum(
         ApifyLimits.from_env()
 
 
-def test_estimate_default_job_stays_within_budget_and_allows_eight_search_runs(
+def test_estimate_default_job_plans_search_then_enrichment_within_budget(
     monkeypatch,
 ):
     _clear_limit_env(monkeypatch)
@@ -414,33 +415,29 @@ def test_estimate_default_job_stays_within_budget_and_allows_eight_search_runs(
         limits.tiktok_results_per_query,
         limits.tiktok_search_max_charge_usd,
     )
+    profile_run = estimate_run_cost(
+        "clockworks/tiktok-profile-scraper",
+        limits.tiktok_profile_videos,
+        limits.tiktok_profile_max_charge_usd,
+    )
 
-    assert estimate == pytest.approx(0.995)
-    assert estimate <= limits.job_budget_usd
+    assert estimate.facebook_usd == pytest.approx(0.125)
+    assert estimate.search_runs == 10
+    assert estimate.search_usd == pytest.approx(10 * search_run)
+    assert estimate.profile_runs == 20
+    assert estimate.enrich_usd == pytest.approx(20 * profile_run)
+    assert estimate.total_usd == pytest.approx(
+        estimate.facebook_usd + estimate.search_usd + estimate.enrich_usd
+    )
+    assert estimate.total_usd <= limits.job_budget_usd
+
     empty = estimate_default_job_usd(limits, queries=0)
-    assert estimate == pytest.approx(empty + 8 * search_run)
-
-    # Eight search runs are allowed; a ninth would not fit next to the reserve.
-    facebook = estimate_run_cost(
-        "apify/facebook-pages-scraper", 1, limits.facebook_max_charge_usd
-    ) + estimate_run_cost(
-        "apify/facebook-posts-scraper", 20, limits.facebook_max_charge_usd
-    )
-    assert (
-        facebook + 8 * search_run + limits.enrich_reserve_usd
-        <= limits.job_budget_usd
-    )
-    assert (
-        facebook + 9 * search_run + limits.enrich_reserve_usd
-        > limits.job_budget_usd
-    )
-    eight = estimate_default_job_usd(limits, queries=8)
-    nine = estimate_default_job_usd(limits, queries=9)
-    assert eight == pytest.approx(estimate)
-    assert nine == pytest.approx(eight)
+    assert empty.search_runs == 0
+    assert empty.profile_runs == DEFAULT_CONFIG.enrich_top_n
+    assert estimate.total_usd > empty.total_usd
 
 
-def test_default_reserve_covers_ten_profile_runs(monkeypatch):
+def test_default_reserve_covers_twenty_profile_runs(monkeypatch):
     _clear_limit_env(monkeypatch)
     limits = ApifyLimits.from_env()
 
@@ -450,7 +447,7 @@ def test_default_reserve_covers_ten_profile_runs(monkeypatch):
         limits.tiktok_profile_max_charge_usd,
     )
 
-    assert limits.enrich_reserve_usd >= 10 * profile_run
+    assert limits.enrich_reserve_usd >= 20 * profile_run
 
 
 def test_search_stops_after_the_budget_and_keeps_found_creators():
@@ -566,7 +563,6 @@ def test_enrich_node_stops_at_the_budget_and_keeps_every_candidate():
         integrations,
         min_candidates=1,
         max_search_rounds=1,
-        enrich_limit=10,
     )["enrich_kols"]
     state = MatchState(
         request=MatchRequest(

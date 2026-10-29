@@ -119,11 +119,8 @@ def make_nodes(
     min_candidates: int,
     max_search_rounds: int,
     cfg: MatchingConfig = DEFAULT_CONFIG,
-    enrich_limit: int | None = None,
 ) -> dict[str, Node]:
     """Build the graph nodes with integrations and tuning closed over."""
-    if enrich_limit is not None and enrich_limit < 1:
-        raise ValueError("enrich_limit must be at least 1")
 
     def _alias_sets(state: MatchState) -> tuple[list[str], list[str]]:
         if state.brand_profile is None:
@@ -202,6 +199,8 @@ def make_nodes(
                 dropped += 1
                 continue
             kept_queries.append(query)
+        remaining = cfg.max_search_queries - len(state.search_queries)
+        kept_queries = kept_queries[:max(remaining, 0)]
         update: dict[str, Any] = {
             "search_queries": kept_queries,
             "last_queries": kept_queries,
@@ -280,6 +279,8 @@ def make_nodes(
         """
         if state.stage == "failed":
             return END
+        if len(state.search_queries) >= cfg.max_search_queries:
+            return "hard_filter"
         if (
             _thai_creator_count(state.discovered) < min_candidates
             and state.search_rounds < max_search_rounds
@@ -350,15 +351,10 @@ def make_nodes(
     def enrich_kols(state: MatchState) -> dict[str, Any]:
         enriched: list[KolProfile] = []
         errors: list[str] = []
-        limit = (
-            cfg.enrich_top_n
-            if enrich_limit is None
-            else min(cfg.enrich_top_n, enrich_limit)
-        )
         # Enrich the first-pass leaders, not the largest accounts.
         to_enrich = {
             normalize_handle(kol.handle)
-            for kol in state.candidates[:limit]
+            for kol in state.candidates[: cfg.enrich_top_n]
         }
         budget_reached = False
         skipped = 0

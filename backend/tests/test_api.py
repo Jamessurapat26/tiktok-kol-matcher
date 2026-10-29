@@ -339,6 +339,8 @@ def test_runner_passes_discovery_env_to_the_graph(make_client, monkeypatch):
     assert job["status"] == "succeeded"
     assert captured["kwargs"]["min_candidates"] == 12
     assert captured["kwargs"]["max_search_rounds"] == 2
+    assert "enrich_limit" not in captured["kwargs"]
+    assert "cfg" not in captured["kwargs"]
 
 
 @pytest.mark.parametrize(

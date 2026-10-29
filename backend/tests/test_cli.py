@@ -455,7 +455,7 @@ def test_live_kols_flag_wires_apify_without_running_it(monkeypatch, capsys):
     assert isinstance(captured["integrations"].enricher, ApifyKolEnricher)
     assert captured["integrations"].kol_search.max_results == 4
     assert captured["integrations"].enricher.max_videos == 6
-    assert captured["kwargs"]["enrich_limit"] == 3
+    assert captured["kwargs"]["cfg"].enrich_top_n == 3
     assert "cli-test-token" not in captured_io.out
     assert "cli-test-token" not in captured_io.err
     assert json.loads(captured_io.out)["stage"] == "done"

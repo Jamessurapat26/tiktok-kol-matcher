@@ -50,7 +50,8 @@ class MatchingConfig:
 
     # Stage sizes and selection.
     recent_videos: int = 10
-    enrich_top_n: int = 25
+    max_search_queries: int = 10
+    enrich_top_n: int = 20
     judge_top_n: int = 15
     mmr_lambda: float = 0.7
 
@@ -106,6 +107,7 @@ class MatchingConfig:
             "followers_max",
             "active_days",
             "recent_videos",
+            "max_search_queries",
             "enrich_top_n",
             "judge_top_n",
         ):

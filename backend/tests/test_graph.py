@@ -98,6 +98,7 @@ def test_loop_stops_at_max_rounds_even_with_too_few_candidates():
     graph = build_graph(
         mock_integrations(kol_fixtures=fixtures),
         min_candidates=30,
+        cfg=replace(DEFAULT_CONFIG, max_search_queries=20),
     )
 
     names, final = run_stream(graph, make_request())
@@ -169,11 +170,32 @@ def test_discovery_never_exceeds_max_search_rounds():
         mock_integrations(kol_fixtures=fixtures),
         min_candidates=30,
         max_search_rounds=3,
+        cfg=replace(DEFAULT_CONFIG, max_search_queries=20),
     )
     names, final = run_stream(graph, make_request())
 
     assert final["search_rounds"] == 3
     assert names.count("generate_queries") == 3
+    assert final["stage"] == "done"
+
+
+def test_discovery_stops_at_the_query_cap_even_with_too_few_candidates():
+    fixtures = [
+        make_fixture(f"kol-{group}-{index}", group)
+        for group in (1, 2)
+        for index in range(3)
+    ]
+
+    graph = build_graph(
+        mock_integrations(kol_fixtures=fixtures),
+        min_candidates=30,
+    )
+    names, final = run_stream(graph, make_request())
+
+    assert DEFAULT_CONFIG.max_search_queries == 10
+    assert final["search_rounds"] == 2
+    assert names.count("generate_queries") == 2
+    assert len(final["search_queries"]) == 10
     assert final["stage"] == "done"
 
 
@@ -524,10 +546,13 @@ class _CountingEnricher:
         return {}
 
 
-def test_enrich_limit_enriches_the_first_pass_leaders():
+def test_config_enrich_top_n_enriches_the_first_pass_leaders():
     enricher = _CountingEnricher()
     integrations = replace(mock_integrations(), enricher=enricher)
-    graph = build_graph(integrations, enrich_limit=3)
+    graph = build_graph(
+        integrations,
+        cfg=replace(DEFAULT_CONFIG, enrich_top_n=3),
+    )
 
     final = graph.invoke(initial_state(make_request()))
 
@@ -628,7 +653,7 @@ def test_cost_log_records_every_paid_stage():
     )
     assert any(
         line.startswith("enrich: est $")
-        and line.endswith("(25 profiles)")
+        and line.endswith("(20 profiles)")
         for line in lines
     )
     assert any(

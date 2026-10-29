@@ -26,7 +26,6 @@ def run_job(
     job_id: str,
     integrations: Integrations,
     *,
-    enrich_limit: int | None = None,
     discovery_limits: DiscoveryLimits | None = None,
 ) -> None:
     """Run one job's graph to completion, recording per-node events.
@@ -44,7 +43,6 @@ def run_job(
             integrations,
             min_candidates=discovery.min_thai_candidates,
             max_search_rounds=discovery.max_rounds,
-            enrich_limit=enrich_limit,
         )
         for mode, payload in graph.stream(
             initial_state(job.request),

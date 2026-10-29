@@ -315,11 +315,6 @@ def test_top_k_above_enrich_cap_is_not_capped():
     assert len(final["results"]) == 30
 
 
-def test_enrich_limit_must_be_positive():
-    with pytest.raises(ValueError, match="enrich_limit"):
-        build_graph(enrich_limit=0)
-
-
 def test_prompt_name_encode_normalizes_and_truncates(tmp_path):
     model = _NamedModel()
     embedder = SentenceTransformerEmbedder(model=model, cache_dir=tmp_path, dim=768, batch_size=2)

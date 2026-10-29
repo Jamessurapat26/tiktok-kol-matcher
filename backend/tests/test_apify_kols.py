@@ -659,7 +659,7 @@ def test_live_sizes_come_from_env_in_the_actor_inputs(monkeypatch, tmp_path):
     assert profile_body["resultsPerPage"] == 3
     assert profile_params["maxItems"] == "3"
     assert any(row.get("handle") == "gretalynnhihi" for row in rows)
-    assert bundle.kol_search._apify._reserve_usd == pytest.approx(0.35)
+    assert bundle.kol_search._apify._reserve_usd == pytest.approx(0.70)
 
     bundle.kol_search._apify._client.close()
     bundle.enricher._apify._client.close()

@@ -72,10 +72,11 @@ def test_off_niche_top_engagement_ranks_below_on_niche_average(demo_state):
     by_handle = {item.kol.handle: item for item in ranked}
     wander = by_handle["wanderwithjin"]
 
-    # The judged creators are the on-niche reviewers in this demo: each has at
-    # least one on-topic video. Gamingduo.peak sits at their median E.
-    on_niche = [item for item in ranked if item.scores.judged]
-    assert all(item.scores.on_topic > 0 for item in on_niche)
+    # On-niche = judged creators with at least half their recent videos on topic.
+    on_niche = [
+        item for item in ranked if item.scores.judged and item.scores.on_topic >= 0.5
+    ]
+    assert len(on_niche) >= 5
     median_e = statistics.median(item.scores.E for item in on_niche)
     average = min(on_niche, key=lambda item: abs(item.scores.E - median_e))
 

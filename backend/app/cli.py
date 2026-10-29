@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import sys
+from dataclasses import replace
 from typing import Any
 
 from langgraph.errors import GraphRecursionError
@@ -18,6 +19,7 @@ from .integrations import build_integrations
 from .integrations.apify import ApifyConfigError, DiscoveryLimits
 from .integrations.embeddings import EmbedConfigError
 from .integrations.llm_live import LlmConfigError, llm_api_key_from_env
+from .matching_config import DEFAULT_CONFIG
 from .models import BrandProfile, MatchRequest, RankedKol
 
 _LIST_FIELDS = ("discovered", "candidates", "ranked", "results")
@@ -111,10 +113,11 @@ def _build_parser() -> argparse.ArgumentParser:
     match.add_argument(
         "--max-enrich",
         type=int,
-        default=10,
+        default=None,
         help=(
-            "with --live-kols, enrich at most this many first-pass leaders; "
-            "each one is a paid Apify run (default: 10)"
+            "override how many first-pass leaders to enrich; each one is a "
+            "paid Apify run when live KOLs are enabled "
+            f"(default: MatchingConfig.enrich_top_n or {DEFAULT_CONFIG.enrich_top_n})"
         ),
     )
     match.add_argument(
@@ -389,7 +392,7 @@ def _cmd_match(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    if args.max_enrich < 1:
+    if args.max_enrich is not None and args.max_enrich < 1:
         print("error: --max-enrich must be at least 1", file=sys.stderr)
         return 2
     if args.live_kols and not os.environ.get("APIFY_TOKEN", "").strip():
@@ -434,8 +437,11 @@ def _cmd_match(args: argparse.Namespace) -> int:
         "min_candidates": min_candidates,
         "max_search_rounds": max_rounds,
     }
-    if args.live_kols:
-        graph_kwargs["enrich_limit"] = args.max_enrich
+    if args.max_enrich is not None:
+        graph_kwargs["cfg"] = replace(
+            DEFAULT_CONFIG,
+            enrich_top_n=args.max_enrich,
+        )
     # Default stays on build_graph's mocked bundle so the CLI never opens a
     # socket or loads a model unless a live flag is set.
     if args.live_web or args.live_kols or args.live_llm or args.live_embed or args.live_fb:

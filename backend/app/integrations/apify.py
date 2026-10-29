@@ -17,6 +17,8 @@ from urllib.parse import quote
 
 import httpx
 
+from ..matching_config import DEFAULT_CONFIG
+
 # Official sync endpoint. Actor ids use ``owner~name`` (slash becomes tilde).
 # https://docs.apify.com/api/v2/act-run-sync-get-dataset-items-post
 _RUN_SYNC_ITEMS = (
@@ -211,11 +213,13 @@ class ApifyLimits:
     facebook_max_charge_usd: float
     tiktok_results_per_query: int = 15
     tiktok_profile_videos: int = 10
-    enrich_reserve_usd: float = 0.35
+    # Twenty profile runs at $0.035 each, so search cannot spend the money the
+    # first twenty enrichments need.
+    enrich_reserve_usd: float = 0.70
 
     @classmethod
     def from_env(cls) -> ApifyLimits:
-        job_budget = _positive_env("APIFY_JOB_BUDGET_USD", 1.00)
+        job_budget = _positive_env("APIFY_JOB_BUDGET_USD", 1.50)
         tiktok_search = _positive_env("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", 0.50)
         tiktok_profile = _positive_env("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", 0.50)
         facebook = _positive_env("APIFY_FACEBOOK_MAX_CHARGE_USD", 0.50)
@@ -231,7 +235,7 @@ class ApifyLimits:
             minimum=1,
             maximum=30,
         )
-        enrich_reserve = _non_negative_env("APIFY_ENRICH_RESERVE_USD", 0.35)
+        enrich_reserve = _non_negative_env("APIFY_ENRICH_RESERVE_USD", 0.70)
         for name, value in (
             ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", tiktok_search),
             ("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", tiktok_profile),
@@ -287,58 +291,86 @@ class DiscoveryLimits:
         )
 
 
+@dataclass(frozen=True)
+class JobEstimate:
+    """Planned Apify spend for one default live job, with component counts."""
+
+    facebook_usd: float
+    search_runs: int
+    search_usd: float
+    profile_runs: int
+    enrich_usd: float
+    total_usd: float
+
+
 def estimate_default_job_usd(
     limits: ApifyLimits,
-    queries: int = 30,
-) -> float:
-    """Estimate the Apify cost of one default live job.
+    queries: int = DEFAULT_CONFIG.max_search_queries,
+    profiles: int = DEFAULT_CONFIG.enrich_top_n,
+) -> JobEstimate:
+    """Plan the Apify cost of one default live job.
 
-    The estimate uses the same per-run estimator and assumes one Facebook page
-    item, 20 Facebook posts, then TikTok search runs that only start while
-    their estimate plus the enrichment reserve fits under the budget (at most
-    ``queries`` runs, default 3 rounds of up to 10 queries), then up to 10
-    profile enrichment runs at ``TIKTOK_PROFILE_VIDEOS`` videos each while each
-    one fits. Search runs use ``TIKTOK_RESULTS_PER_QUERY`` videos. This is
-    deliberately conservative and is only used for planning and tests, never
-    for billing.
+    The plan follows the real job order: one Facebook page item plus 20 posts,
+    then TikTok search runs that only start while their estimate plus the
+    enrichment reserve fits under the budget (at most ``queries``), then profile
+    enrichment runs while each one fits (at most ``profiles``). Search runs use
+    ``TIKTOK_RESULTS_PER_QUERY`` videos and profile runs use
+    ``TIKTOK_PROFILE_VIDEOS`` videos. This is deliberately conservative and is
+    only used for planning and tests, never for billing.
     """
     if queries < 0:
         raise ValueError("queries must be zero or greater")
+    if profiles < 0:
+        raise ValueError("profiles must be zero or greater")
 
-    spent = estimate_run_cost(
+    facebook_usd = estimate_run_cost(
         "apify/facebook-pages-scraper",
         1,
         limits.facebook_max_charge_usd,
-    )
-    spent += estimate_run_cost(
+    ) + estimate_run_cost(
         "apify/facebook-posts-scraper",
         20,
         limits.facebook_max_charge_usd,
     )
+    spent = facebook_usd
 
     search_run = estimate_run_cost(
         "clockworks/tiktok-scraper",
         limits.tiktok_results_per_query,
         limits.tiktok_search_max_charge_usd,
     )
-    for _ in range(queries):
+    search_runs = 0
+    while search_runs < queries:
         if (
             spent + limits.enrich_reserve_usd + search_run
             > limits.job_budget_usd
         ):
             break
         spent += search_run
+        search_runs += 1
+    search_usd = search_runs * search_run
 
     enrichment_run = estimate_run_cost(
         "clockworks/tiktok-profile-scraper",
         limits.tiktok_profile_videos,
         limits.tiktok_profile_max_charge_usd,
     )
-    for _ in range(10):
+    profile_runs = 0
+    while profile_runs < profiles:
         if spent + enrichment_run > limits.job_budget_usd:
             break
         spent += enrichment_run
-    return spent
+        profile_runs += 1
+    enrich_usd = profile_runs * enrichment_run
+
+    return JobEstimate(
+        facebook_usd=facebook_usd,
+        search_runs=search_runs,
+        search_usd=search_usd,
+        profile_runs=profile_runs,
+        enrich_usd=enrich_usd,
+        total_usd=spent,
+    )
 
 
 def actor_run_sync_url(actor: str) -> str:

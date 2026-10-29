@@ -10,11 +10,15 @@ sent as ``hashtags``. Every other query is sent as ``searchQueries`` with
 ``authorMeta`` (handle, profile URL, ``fans``, ``signature``).
 
 Videos are deduped by author. The higher follower count wins; empty bio,
-nickname, language, and region are filled from the other video. Up to three
-distinct captions are kept as ``content_summary`` so Thai script in a video can
-identify a creator before enrichment replaces the summary. Items with an
-``errorCode``, and videos with no author handle, are returned as error records
-so ``discover_kols`` skips and records them.
+nickname, language, and region are filled from the other video. Every item's
+per-video stats (``playCount``, ``diggCount``, ``commentCount``, ``shareCount``,
+``createTime``/``createTimeISO``, caption, video URL) are kept in a ``videos``
+list of :class:`VideoStats`-compatible dictionaries, and the lists are
+concatenated per author (deduped by URL). Up to three distinct captions are
+also kept as ``content_summary`` so Thai script in a video can identify a
+creator before enrichment replaces the summary. Items with an ``errorCode``,
+and videos with no author handle, are returned as error records so
+``discover_kols`` skips and records them.
 """
 
 from __future__ import annotations
@@ -34,6 +38,7 @@ from .apify import (
     as_count,
     dig,
 )
+from .tiktok_videos import video_from_item
 
 SEARCH_ACTOR = "clockworks/tiktok-scraper"
 
@@ -150,6 +155,7 @@ def map_search_item(item: Any) -> dict[str, Any]:
     caption = _caption(item.get("text"))
     if caption:
         row["content_summary"] = caption
+    row["videos"] = [video_from_item(item, handle)]
     return row
 
 
@@ -186,7 +192,27 @@ def _prefer_profile(current: dict[str, Any], new: dict[str, Any]) -> dict[str, A
     summary = _merge_captions(current, new)
     if summary:
         merged["content_summary"] = summary
+    merged["videos"] = _merge_videos(current.get("videos"), new.get("videos"))
     return merged
+
+
+def _merge_videos(*groups: object) -> list[dict[str, Any]]:
+    """Concatenate per-author videos, keeping the first row for each URL."""
+    videos: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for group in groups:
+        if not isinstance(group, list):
+            continue
+        for video in group:
+            if not isinstance(video, dict):
+                continue
+            url = video.get("url")
+            if isinstance(url, str):
+                if url in seen:
+                    continue
+                seen.add(url)
+            videos.append(dict(video))
+    return videos
 
 
 def _caption(value: object) -> str | None:

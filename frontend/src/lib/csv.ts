@@ -3,16 +3,20 @@ import type { RankedKol } from '@/api/types'
 const COLUMNS: [string, (row: RankedKol) => string | number | null][] = [
   ['handle', (r) => r.kol.handle],
   ['nickname', (r) => r.kol.nickname],
-  ['url', (r) => r.kol.url],
+  ['profile_url', (r) => r.profile_url],
   ['followers', (r) => r.kol.followers],
-  ['engagement_rate', (r) => r.kol.median_engagement_rate],
-  ['total_score', (r) => r.total_score],
-  ['relevance', (r) => r.scores.relevance],
-  ['engagement', (r) => r.scores.engagement],
-  ['audience_fit', (r) => r.scores.audience_fit],
-  ['tier_fit', (r) => r.scores.tier_fit],
-  ['audience_confidence', (r) => r.scores.audience_confidence],
+  ['final', (r) => r.final],
+  ['F', (r) => r.scores.F],
+  ['E', (r) => r.scores.E],
+  ['T', (r) => r.scores.T],
+  ['A_eff', (r) => r.scores.A_eff],
+  ['F_conf', (r) => r.scores.F_conf],
+  ['E_conf', (r) => r.scores.E_conf],
+  ['T_conf', (r) => r.scores.T_conf],
+  ['A_conf', (r) => r.scores.A_conf],
+  ['flags', (r) => r.flags.join('; ')],
   ['reason', (r) => r.reason],
+  ['evidence_urls', (r) => r.evidence_urls.join(' | ')],
 ]
 
 function cell(value: string | number | null): string {

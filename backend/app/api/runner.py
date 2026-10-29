@@ -26,7 +26,6 @@ def run_job(
     job_id: str,
     integrations: Integrations,
     *,
-    enrich_limit: int | None = None,
     discovery_limits: DiscoveryLimits | None = None,
 ) -> None:
     """Run one job's graph to completion, recording per-node events.
@@ -44,7 +43,6 @@ def run_job(
             integrations,
             min_candidates=discovery.min_thai_candidates,
             max_search_rounds=discovery.max_rounds,
-            enrich_limit=enrich_limit,
         )
         for mode, payload in graph.stream(
             initial_state(job.request),
@@ -57,6 +55,8 @@ def run_job(
                     stage=payload["stage"],
                     errors=payload["errors"],
                     brand_profile=payload.get("brand_profile"),
+                    rejected=payload.get("rejected") or {},
+                    cost_log=payload.get("cost_log") or [],
                 )
             elif "input" in payload:
                 store.add_event(job_id, node=payload["name"], status="started")
@@ -76,6 +76,8 @@ def run_job(
                 )
 
         errors = list(final.get("errors") or [])
+        rejected = final.get("rejected") or {}
+        cost_log = final.get("cost_log") or []
         if final.get("stage") == "done":
             results = final.get("results") or []
             store.transition(
@@ -83,6 +85,8 @@ def run_job(
                 "succeeded",
                 stage="done",
                 errors=errors,
+                rejected=rejected,
+                cost_log=cost_log,
                 results=results,
                 summary=f"ranked {len(results)} KOLs",
             )
@@ -92,6 +96,8 @@ def run_job(
                 "failed",
                 stage=final.get("stage") or "failed",
                 errors=errors,
+                rejected=rejected,
+                cost_log=cost_log,
                 summary=_short(errors[-1] if errors else "pipeline stopped before output"),
             )
     except Exception as exc:  # noqa: BLE001 - a job must never stay queued or running

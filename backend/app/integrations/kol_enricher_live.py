@@ -7,22 +7,12 @@ scrapes turned off, and with pinned posts excluded so they are not billed.
 Results are cached as JSON under ``data/cache/apify`` (or ``$KOL_CACHE_DIR/apify``)
 for 7 days. A hit does not call Apify.
 
-Engagement
-----------
-For each non-pinned video (pinned videos are used only when every returned
-video is pinned):
-
-    rate = (diggCount + commentCount + shareCount) / playCount
-
-``diggCount`` is TikTok's like count. Saves (``collectCount``) are not included.
-When ``playCount`` is missing or zero, that video falls back to the same
-numerator divided by the profile's follower count (``authorMeta.fans``, or the
-discovered ``KolProfile.followers`` when the actor omits fans). Videos with no
-counts, and no follower count to divide by, are skipped.
-
-The stored ``median_engagement_rate`` is the median of those per-video rates,
-capped to ``[0, 1]`` because ``KolProfile.median_engagement_rate`` is a fraction.
-``statistics.median`` averages the two middle values when the count is even.
+Videos
+------
+The update carries ``videos`` (per-video stats) and ``stats_source``
+``"profile"`` so the scorer can use profile data without a second lookup.
+Pinned videos are used only when every returned video is pinned. Cached updates
+written before videos existed simply omit them.
 
 ``posts_per_week`` is ``(n - 1) / weeks`` between the oldest and newest
 timestamp in that same video set (``createTime``, else ``createTimeISO``).
@@ -38,7 +28,6 @@ import hashlib
 import json
 import os
 import re
-import statistics
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -46,9 +35,11 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import ValidationError
 
-from ..models import KolProfile, normalize_handle
-from .apify import ApifyBudget, ApifyClient, ApifyError, as_count, dig
+from ..models import KolProfile, VideoStats, normalize_handle
+from .apify import ApifyBudget, ApifyClient, ApifyError, dig
+from .tiktok_videos import video_from_item
 
 PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -79,27 +70,6 @@ def profile_input(handle: str, *, max_videos: int) -> dict[str, Any]:
     }
 
 
-def engagement_rate(item: dict[str, Any], *, followers: int) -> float | None:
-    """Per-video rate. Views first; follower count only when views are missing.
-
-    The returned rate is not capped. ``enrich_from_items`` caps the median.
-    """
-    likes = as_count(item.get("diggCount"))
-    comments = as_count(item.get("commentCount"))
-    shares = as_count(item.get("shareCount"))
-    if likes is None and comments is None and shares is None:
-        return None
-    interactions = (likes or 0) + (comments or 0) + (shares or 0)
-    views = as_count(item.get("playCount"))
-    if views is not None and views > 0:
-        return interactions / views
-    fans = as_count(dig(item, "authorMeta", "fans"))
-    denominator = fans if fans else followers
-    if denominator > 0:
-        return interactions / denominator
-    return None
-
-
 def posts_per_week(videos: list[dict[str, Any]]) -> float | None:
     """``(n - 1) / weeks`` across videos that have a timestamp."""
     stamps = [stamp for stamp in (_timestamp(video) for video in videos) if stamp is not None]
@@ -113,7 +83,7 @@ def posts_per_week(videos: list[dict[str, Any]]) -> float | None:
 
 
 def content_summary(videos: list[dict[str, Any]], *, limit: int = SUMMARY_CHARS) -> str | None:
-    """Captions and hashtag names from the videos used for the engagement median."""
+    """Captions and hashtag names from the videos kept for scoring."""
     captions: list[str] = []
     tags: list[str] = []
     seen_tags: set[str] = set()
@@ -149,16 +119,16 @@ def content_summary(videos: list[dict[str, Any]], *, limit: int = SUMMARY_CHARS)
 
 def enrich_from_items(items: list[Any], *, followers: int) -> dict[str, Any]:
     """Turn profile-scraper dataset items into KolProfile field updates."""
+    del followers  # Kept in the signature for existing callers.
     videos = _videos_for_stats(items)
-    rates = [
-        rate
-        for video in videos
-        if (rate := engagement_rate(video, followers=followers)) is not None
-    ]
     update: dict[str, Any] = {}
-    if rates:
-        median = statistics.median(rates)
-        update["median_engagement_rate"] = round(min(1.0, max(0.0, float(median))), 4)
+    stats = [
+        video_from_item(video, _author_handle(video))
+        for video in videos
+    ]
+    if stats:
+        update["videos"] = stats
+        update["stats_source"] = "profile"
     per_week = posts_per_week(videos)
     if per_week is not None:
         update["posts_per_week"] = per_week
@@ -166,6 +136,13 @@ def enrich_from_items(items: list[Any], *, followers: int) -> dict[str, Any]:
     if summary:
         update["content_summary"] = summary
     return update
+
+
+def _author_handle(item: dict[str, Any]) -> str | None:
+    raw = dig(item, "authorMeta", "name")
+    if isinstance(raw, str) and raw.strip().lstrip("@").strip():
+        return raw.strip().lstrip("@").strip()
+    return None
 
 
 def _videos_for_stats(items: list[Any]) -> list[dict[str, Any]]:
@@ -236,15 +213,28 @@ def _load_cached_update(
 
 def _clean_update(update: dict[str, Any]) -> dict[str, Any]:
     clean: dict[str, Any] = {}
-    rate = update.get("median_engagement_rate")
-    if isinstance(rate, (int, float)) and not isinstance(rate, bool) and 0 <= float(rate) <= 1:
-        clean["median_engagement_rate"] = float(rate)
     posts = update.get("posts_per_week")
     if isinstance(posts, (int, float)) and not isinstance(posts, bool) and float(posts) >= 0:
         clean["posts_per_week"] = float(posts)
     summary = update.get("content_summary")
     if isinstance(summary, str) and summary.strip():
         clean["content_summary"] = summary.strip()
+    raw_videos = update.get("videos")
+    if isinstance(raw_videos, list):
+        videos: list[dict[str, Any]] = []
+        for raw in raw_videos:
+            if not isinstance(raw, dict):
+                continue
+            try:
+                video = VideoStats.model_validate(raw)
+            except ValidationError:
+                continue
+            videos.append(video.model_dump(mode="json"))
+        if videos:
+            clean["videos"] = videos
+    source = update.get("stats_source")
+    if source in {"search", "profile"}:
+        clean["stats_source"] = source
     return clean
 
 

@@ -1,5 +1,6 @@
 // Wire types for the HTTP API. Field names mirror the backend models exactly:
-// backend/app/api/main.py, store.py, settings.py, and backend/app/models.py.
+// backend/app/api/main.py, store.py, settings.py, backend/app/models.py, and
+// backend/app/state.py.
 
 /** settings.py `Mode` */
 export type Mode = 'demo' | 'live'
@@ -36,45 +37,49 @@ export interface JobCreated {
   job_id: string
 }
 
-/** models.py `MatchWeights` */
-export interface MatchWeights {
-  relevance: number
-  engagement: number
-  audience: number
-  tier: number
-}
-
 /** models.py `MatchRequest` */
 export interface MatchRequest {
   website_url: string
   facebook_url: string
   top_k: number
-  weights: MatchWeights
 }
 
 /** models.py `TargetAudience` */
 export interface TargetAudience {
-  age_min: number | null
-  age_max: number | null
   gender: 'male' | 'female' | 'any'
+  age_range: string
   interests: string[]
-  location: string
 }
 
-export type Tier = 'nano' | 'micro' | 'macro' | 'mega'
+export type Tier = 'nano' | 'micro' | 'mid' | 'macro'
 
-/** models.py `BrandProfile` */
+/** models.py `BrandProfile`: the structured brief. */
 export interface BrandProfile {
   category: string
-  products: string[]
+  key_products: string[]
+  price_tier: 'budget' | 'mid' | 'premium' | 'luxury'
   target_audience: TargetAudience
   tone: string
-  content_style: string
-  keywords_th: string[]
-  keywords_en: string[]
-  hashtags: string[]
-  preferred_tiers: Tier[]
-  reasoning: string
+  topic_keywords_th: string[]
+  topic_keywords_en: string[]
+  competitors: string[]
+  brand_handles: string[]
+  brand_names: string[]
+  target_followers: number
+  tier_label: Tier
+  tier_confidence: number
+  tier_reason: string
+}
+
+/** models.py `VideoStats` */
+export interface VideoStats {
+  url: string | null
+  views: number
+  likes: number
+  comments: number
+  shares: number
+  posted_at: string | null
+  caption: string
 }
 
 /** models.py `KolProfile`. The API has no avatar field. */
@@ -86,31 +91,57 @@ export interface KolProfile {
   bio: string | null
   language: string | null
   region: string | null
-  /** Fraction, 0.043 = 4.3%. */
-  median_engagement_rate: number | null
   posts_per_week: number
   content_summary: string | null
+  videos: VideoStats[]
+  stats_source: 'search' | 'profile'
   source: 'apify' | 'seed' | 'cache'
 }
 
-export type AudienceConfidence = 'low' | 'medium' | 'high'
-
-/** models.py `ScoreBreakdown`. Each score is 0..1. */
-export interface ScoreBreakdown {
-  relevance: number
-  engagement: number
-  audience_fit: number
-  tier_fit: number
-  audience_confidence: AudienceConfidence
+/** models.py `Scores`. Each score and confidence is 0..1. */
+export interface Scores {
+  F: number
+  E: number
+  T: number
+  A_eff: number
+  F_conf: number
+  E_conf: number
+  T_conf: number
+  A_conf: number
+  sim: number
+  on_topic: number
+  judge: number
+  er_star: number | null
+  reach: number | null
+  judged: boolean
 }
 
 /** models.py `RankedKol` */
 export interface RankedKol {
   kol: KolProfile
-  scores: ScoreBreakdown
-  total_score: number
+  scores: Scores
+  quality: number
+  final: number
+  flags: string[]
   reason: string
+  evidence_urls: string[]
+  profile_url: string
 }
+
+/** state.py `MatchState.stage`, in pipeline order. */
+export type Stage =
+  | 'received'
+  | 'scraping'
+  | 'analyzing_brand'
+  | 'generating_queries'
+  | 'discovering_kols'
+  | 'filtering'
+  | 'first_pass'
+  | 'enriching_kols'
+  | 'judging'
+  | 'outputting'
+  | 'done'
+  | 'failed'
 
 /** store.py `JobStatus` */
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
@@ -119,11 +150,13 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 export interface Job {
   id: string
   status: JobStatus
-  stage: string
+  stage: Stage
   request: MatchRequest
   flags: LiveFlags
   errors: string[]
   brand_profile: BrandProfile | null
+  rejected: Record<string, number>
+  cost_log: string[]
   results: RankedKol[]
   created_at: string
   updated_at: string

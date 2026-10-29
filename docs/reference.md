@@ -8,7 +8,7 @@ Detailed behaviour of the HTTP API and each live integration. The
 | Method and path | Result |
 | --- | --- |
 | `POST /api/jobs` | 202 `{"job_id": "..."}`. 400 when a requested live flag cannot run. 422 on an invalid body, a `facebook_url` outside facebook.com or fb.com, or a `website_url` on a local or private address. 429 when `MAX_QUEUED_JOBS` jobs are queued or running |
-| `GET /api/jobs/{id}` | Status, stage, request, effective flags, errors, brand profile, and ranked results. 404 when unknown |
+| `GET /api/jobs/{id}` | Status, stage, request, effective flags, errors, brand profile, rejected counts, cost log, and ranked results. 404 when unknown |
 | `GET /api/jobs/{id}/events` | Server-sent events, ending with a `done` or `failed` event. 404 when unknown |
 | `GET /api/jobs?limit=20` | Recent jobs, newest first. `limit` is 1 to 100 |
 | `GET /api/health` | Mode, default flags, the configured models, and which credentials are set |
@@ -50,51 +50,105 @@ curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
   "request": {
     "website_url": "https://example-brand.co.th/",
     "facebook_url": "https://www.facebook.com/example-brand",
-    "top_k": 3,
-    "weights": {"relevance": 0.4, "engagement": 0.25, "audience": 0.2, "tier": 0.15}
+    "top_k": 3
   },
   "flags": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false},
   "errors": [],
   "brand_profile": {
     "category": "gaming eyewear / blue-light glasses",
-    "products": ["blue-light glasses", "gaming glasses", "clip-on blue-light lenses"],
-    "target_audience": {"age_min": 16, "age_max": 34, "gender": "any", "interests": ["gaming", "esports", "tech"], "location": "Thailand (Bangkok)"},
+    "key_products": ["blue-light glasses", "gaming glasses", "clip-on blue-light lenses"],
+    "price_tier": "mid",
+    "target_audience": {"gender": "any", "age_range": "16-34", "interests": ["gaming", "esports", "tech"]},
     "tone": "energetic, friendly, gamer-coded",
-    "content_style": "short-form reviews, gameplay commentary and desk setups",
-    "keywords_th": ["แว่นกันแสงสีฟ้า", "แว่นเกมมิ่ง"],
-    "keywords_en": ["blue light glasses", "gaming glasses"],
-    "hashtags": ["#ExampleBrand", "#BlueLightGlasses"],
-    "preferred_tiers": ["micro", "macro", "mega"],
-    "reasoning": "Mock analysis derived from the website and Facebook page: ..."
+    "topic_keywords_th": ["แว่นกันแสงสีฟ้า", "แว่นเกมมิ่ง"],
+    "topic_keywords_en": ["blue light glasses", "gaming glasses", "eyewear"],
+    "competitors": [],
+    "brand_handles": ["@ExampleBrand", "examplebrand"],
+    "brand_names": ["ExampleBrand"],
+    "target_followers": 30000,
+    "tier_label": "micro",
+    "tier_confidence": 0.7,
+    "tier_reason": "Mock analysis derived from the website and Facebook page: a small Bangkok online shop, so a micro creator around 30k."
   },
+  "rejected": {
+    "own_brand_account": 1,
+    "competitor_account": 1,
+    "shop_media_account": 2,
+    "not_thai": 1,
+    "inactive": 1,
+    "followers_out_of_range": 2
+  },
+  "cost_log": [
+    "llm: analyze_brand 1 call",
+    "llm: generate_queries round 1 1 call",
+    "search round 1: est $0.52 (8 queries)",
+    "llm: generate_queries round 2 1 call",
+    "search round 2: est $0.13 (2 queries)",
+    "enrich: est $0.70 (20 profiles)",
+    "llm: judge 1 call (15 creators)"
+  ],
   "results": [
     {
       "kol": {
-        "handle": "BankZaGaming",
-        "url": "https://www.tiktok.com/@BankZaGaming",
-        "followers": 1250000,
+        "handle": "fpscoach.oat",
+        "url": "https://www.tiktok.com/@fpscoach.oat",
+        "nickname": "โค้ชโอ๊ต FPS",
+        "followers": 36000,
+        "bio": "สอนเล่นเกมยิง ตั้งค่าเมาส์ จอ แว่น",
         "language": "th",
         "region": "TH",
-        "median_engagement_rate": 0.091,
-        "posts_per_week": 1.1,
-        "content_summary": "Topics: gaming, esports",
+        "posts_per_week": 2.24,
+        "content_summary": "Recent posts: สอนคอมโบตัวใหม่ ... รีวิวแว่นเกมมิ่ง ... แว่นกันแสงสีฟ้า",
+        "videos": [
+          {
+            "url": "https://www.tiktok.com/@fpscoach.oat/video/7326318781316695081",
+            "views": 68043,
+            "likes": 4188,
+            "comments": 178,
+            "shares": 340,
+            "posted_at": "2026-10-06T08:07:09Z",
+            "caption": "สรุปให้: แว่นกันแสงสีฟ้า รุ่น Lumen ใส่เล่นเกมทั้งคืน ..."
+          }
+        ],
+        "stats_source": "profile",
         "source": "apify"
       },
       "scores": {
-        "relevance": 0.2145,
-        "engagement": 0.6067,
-        "audience_fit": 1.0,
-        "tier_fit": 1.0,
-        "audience_confidence": "high"
+        "F": 0.8017,
+        "E": 0.8318,
+        "T": 0.8853,
+        "A_eff": 0.7457,
+        "F_conf": 0.9,
+        "E_conf": 0.75,
+        "T_conf": 0.7,
+        "A_conf": 0.4913,
+        "sim": 0.8375,
+        "on_topic": 0.5556,
+        "judge": 1.0,
+        "er_star": 0.0761,
+        "reach": 1.2289,
+        "judged": true
       },
-      "total_score": 0.5875,
-      "reason": "Embedding similarity 0.21. Tier: mega; audience fit: high."
+      "quality": 0.8263,
+      "final": 0.6624,
+      "flags": [],
+      "reason": "Matched brief topics: แว่นกันแสงสีฟ้า, แว่นเกมมิ่ง, เกมเมอร์. Audience cues: gaming, eyewear.",
+      "evidence_urls": [
+        "https://www.tiktok.com/@fpscoach.oat/video/7326318781316695081",
+        "https://www.tiktok.com/@fpscoach.oat/video/7386802432291829589"
+      ],
+      "profile_url": "https://www.tiktok.com/@fpscoach.oat"
     }
   ],
   "created_at": "2026-10-27T06:17:33.008856+00:00",
   "updated_at": "2026-10-27T06:17:33.057882+00:00"
 }
 ```
+
+`rejected` counts hard-filter drops by reason. `cost_log` has one line per paid
+stage. `flags` can contain `mentions_brand`, `mentions_competitor`,
+`competitor_sponsored`, `low_reach`, `activity_unknown`, `search_stats_only`,
+and `risky_content`.
 
 ### Stream progress
 
@@ -204,6 +258,14 @@ embeddings, and the LLM mocked:
   `Accept`, `Accept-Language`, and `Accept-Encoding` headers and HTTP/2, because
   some storefronts answer 200 to curl and 429 to a bare
   HTTP/1.1 client.
+- Login walls and unavailable-content pages are rejected as failed reads, so
+  they are never used as website content or cached. A cached entry with blocked
+  content is treated as a miss.
+- **Direct-fetch guard.** The direct fetch refuses hosts that resolve to
+  loopback, private, link-local, multicast, or other non-public addresses.
+  `WEB_FETCH_ALLOW_PROXY_RANGE` (`1` or `true`) additionally allows exactly
+  198.18.0.0/15, the fake-IP range some sandbox DNS servers return. It is off by
+  default because it weakens the private-address guard.
 - Successful pages are cached as JSON under `data/cache/web` for 7 days. The cache
   key is the SHA-256 of the normalized URL. Set `KOL_CACHE_DIR` to move the cache
   root (`$KOL_CACHE_DIR/web`). A cache hit skips the network.
@@ -240,9 +302,12 @@ before the pipeline starts.
 - **Fallback.** When the profile run fails or returns no usable item, the page
   URL is read with the live web reader (Jina, then trafilatura, with its own
   cache), even without `--live-web`. The page name comes from the URL, the title
-  from the first heading, and the intro from the page text. If that also
+  from the first heading, and the intro from the page text. Login walls and
+  unavailable-content pages are rejected rather than accepted. If that also
   fails, `scrape_facebook` records a warning and brand analysis runs on the
-  website alone. When only the posts run fails, the page is kept with no posts.
+  website alone. When the fallback succeeds after an Apify item error, the page
+  keeps a warning naming that error. When only the posts run fails, the page is
+  kept with no posts.
 - **Cache.** Complete Apify results are stored as JSON under
   `data/cache/facebook` for 7 days. The key is the SHA-256 of the normalized
   URL. Set `KOL_CACHE_DIR` to move the root (`$KOL_CACHE_DIR/facebook`). A hit
@@ -261,9 +326,10 @@ uv run python -m app.cli match \
 ### TikTok KOL search (Apify)
 
 The default run uses the offline KOL fixtures and does not call Apify.
-`--live-kols` searches TikTok and enriches Thai creators through Apify (at most
-`--max-enrich`, default 10, largest accounts first, one paid run each).
-Combine it with `--live-web` when both the site and the creator data should be live.
+`--live-kols` searches TikTok and enriches the first-pass leaders through Apify
+(one paid run each, up to `--max-enrich`, which overrides
+`MatchingConfig.enrich_top_n`, default 20). Combine it with
+`--live-web` when both the site and the creator data should be live.
 
 `APIFY_TOKEN` is read from the environment and sent only as an `Authorization`
 header. It is not written to logs or error messages. If it is missing, the CLI
@@ -276,17 +342,19 @@ exits with code 2 before the pipeline starts.
   with `authorMeta`. Authors are deduped. Rows without a handle, and actor
   `errorCode` items, are skipped and recorded by `discover_kols`.
 - **Enrichment** uses [clockworks/tiktok-profile-scraper](https://apify.com/clockworks/tiktok-profile-scraper)
-  to fetch recent videos for one profile. The engagement rate for a video is
-  `(likes + comments + shares) / views` (`diggCount`, `commentCount`,
-  `shareCount`, `playCount`). When `playCount` is missing or zero, that video
-  uses the same numerator divided by the profile's follower count. The stored
-  value is the median of those rates, capped to the range 0–1.
-  `posts_per_week` is `(n - 1) / weeks` between the oldest and newest non-pinned
-  video in the sample. `content_summary` is a short line of captions and hashtags.
-- **Cost controls.** `--max-results-per-query` (default 10) caps videos per
-  search query and videos fetched per profile. `--max-enrich` (default 10)
-  caps how many profiles are enriched. Video, cover, subtitle, and avatar
-  downloads stay off, and comment scraping stays at zero. Each run sets
+  to fetch recent videos for one profile. Each video keeps its views, likes,
+  comments, shares, date, caption, and URL, and the profile is marked
+  `stats_source: "profile"`. The scorer computes
+  `(likes + comments + shares) / views` per video and takes the median; the
+  profile itself does not store a pre-computed rate. `posts_per_week` is
+  `(n - 1) / weeks` between the oldest and newest non-pinned video in the
+  sample. `content_summary` is a short line of captions and hashtags.
+- **Cost controls.** `--max-results-per-query` overrides
+  `TIKTOK_RESULTS_PER_QUERY` (default 15) for search only; profile enrichment
+  always uses `TIKTOK_PROFILE_VIDEOS` (default 10). `--max-enrich` overrides
+  `MatchingConfig.enrich_top_n` (default 20), which caps how many first-pass
+  leaders are enriched. Video, cover, subtitle, and
+  avatar downloads stay off, and comment scraping stays at zero. Each run sets
   `maxItems`, `limit`, and `maxTotalChargeUsd` (default $0.50) on the sync
   endpoint. Transport errors and HTTP 429/5xx are retried once. Timeouts and
   HTTP 408 are not retried, because the paid run may already be in progress.
@@ -298,7 +366,7 @@ exits with code 2 before the pipeline starts.
   so spend is estimated from the items returned plus a small per-run amount.
   The budget is soft: the run that crosses it finishes, then later calls are
   skipped and recorded as warnings instead of failing the job. Cache hits do
-  not call Apify and cost nothing.
+  not call Apify. TikTok search is not cached, so every query is a paid run.
 - **Cache.** Enrichment results are stored as JSON under `data/cache/apify` for
   7 days. Set `KOL_CACHE_DIR` to move the root (`$KOL_CACHE_DIR/apify`). A hit
   does not call Apify.
@@ -311,7 +379,7 @@ uv run python -m app.cli match \
   --top-k 5 \
   --live-kols \
   --max-results-per-query 5 \
-  --max-enrich 10
+  --max-enrich 20
 ```
 
 `backend/scripts/apify_smoke.py` runs one search query with a maximum of 5
@@ -325,8 +393,8 @@ uv run python scripts/apify_smoke.py "รีวิวแว่นตา"
 ### LLM
 
 The default run uses the offline brand analyzer and does not call a model.
-`--live-llm` sends brand analysis, TikTok query generation, and relevance
-reranking to an OpenAI-compatible chat completions API. Facebook scraping
+`--live-llm` sends brand analysis, TikTok query generation, and creator judging
+to an OpenAI-compatible chat completions API. Facebook scraping
 stays mocked unless `--live-fb` is set. Embeddings stay on the offline mock unless `--live-embed` is
 set. Combine the flag with `--live-web` and `--live-kols`
 when those sources should be live too. Switching providers is configuration
@@ -337,17 +405,16 @@ only: set `LLM_BASE_URL`, `LLM_MODEL`, and a key.
 | `LLM_BASE_URL` | `https://integrate.api.nvidia.com/v1` | API root, including the `/v1` prefix |
 | `LLM_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Chat model id |
 | `LLM_API_KEY` | unset | Bearer token. If empty, `NVIDIA_API_KEY` is used, then `OPENAI_API_KEY` |
-| `LLM_TIMEOUT` | `120` | Request timeout in seconds |
+| `LLM_TIMEOUT` | `60` | Request timeout in seconds |
 | `LLM_MAX_TOKENS` | `4096` | Completion token budget, shared with any reasoning trace |
 | `LLM_TEMPERATURE` | `0.2` | Sampling temperature |
-| `LLM_RERANK_BATCH_SIZE` | `5` | Creators scored per rerank request |
 | `LLM_DISABLE_REASONING` | `extra_body` for the default endpoint and model, otherwise `off` | Provider-specific reasoning control, below |
 | `LLM_NO_THINK_MESSAGE` | `/no_think` | System message used when reasoning control is `system` or `both` |
 
 The default model is a reasoning model. A short prompt can take tens of seconds
 and spend most of its completion tokens on `reasoning_content`. With a small
 `max_tokens`, `content` comes back null. The client defaults are sized for
-that: 4096 completion tokens and a 120 second timeout. Empty or missing
+that: 4096 completion tokens and a 60 second timeout. Empty or missing
 `content` is retried once.
 
 `LLM_DISABLE_REASONING` picks how thinking is turned off. When it is unset, the
@@ -374,11 +441,14 @@ retried once with the error in the next prompt. A second failure raises. The
 graph records that on `errors`, sets `stage` to `failed`, and stops, the same
 way other node failures do.
 
-The model returns relevance from 0 to 1 and a short Thai or English reason.
-Engagement, audience fit, and tier fit stay on the existing heuristics. The
-total still uses the weights 0.4, 0.25, 0.2, and 0.15, with relevance as the
-0.4 term. Query generation returns only the new queries for that round, so the
-discovery loop and `last_queries` keep working. Rerank requests are batched.
+The model returns three things for each creator: `judge` (0–1), `audience`
+(0–1), and `audience_confidence` (0–1), plus `risky` and a short reason. The
+judge rubric covers category match, tone match, and no risky content. Audience
+is inferred from text, captions, and bio only, never from faces. Only the top
+15 candidates by first-pass score are sent, in one request. The returned
+values replace the `judge = sim` placeholder and the neutral `A_eff = 0.5`,
+and the final ranking is recomputed. Query generation returns only the new
+queries for that round, so the discovery loop and `last_queries` keep working.
 
 The API key is not written to logs. It is stripped from error text.
 
@@ -429,12 +499,12 @@ uv run python -m app.cli match \
 | `EMBED_DIM` | `768` | Matryoshka size passed as `truncate_dim` (`768`, `512`, `256`, or `128`) |
 | `EMBED_DTYPE` | `float32` | `float32` or `bfloat16` |
 | `EMBED_BATCH_SIZE` | `32` | texts encoded per call |
-| `PREFILTER_LIMIT` | `25` | candidates kept after cosine ranking, before rerank |
 | `KOL_CACHE_DIR` | `data/cache` | cache root; embeddings are `$KOL_CACHE_DIR/embeddings` |
 | `HF_TOKEN` | unset | optional download token |
 
-The brand text (category, products, audience, keywords, hashtags) is the
-query. Each creator (nickname, bio, caption summary, hashtags) is a document.
+The brand text (category, key products, target audience, topic keywords, and
+competitors) is the query. Each creator (nickname, bio, caption summary, and
+hashtags found in them) is a document.
 Queries use the `SearchQuery` prompt (`task: search result | query: `).
 Documents use the `Document` prompt (`title: none | text: `). If those prompts
 are not on the model, a document is formatted as
@@ -444,14 +514,11 @@ Similarity is cosine on L2-normalized vectors. `EMBED_DIM` truncates the
 vector. The context window is 8192 tokens. Dtype is float32 or bfloat16, not
 float16.
 
-`--prefilter-limit` (or `PREFILTER_LIMIT`) sets how many creators go to the
-reranker. The default is 25. If `--top-k` is larger, the width is raised to
-`--top-k`, so a larger shortlist is not silently cut.
-
-The offline reranker uses that cosine as the relevance score. The live
-reranker still scores relevance itself and sees the cosine as
-`embedding_similarity`. Engagement, audience fit, and tier fit are unchanged.
-The total still uses the weights 0.4, 0.25, 0.2, and 0.15.
+The brand-to-creator cosine is converted to a percentile within the candidate
+pool and becomes the `sim` term of F. Before the judge stage that percentile
+also stands in for `judge`. MMR uses document-to-document cosine to keep
+near-duplicates out of the final list. Engagement, tier fit, and audience fit
+do not use embeddings.
 
 Vectors are cached as JSON under `data/cache/embeddings`. The file name is the
 SHA-256 of the model, the prompt prefix, the text, and the dimension. Writes

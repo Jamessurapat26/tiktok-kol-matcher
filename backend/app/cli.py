@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import sys
+from dataclasses import replace
 from typing import Any
 
 from langgraph.errors import GraphRecursionError
@@ -11,7 +12,6 @@ from pydantic import ValidationError
 from .graph import (
     MAX_SEARCH_ROUNDS,
     MIN_CANDIDATES,
-    PREFILTER_N,
     build_graph,
     initial_state,
 )
@@ -19,14 +19,16 @@ from .integrations import build_integrations
 from .integrations.apify import ApifyConfigError, DiscoveryLimits
 from .integrations.embeddings import EmbedConfigError
 from .integrations.llm_live import LlmConfigError, llm_api_key_from_env
-from .models import MatchRequest, RankedKol
+from .matching_config import DEFAULT_CONFIG
+from .models import BrandProfile, MatchRequest, RankedKol
 
-_LIST_FIELDS = ("discovered", "candidates", "shortlisted", "ranked", "results")
+_LIST_FIELDS = ("discovered", "candidates", "ranked", "results")
 _ADDITIVE_FIELDS = {"discovered"}
+_MAX_EVIDENCE_LINES = 3
 
 _TABLE_ROW = (
-    "{rank:>4}  {handle:<24} {followers:>11} {er:>7} {relevance:>9} "
-    "{engagement:>10} {audience:>8} {tier:<6} {total:>6}  {reason}"
+    "{rank:>4}  {handle:<22} {followers:>11} {final:>6} {fit:>6} {eng:>6} "
+    "{tier:>6} {aud:>6} {conf:<17} {flags:<28} {profile}"
 )
 
 
@@ -111,17 +113,18 @@ def _build_parser() -> argparse.ArgumentParser:
     match.add_argument(
         "--max-enrich",
         type=int,
-        default=10,
+        default=None,
         help=(
-            "with --live-kols, enrich at most this many candidates (largest "
-            "accounts first); each one is a paid Apify run (default: 10)"
+            "override how many first-pass leaders to enrich; each one is a "
+            "paid Apify run when live KOLs are enabled "
+            f"(default: MatchingConfig.enrich_top_n or {DEFAULT_CONFIG.enrich_top_n})"
         ),
     )
     match.add_argument(
         "--live-llm",
         action="store_true",
         help=(
-            "run brand analysis, query generation, and reranking through an "
+            "run brand analysis, query generation, and judging through an "
             "OpenAI-compatible chat API (LLM_API_KEY, NVIDIA_API_KEY, or "
             "OPENAI_API_KEY; default stays on the offline mock)"
         ),
@@ -134,16 +137,6 @@ def _build_parser() -> argparse.ArgumentParser:
             "(EMBED_MODEL, default google/embeddinggemma-2; EMBED_DEVICE, "
             "default cpu; EMBED_DIM, default 768). Requires the embed extra. "
             "The default stays on the offline mock"
-        ),
-    )
-    match.add_argument(
-        "--prefilter-limit",
-        type=int,
-        default=None,
-        help=(
-            "candidates kept after cosine ranking, before rerank "
-            f"(default: {PREFILTER_N}, or PREFILTER_LIMIT). "
-            "Raised to --top-k when that is larger"
         ),
     )
     return parser
@@ -191,6 +184,12 @@ def summarize_update(
         parts.append(f"facebook={name}" if name else "facebook=ok")
     if "brand_profile" in update:
         parts.append("brand=profile")
+    if "brand_sources" in update:
+        sources = [
+            str(source).replace(": ", " ")
+            for source in update["brand_sources"] or []
+        ]
+        parts.append(f"sources: {', '.join(sources)}")
 
     errors = update.get("errors") or []
     if errors:
@@ -200,7 +199,17 @@ def summarize_update(
         stage = update.get("stage")
         parts.append(f"stage={stage}" if stage else "ok")
 
-    return " ".join(parts)
+    summary = " ".join(parts)
+    if errors and any(
+        key not in {"errors", "stage", "cost_log"} for key in update
+    ):
+        warning = str(errors[-1])
+        if node and warning.startswith(f"{node}: "):
+            warning = warning[len(f"{node}: "):]
+        if warning.startswith("warning: "):
+            warning = warning[len("warning: "):]
+        summary += f"; warning: {warning}"
+    return summary
 
 
 def _run_pipeline(
@@ -250,62 +259,88 @@ def _run_pipeline(
     return final_state
 
 
-def _follower_tier(followers: int) -> str:
-    if followers >= 1_000_000:
-        return "mega"
-    if followers >= 100_000:
-        return "macro"
-    if followers >= 10_000:
-        return "micro"
-    return "nano"
-
-
 def _truncate(text: str, limit: int = 50) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3].rstrip() + "..."
 
 
-def _print_table(results: list[RankedKol]) -> None:
+def _brief_line(brief: BrandProfile | None) -> str:
+    if brief is None:
+        return "brief: unavailable"
+    return (
+        f"brief: tier={brief.tier_label} target={brief.target_followers} "
+        f"conf={brief.tier_confidence:.2f} — {brief.tier_reason}"
+    )
+
+
+def _confidence_text(item: RankedKol) -> str:
+    scores = item.scores
+    return (
+        f"{scores.F_conf:.1f}/{scores.E_conf:.1f}/"
+        f"{scores.T_conf:.1f}/{scores.A_conf:.1f}"
+    )
+
+
+def _print_table(
+    results: list[RankedKol],
+    brief: BrandProfile | None,
+) -> None:
+    print(_brief_line(brief))
     print(
         _TABLE_ROW.format(
             rank="rank",
             handle="handle",
             followers="followers",
-            er="ER %",
-            relevance="relevance",
-            engagement="engagement",
-            audience="audience",
-            tier="tier",
-            total="total",
-            reason="reason",
+            final="final",
+            fit="F",
+            eng="E",
+            tier="T",
+            aud="A_eff",
+            conf="conf F/E/T/A",
+            flags="flags",
+            profile="profile_url",
         )
     )
-    print("-" * 132)
+    print("-" * 170)
 
     for rank, item in enumerate(results, start=1):
         kol = item.kol
-        engagement_rate = (kol.median_engagement_rate or 0.0) * 100
         print(
             _TABLE_ROW.format(
                 rank=rank,
-                handle=_truncate(kol.handle, 24),
+                handle=_truncate(kol.handle, 22),
                 followers=f"{kol.followers:,}",
-                er=f"{engagement_rate:.2f}%",
-                relevance=f"{item.scores.relevance:.2f}",
-                engagement=f"{item.scores.engagement:.2f}",
-                audience=f"{item.scores.audience_fit:.2f}",
-                tier=_follower_tier(kol.followers),
-                total=f"{item.total_score:.3f}",
-                reason=_truncate(item.reason),
+                final=f"{item.final:.3f}",
+                fit=f"{item.scores.F:.2f}",
+                eng=f"{item.scores.E:.2f}",
+                tier=f"{item.scores.T:.2f}",
+                aud=f"{item.scores.A_eff:.2f}",
+                conf=_confidence_text(item),
+                flags=_truncate(",".join(item.flags) or "-", 28),
+                profile=item.profile_url,
             )
         )
 
     if not results:
         print("No results.")
+        return
+
+    print()
+    for rank, item in enumerate(results, start=1):
+        print(f"  {rank}. {item.reason}")
+        for url in item.evidence_urls[:_MAX_EVIDENCE_LINES]:
+            print(f"     {url}")
+
+
+def _result_payload(item: RankedKol) -> dict[str, Any]:
+    return item.model_dump(mode="json")
 
 
 def _json_payload(final_state: dict[str, Any]) -> dict[str, Any]:
+    brief = final_state.get("brand_profile")
+    if isinstance(brief, BrandProfile):
+        brief = brief.model_dump(mode="json")
     return {
         "stage": final_state.get("stage", "failed"),
         "search_rounds": final_state.get("search_rounds", 0),
@@ -313,33 +348,36 @@ def _json_payload(final_state: dict[str, Any]) -> dict[str, Any]:
         "counts": {
             "discovered": len(final_state.get("discovered") or []),
             "candidates": len(final_state.get("candidates") or []),
-            "shortlisted": len(final_state.get("shortlisted") or []),
             "ranked": len(final_state.get("ranked") or []),
+            "results": len(final_state.get("results") or []),
         },
+        "brief": brief,
+        "rejected": final_state.get("rejected") or {},
         "results": [
-            result.model_dump(mode="json")
+            _result_payload(result)
             for result in final_state.get("results") or []
         ],
+        "cost_log": final_state.get("cost_log") or [],
         "errors": final_state.get("errors") or [],
     }
 
 
-def _resolve_prefilter_limit(args: argparse.Namespace) -> int:
-    """CLI flag wins, then ``PREFILTER_LIMIT``, then the graph default."""
-    if args.prefilter_limit is not None:
-        if args.prefilter_limit < 1:
-            raise ValueError("--prefilter-limit must be at least 1")
-        return args.prefilter_limit
-    raw = os.environ.get("PREFILTER_LIMIT", "").strip()
-    if not raw:
-        return PREFILTER_N
-    try:
-        value = int(raw, 10)
-    except ValueError:
-        raise ValueError("PREFILTER_LIMIT must be an integer") from None
-    if value < 1:
-        raise ValueError("PREFILTER_LIMIT must be at least 1")
-    return value
+def _print_rejected(rejected: dict[str, int]) -> None:
+    if rejected:
+        counts = ", ".join(
+            f"{reason}={count}" for reason, count in sorted(rejected.items())
+        )
+    else:
+        counts = "(none)"
+    print(f"rejected: {counts}")
+
+
+def _print_cost_log(lines: list[str]) -> None:
+    print("cost log:")
+    for line in lines:
+        print(f"  {line}")
+    if not lines:
+        print("  (none)")
 
 
 def _cmd_match(args: argparse.Namespace) -> int:
@@ -370,13 +408,8 @@ def _cmd_match(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    if args.max_enrich < 1:
+    if args.max_enrich is not None and args.max_enrich < 1:
         print("error: --max-enrich must be at least 1", file=sys.stderr)
-        return 2
-    try:
-        prefilter_limit = _resolve_prefilter_limit(args)
-    except ValueError as exc:
-        print(f"error: {exc}", file=sys.stderr)
         return 2
     if args.live_kols and not os.environ.get("APIFY_TOKEN", "").strip():
         print(
@@ -419,10 +452,12 @@ def _cmd_match(args: argparse.Namespace) -> int:
     graph_kwargs: dict[str, Any] = {
         "min_candidates": min_candidates,
         "max_search_rounds": max_rounds,
-        "prefilter_n": prefilter_limit,
     }
-    if args.live_kols:
-        graph_kwargs["enrich_limit"] = args.max_enrich
+    if args.max_enrich is not None:
+        graph_kwargs["cfg"] = replace(
+            DEFAULT_CONFIG,
+            enrich_top_n=args.max_enrich,
+        )
     # Default stays on build_graph's mocked bundle so the CLI never opens a
     # socket or loads a model unless a live flag is set.
     if args.live_web or args.live_kols or args.live_llm or args.live_embed or args.live_fb:
@@ -460,7 +495,12 @@ def _cmd_match(args: argparse.Namespace) -> int:
             )
         )
     else:
-        _print_table(final_state.get("results") or [])
+        _print_table(
+            final_state.get("results") or [],
+            final_state.get("brand_profile"),
+        )
+        _print_rejected(final_state.get("rejected") or {})
+        _print_cost_log(final_state.get("cost_log") or [])
 
     # Warnings stay in the JSON body. Failures also go to stderr, and the
     # human table always lists them.

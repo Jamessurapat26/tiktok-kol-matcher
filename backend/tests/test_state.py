@@ -1,8 +1,8 @@
-import pytest
-from langgraph.graph import END, START, StateGraph
-from pydantic import ValidationError
+from datetime import UTC, datetime, timedelta
 
-from app.models import KolProfile, MatchRequest, MatchWeights, ScoreBreakdown
+from langgraph.graph import END, START, StateGraph
+
+from app.models import KolProfile, MatchRequest, VideoStats
 from app.state import MatchState, merge_kols
 
 
@@ -89,7 +89,6 @@ def test_merge_kols_fills_missing_fields_from_lower_priority():
         nickname="Nick",
         region="TH",
         content_summary="seed topics",
-        median_engagement_rate=0.05,
     )
     apify = make_kol("Creator", "apify", followers=300)
 
@@ -105,7 +104,6 @@ def test_merge_kols_fills_missing_fields_from_lower_priority():
     assert winner.nickname == "Nick"
     assert winner.region == "TH"
     assert winner.content_summary == "seed topics"
-    assert winner.median_engagement_rate == 0.05
 
 
 def test_merge_kols_fills_when_the_lower_priority_row_arrives_later():
@@ -175,6 +173,72 @@ def test_merge_kols_fills_missing_fields_from_dict_rows():
     assert merged[0].bio == "hello"
 
 
+def test_merge_kols_returns_the_union_of_videos_newest_first():
+    def video(suffix: str, days: int | None) -> VideoStats:
+        posted_at = None if days is None else datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=days)
+        return VideoStats(
+            url=f"https://www.tiktok.com/@creator/video/{suffix}",
+            views=100,
+            likes=10,
+            comments=1,
+            shares=1,
+            posted_at=posted_at,
+            caption=f"video {suffix}",
+        )
+
+    older = make_kol(
+        "creator",
+        "cache",
+        videos=[video("shared", 2), video("old", 3), video("shared", 2)],
+    )
+    newer = make_kol(
+        "CREATOR",
+        "apify",
+        videos=[video("middle", 1), video("newest", 5), video("undated", None)],
+    )
+
+    winner = merge_kols([older], [newer])[0]
+
+    assert winner.source == "apify"
+    assert [item.url.rsplit("/", 1)[-1] for item in winner.videos] == [
+        "newest",
+        "old",
+        "shared",
+        "middle",
+        "undated",
+    ]
+
+
+def test_merge_kols_unions_videos_for_equal_priority_rows():
+    first = make_kol(
+        "creator",
+        "seed",
+        followers=1,
+        videos=[
+            VideoStats(
+                url="https://www.tiktok.com/@creator/video/1",
+                posted_at=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+        ],
+    )
+    later = make_kol(
+        "Creator",
+        "seed",
+        followers=2,
+        videos=[
+            VideoStats(
+                url="https://www.tiktok.com/@creator/video/2",
+                posted_at=datetime(2026, 1, 2, tzinfo=UTC),
+            )
+        ],
+    )
+
+    winner = merge_kols([first], [later])[0]
+
+    assert winner.followers == 1
+    assert [item.url.rsplit("/", 1)[-1] for item in winner.videos] == ["2", "1"]
+
+
 def test_handle_strips_at_sign_and_preserves_case():
     foo = KolProfile(
         handle="@Foo",
@@ -210,87 +274,6 @@ def test_handle_strips_at_sign_and_preserves_case():
     assert [kol.handle for kol in merged] == ["Foo", "Bar"]
 
 
-def test_match_weights_normalize_to_one():
-    weights = MatchWeights(relevance=4, engagement=2, audience=2, tier=2)
-
-    assert weights.relevance == pytest.approx(0.4)
-    assert weights.engagement == pytest.approx(0.2)
-    assert weights.audience == pytest.approx(0.2)
-    assert weights.tier == pytest.approx(0.2)
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-
-
-@pytest.mark.parametrize("field", ["relevance", "engagement", "audience", "tier"])
-def test_match_weights_reject_negative(field):
-    values = {"relevance": 1.0, "engagement": 1.0, "audience": 1.0, "tier": 1.0}
-    values[field] = -0.1
-
-    with pytest.raises(ValidationError):
-        MatchWeights(**values)
-
-
-def test_match_weights_reject_all_zero():
-    with pytest.raises(ValidationError, match="must not all be zero"):
-        MatchWeights(relevance=0, engagement=0, audience=0, tier=0)
-
-
-def test_match_weights_defaults_fill_and_apply():
-    weights = MatchWeights()
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-
-    request = make_request()
-    assert sum(request.weights.model_dump().values()) == pytest.approx(1.0)
-
-    scores = ScoreBreakdown(
-        relevance=1,
-        engagement=1,
-        audience_fit=1,
-        tier_fit=1,
-        audience_confidence="high",
-    )
-    assert request.weights.apply(scores) == pytest.approx(1.0)
-
-
-def test_match_weights_missing_fields_get_defaults_before_normalizing():
-    weights = MatchWeights(relevance=1)
-
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-    assert weights.engagement == pytest.approx(0.25 / 1.6)
-    assert weights.audience == pytest.approx(0.2 / 1.6)
-    assert weights.tier == pytest.approx(0.15 / 1.6)
-
-
-def test_match_weights_assignment_raises():
-    weights = MatchWeights()
-
-    with pytest.raises(ValidationError):
-        weights.relevance = 1.0
-
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-
-
-def test_match_weights_model_copy_revalidates_update():
-    weights = MatchWeights()
-
-    copied = weights.model_copy(update={"relevance": 9})
-
-    assert copied is not weights
-    assert sum(copied.model_dump().values()) == pytest.approx(1.0)
-    assert copied.relevance == pytest.approx(9 / 9.6)
-
-
-def test_match_weights_model_validate_normalizes():
-    weights = MatchWeights.model_validate(
-        {"relevance": 4, "engagement": 2, "audience": 2, "tier": 2}
-    )
-
-    assert weights.relevance == pytest.approx(0.4)
-    assert weights.engagement == pytest.approx(0.2)
-    assert weights.audience == pytest.approx(0.2)
-    assert weights.tier == pytest.approx(0.2)
-    assert sum(weights.model_dump().values()) == pytest.approx(1.0)
-
-
 def test_graph_loop_accumulates_discovered_and_filter_can_shrink():
     def discover(state: MatchState) -> dict:
         round_no = state.search_rounds + 1
@@ -311,19 +294,19 @@ def test_graph_loop_accumulates_discovered_and_filter_can_shrink():
             "errors": [f"discover round {round_no}"],
         }
 
-    def filter_thai(state: MatchState) -> dict:
+    def hard_filter(state: MatchState) -> dict:
         kept = [kol for kol in state.discovered if kol.followers >= 500]
-        return {"candidates": kept, "errors": ["filter_thai"]}
+        return {"candidates": kept, "errors": ["hard_filter"]}
 
     def next_node(state: MatchState) -> str:
-        return "discover" if state.search_rounds < 2 else "filter_thai"
+        return "discover" if state.search_rounds < 2 else "hard_filter"
 
     graph = StateGraph(MatchState)
     graph.add_node("discover", discover)
-    graph.add_node("filter_thai", filter_thai)
+    graph.add_node("hard_filter", hard_filter)
     graph.add_edge(START, "discover")
-    graph.add_conditional_edges("discover", next_node, ["discover", "filter_thai"])
-    graph.add_edge("filter_thai", END)
+    graph.add_conditional_edges("discover", next_node, ["discover", "hard_filter"])
+    graph.add_edge("hard_filter", END)
 
     result = graph.compile().invoke({"request": make_request()})
 
@@ -341,7 +324,7 @@ def test_graph_loop_accumulates_discovered_and_filter_can_shrink():
     assert result["errors"] == [
         "discover round 1",
         "discover round 2",
-        "filter_thai",
+        "hard_filter",
     ]
 
 

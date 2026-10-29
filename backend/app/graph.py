@@ -1,6 +1,7 @@
 from langgraph.graph import END, START, StateGraph
 
 from .integrations import Integrations, mock_integrations
+from .matching_config import DEFAULT_CONFIG, MatchingConfig
 from .models import MatchRequest
 from .nodes import make_nodes
 from .state import MatchState
@@ -8,7 +9,6 @@ from .state import MatchState
 # Discovery keeps searching until this many Thai creators are found.
 MIN_CANDIDATES = 30
 MAX_SEARCH_ROUNDS = 3
-PREFILTER_N = 25
 
 _NODE_ORDER = (
     "scrape_website",
@@ -16,10 +16,10 @@ _NODE_ORDER = (
     "analyze_brand",
     "generate_queries",
     "discover_kols",
-    "filter_thai",
+    "hard_filter",
+    "first_pass_rank",
     "enrich_kols",
-    "embed_and_prefilter",
-    "llm_rerank",
+    "judge_and_rank",
     "rank_and_output",
 )
 
@@ -47,19 +47,15 @@ def build_graph(
     *,
     min_candidates: int = MIN_CANDIDATES,
     max_search_rounds: int = MAX_SEARCH_ROUNDS,
-    prefilter_n: int = PREFILTER_N,
-    enrich_limit: int | None = None,
+    cfg: MatchingConfig = DEFAULT_CONFIG,
 ):
-    """Build and compile the mock KOL-matching graph."""
-    if prefilter_n < 1:
-        raise ValueError("prefilter_n must be at least 1")
+    """Build and compile the KOL-matching graph."""
     integrations = integrations or mock_integrations()
     nodes = make_nodes(
         integrations,
         min_candidates=min_candidates,
         max_search_rounds=max_search_rounds,
-        prefilter_n=prefilter_n,
-        enrich_limit=enrich_limit,
+        cfg=cfg,
     )
 
     graph = StateGraph(MatchState)
@@ -88,14 +84,14 @@ def build_graph(
         nodes["route_after_discover"],
         {
             "generate_queries": "generate_queries",
-            "filter_thai": "filter_thai",
+            "hard_filter": "hard_filter",
             END: END,
         },
     )
-    _edge("filter_thai", "enrich_kols")
-    _edge("enrich_kols", "embed_and_prefilter")
-    _edge("embed_and_prefilter", "llm_rerank")
-    _edge("llm_rerank", "rank_and_output")
+    _edge("hard_filter", "first_pass_rank")
+    _edge("first_pass_rank", "enrich_kols")
+    _edge("enrich_kols", "judge_and_rank")
+    _edge("judge_and_rank", "rank_and_output")
     graph.add_edge("rank_and_output", END)
 
     return graph.compile()

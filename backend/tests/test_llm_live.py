@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import subprocess
 import sys
 from dataclasses import replace
@@ -28,13 +27,12 @@ from app.integrations import build_integrations, mock_integrations
 from app.integrations.embeddings import MockEmbedder
 from app.integrations.facebook import MockFacebookScraper
 from app.integrations.kol_search import MockKolSearch
-from app.integrations.llm import MockBrandAnalyzer, heuristic_score
+from app.integrations.llm import MockBrandAnalyzer
 from app.integrations.llm_live import (
     DEFAULT_BASE_URL,
     DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
-    DEFAULT_RERANK_BATCH_SIZE,
     DEFAULT_RETRY_BACKOFF,
     DEFAULT_TEMPERATURE,
     DEFAULT_TIMEOUT,
@@ -54,8 +52,6 @@ from app.models import (
     FacebookPage,
     KolProfile,
     MatchRequest,
-    MatchWeights,
-    TargetAudience,
 )
 from app.nodes import make_nodes
 from app.state import MatchState
@@ -75,26 +71,27 @@ _KEY_ENVS = (
     "LLM_TEMPERATURE",
     "LLM_DISABLE_REASONING",
     "LLM_NO_THINK_MESSAGE",
-    "LLM_RERANK_BATCH_SIZE",
 )
 
 _BRAND_JSON = {
     "category": "blue-light glasses",
-    "products": ["blue-light glasses"],
+    "key_products": ["blue-light glasses"],
+    "price_tier": "mid",
     "target_audience": {
-        "age_min": 18,
-        "age_max": 30,
         "gender": "any",
+        "age_range": "18-30",
         "interests": ["gaming"],
-        "location": "Thailand",
     },
     "tone": "friendly",
-    "content_style": "short reviews",
-    "keywords_th": ["แว่น"],
-    "keywords_en": ["blue light glasses"],
-    "hashtags": ["#glasses"],
-    "preferred_tiers": ["micro"],
-    "reasoning": "The site sells glasses.",
+    "topic_keywords_th": ["แว่น"],
+    "topic_keywords_en": ["blue light glasses"],
+    "competitors": ["OtherLens"],
+    "brand_handles": ["@ExampleBrand"],
+    "brand_names": ["ExampleBrand"],
+    "target_followers": 30_000,
+    "tier_label": "micro",
+    "tier_confidence": 0.7,
+    "tier_reason": "A small online shop.",
 }
 
 
@@ -145,7 +142,6 @@ def _analyzer(handler, **overrides) -> LiveBrandAnalyzer:
         temperature=overrides.get("temperature", DEFAULT_TEMPERATURE),
         reasoning=overrides.get("reasoning", "off"),
         no_think_message=overrides.get("no_think_message", "/no_think"),
-        rerank_batch_size=overrides.get("rerank_batch_size", DEFAULT_RERANK_BATCH_SIZE),
     )
     http = httpx2.Client(transport=httpx2.MockTransport(handler))
     return LiveBrandAnalyzer(settings=settings, http_client=http)
@@ -175,7 +171,6 @@ def _kol(handle: str = "Alpha", **overrides) -> KolProfile:
         "bio": "reviews gadgets",
         "language": "th",
         "region": "TH",
-        "median_engagement_rate": 0.05,
         "content_summary": "topics: gaming, tech",
         "source": "apify",
     }
@@ -284,7 +279,6 @@ def test_default_settings_and_key_fallback(monkeypatch):
     assert settings.max_tokens == DEFAULT_MAX_TOKENS == 4096
     assert settings.temperature == DEFAULT_TEMPERATURE
     assert settings.reasoning == "extra_body"
-    assert settings.rerank_batch_size == 5
     assert settings.api_key == ""
 
     monkeypatch.setenv("OPENAI_API_KEY", "oa-key")
@@ -306,7 +300,6 @@ def test_settings_overrides_and_invalid_values(monkeypatch):
     monkeypatch.setenv("LLM_TIMEOUT", "30")
     monkeypatch.setenv("LLM_MAX_TOKENS", "2048")
     monkeypatch.setenv("LLM_TEMPERATURE", "0")
-    monkeypatch.setenv("LLM_RERANK_BATCH_SIZE", "3")
     monkeypatch.setenv("LLM_DISABLE_REASONING", "system")
     monkeypatch.setenv("LLM_NO_THINK_MESSAGE", "do not think")
     settings = LlmSettings.from_env()
@@ -315,7 +308,6 @@ def test_settings_overrides_and_invalid_values(monkeypatch):
     assert settings.timeout == 30
     assert settings.max_tokens == 2048
     assert settings.temperature == 0
-    assert settings.rerank_batch_size == 3
     assert settings.reasoning == "system"
     assert settings.no_think_message == "do not think"
 
@@ -397,7 +389,7 @@ def test_success_parses_fenced_json_and_sends_configured_request():
         analyzer.close()
 
     assert profile.category == "blue-light glasses"
-    assert profile.keywords_th == ["แว่น"]
+    assert profile.topic_keywords_th == ["แว่น"]
     assert len(queue.requests) == 1
     request = queue.requests[0]
     body = _body(request)
@@ -425,7 +417,7 @@ def test_none_content_is_retried_once_then_succeeds():
     finally:
         analyzer.close()
 
-    assert profile.products == ["blue-light glasses"]
+    assert profile.key_products == ["blue-light glasses"]
     assert len(queue.requests) == 2
 
 
@@ -795,6 +787,28 @@ def test_generate_queries_drops_previous_and_retries_when_all_repeat():
     assert "no new queries" in prompts[1]
 
 
+def test_generate_queries_keeps_topic_queries_for_a_short_brand_name():
+    brand = _brand().model_copy(update={"brand_names": ["Sun"], "brand_handles": ["@eve"]})
+    sent = ["กันแดด sunscreen review", "skincare everyday routine"]
+    chat = _ScriptedChat([json.dumps({"queries": sent})])
+    analyzer = LiveBrandAnalyzer(settings=LlmSettings(api_key=_KEY), chat=chat)
+
+    assert analyzer.generate_queries(brand, [], 1) == sent
+
+
+def test_generate_queries_retries_when_every_query_names_the_brand():
+    brand = _brand().model_copy(update={"brand_names": ["Lumina Eyewear"]})
+    chat = _ScriptedChat(
+        [
+            json.dumps({"queries": ["Lumina Eyewear review", "luminaeyewear แว่น"]}),
+            json.dumps({"queries": ["Lumina Eyewear รีวิว", "แว่นกรองแสง รีวิว"]}),
+        ]
+    )
+    analyzer = LiveBrandAnalyzer(settings=LlmSettings(api_key=_KEY), chat=chat)
+
+    assert analyzer.generate_queries(brand, [], 1) == ["แว่นกรองแสง รีวิว"]
+
+
 def test_generate_queries_caps_an_oversized_batch_at_the_prompt_limit():
     sent = [f"query {i}" for i in range(60)]
     chat = _ScriptedChat([json.dumps({"queries": sent})])
@@ -805,115 +819,93 @@ def test_generate_queries_caps_an_oversized_batch_at_the_prompt_limit():
     assert queries == sent[:10]
 
 
-def test_rerank_batches_and_keeps_heuristic_scores_in_the_total():
-    kols = [
-        _kol("Alpha"),
-        _kol("Beta"),
-        _kol("Gamma", followers=500, language="en", region="US"),
-    ]
-    seen: list[list[str]] = []
+def test_judge_asks_again_for_missing_handles_and_drops_unknown_ones():
+    kols = [_kol("Alpha"), _kol("Beta"), _kol("Gamma")]
+    prompts: list[str] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
-        user = _body(request)["messages"][-1]["content"]
-        handles = re.findall(r"^handle: (.+)$", user, re.M)
-        seen.append(handles)
+        prompts.append(_body(request)["messages"][-1]["content"])
         payload = {
-            "scores": [
-                {"handle": f"@{handle}", "relevance": 0.8, "reason": f"fits {handle}"}
-                for handle in handles
+            "creators": [
+                {
+                    "handle": "@Alpha",
+                    "judge": 1.4,
+                    "audience": -0.2,
+                    "audience_confidence": 0.5,
+                    "reason": "  fits the brief  ",
+                    "risky": True,
+                },
+                {
+                    "handle": "Ghost",
+                    "judge": 0.9,
+                    "audience": 0.8,
+                    "audience_confidence": 0.8,
+                    "reason": "unknown",
+                },
+                {
+                    "handle": "alpha",
+                    "judge": 0.1,
+                    "audience": 0.1,
+                    "audience_confidence": 0.1,
+                    "reason": "duplicate",
+                },
             ]
         }
         return httpx2.Response(200, json=_completion(json.dumps(payload)))
 
-    analyzer = _analyzer(handler, rerank_batch_size=2)
+    analyzer = _analyzer(handler)
     try:
-        ranked = analyzer.rerank(_brand(), kols)
-        assert analyzer.rerank(_brand(), []) == []
-        state = MatchState(
-            request=_request(),
-            brand_profile=_brand().model_copy(update={"brand_names": ["Alpha"]}),
-            shortlisted=[kols[0]],
-            stage="embedding_prefilter",
-        )
-        update = make_nodes(
-            replace(mock_integrations(), llm=analyzer),
-            min_candidates=1,
-            max_search_rounds=1,
-        )["llm_rerank"](state)
+        judgements = analyzer.judge(_brand(), kols)
+        assert analyzer.judge(_brand(), []) == []
     finally:
         analyzer.close()
 
-    assert seen[:2] == [["Alpha", "Beta"], ["Gamma"]]
-    assert [item[0].handle for item in ranked] == ["Alpha", "Beta", "Gamma"]
-    assert ranked[0][1].relevance == 0.8
-    assert ranked[0][2] == "fits Alpha"
-    heuristic, _reason = heuristic_score(_brand(), kols[0])
-    assert ranked[0][1].engagement == heuristic.engagement
-    assert ranked[0][1].audience_fit == heuristic.audience_fit
-    assert ranked[0][1].tier_fit == heuristic.tier_fit
-    assert ranked[0][1].audience_confidence == heuristic.audience_confidence
-    gamma_heuristic, _reason = heuristic_score(_brand(), kols[2])
-    assert ranked[2][1].audience_fit == gamma_heuristic.audience_fit == 0.35
-    weights = MatchWeights()
-    assert (weights.relevance, weights.engagement, weights.audience, weights.tier) == (
-        0.4,
-        0.25,
-        0.2,
-        0.15,
-    )
-    assert weights.apply(ranked[0][1]) == round(
-        0.8 * 0.4
-        + ranked[0][1].engagement * 0.25
-        + ranked[0][1].audience_fit * 0.2
-        + ranked[0][1].tier_fit * 0.15,
-        4,
-    )
-    item = update["ranked"][0]
-    assert update["stage"] == "reranking"
-    assert item.scores.relevance == 0.8
-    assert item.total_score == state.request.weights.apply(item.scores)
+    assert len(prompts) == 2
+    assert "handle: Alpha" in prompts[0]
+    assert "handle: Beta" in prompts[0]
+    assert "handle: Gamma" in prompts[0]
+    # The follow-up asks only for the creators the first reply left out.
+    assert "handle: Alpha" not in prompts[1]
+    assert "handle: Beta" in prompts[1]
+    assert "handle: Gamma" in prompts[1]
+    # Beta and Gamma stay missing, Ghost is unknown, and Alpha appears twice.
+    assert [item.handle for item in judgements] == ["Alpha"]
+    judged = judgements[0]
+    assert judged.judge == 1.0
+    assert judged.audience == 0.0
+    assert judged.audience_confidence == 0.5
+    assert judged.reason == "fits the brief"
+    assert judged.risky is True
 
 
-class _FakeEmbedder:
-    """Stand-in for a real embedder: not MockEmbedder, so its scores are evidence."""
+def test_judge_retries_once_when_the_batch_is_invalid():
+    calls = {"n": 0}
 
-    def similarity(self, query, documents, *, titles=None):
-        return [0.9] * len(documents)
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx2.Response(200, json=_completion('{"creators": []}'))
+        payload = {
+            "creators": [
+                {
+                    "handle": "Alpha",
+                    "judge": 0.5,
+                    "audience": 0.5,
+                    "audience_confidence": 0.5,
+                    "reason": "ok",
+                }
+            ]
+        }
+        return httpx2.Response(200, json=_completion(json.dumps(payload)))
 
+    analyzer = _analyzer(handler)
+    try:
+        judgements = analyzer.judge(_brand(), [_kol("Alpha")])
+    finally:
+        analyzer.close()
 
-def _live_rerank_prompt(embedder) -> str:
-    kols = [_kol("Alpha")]
-    reply = json.dumps(
-        {"scores": [{"handle": kol.handle, "relevance": 0.5, "reason": "ok"} for kol in kols]}
-    )
-    chat = _ScriptedChat([reply])
-    analyzer = LiveBrandAnalyzer(settings=LlmSettings(api_key=_KEY), chat=chat)
-    state = MatchState(
-        request=_request(),
-        brand_profile=_brand(),
-        shortlisted=kols,
-        prefilter_scores=[0.2899],
-        stage="embedding_prefilter",
-    )
-    update = make_nodes(
-        replace(mock_integrations(), llm=analyzer, embedder=embedder),
-        min_candidates=1,
-        max_search_rounds=1,
-    )["llm_rerank"](state)
-    assert update["stage"] == "reranking", update
-    return "\n".join(message["content"] for message in chat.messages[0])
-
-
-def test_live_rerank_hides_mock_embedder_scores():
-    prompt = _live_rerank_prompt(MockEmbedder())
-    assert "embedding_similarity" not in prompt
-    assert "cosine similarity" not in prompt
-
-
-def test_live_rerank_sends_real_embedder_scores():
-    prompt = _live_rerank_prompt(_FakeEmbedder())
-    assert "embedding_similarity: 0.2899" in prompt
-    assert "cosine similarity" in prompt
+    assert calls["n"] == 2
+    assert judgements[0].judge == 0.5
 
 
 def test_generate_queries_node_keeps_per_round_queries():
@@ -1133,10 +1125,10 @@ def test_smoke_script_exits_2_without_a_key(monkeypatch):
 def test_brand_list_fields_given_as_strings_are_split():
     messy = {
         **_BRAND_JSON,
-        "hashtags": "#glasses #gaming",
-        "keywords_en": "blue light glasses, gaming glasses",
-        "products": "clip-on lenses; gaming glasses\nreading glasses",
-        "preferred_tiers": "micro",
+        "competitors": "OtherLens, FocusGear",
+        "brand_handles": "@ExampleBrand, examplebrand",
+        "topic_keywords_en": "blue light glasses, gaming glasses",
+        "key_products": "clip-on lenses; gaming glasses\nreading glasses",
         "target_audience": {**_BRAND_JSON["target_audience"], "interests": "gaming, study"},
     }
     queue = _Queue([(200, _completion(json.dumps(messy)))])
@@ -1146,10 +1138,14 @@ def test_brand_list_fields_given_as_strings_are_split():
     finally:
         analyzer.close()
 
-    assert profile.hashtags == ["#glasses", "#gaming"]
-    assert profile.keywords_en == ["blue light glasses", "gaming glasses"]
-    assert profile.products == ["clip-on lenses", "gaming glasses", "reading glasses"]
-    assert profile.preferred_tiers == ["micro"]
+    assert profile.competitors == ["OtherLens", "FocusGear"]
+    assert profile.brand_handles == ["@ExampleBrand", "examplebrand"]
+    assert profile.topic_keywords_en == ["blue light glasses", "gaming glasses"]
+    assert profile.key_products == [
+        "clip-on lenses",
+        "gaming glasses",
+        "reading glasses",
+    ]
     assert profile.target_audience.interests == ["gaming", "study"]
     assert len(queue.requests) == 1
 
@@ -1157,27 +1153,25 @@ def test_brand_list_fields_given_as_strings_are_split():
 def test_analyze_brand_tidies_a_polluted_profile():
     polluted = {
         **_BRAND_JSON,
-        "products": [
+        "key_products": [
             "blue-light glasses",
             "free cotton towel from the latest giveaway post",
             "towel",
         ],
-        "keywords_th": [
+        "topic_keywords_th": [
             "แว่นตา",
             (
                 "แว่นตากันแสงสีฟ้าสำหรับเกมเมอร์ที่ต้องนั่งหน้าจอคอมพิวเตอร์"
                 "เป็นเวลานานทุกวันโดยไม่พักสายตา"
             ),
         ],
-        "keywords_en": [
+        "topic_keywords_en": [
             "blue light glasses",
             "what to look for when buying blue light glasses",
         ],
-        "hashtags": ["#Blue Light", "##Glasses", "x" * 40],
+        "competitors": ["OtherLens", "a competitor name that is far too long"],
         "target_audience": {
             **_BRAND_JSON["target_audience"],
-            "age_min": 75,
-            "age_max": 18,
             "interests": ["gaming", "too many words in one interest"],
         },
     }
@@ -1186,11 +1180,9 @@ def test_analyze_brand_tidies_a_polluted_profile():
 
     profile = analyzer.analyze_brand("A shop sells blue-light glasses.", _page())
 
-    assert profile.products == ["blue-light glasses", "towel"]
-    assert profile.keywords_th == ["แว่นตา"]
-    assert profile.keywords_en == ["blue light glasses"]
-    assert profile.hashtags == ["#BlueLight", "#Glasses"]
-    assert profile.target_audience.age_min == 18
-    assert profile.target_audience.age_max == 75
+    assert profile.key_products == ["blue-light glasses", "towel"]
+    assert profile.topic_keywords_th == ["แว่นตา"]
+    assert profile.topic_keywords_en == ["blue light glasses"]
+    assert profile.competitors == ["OtherLens"]
     assert profile.target_audience.interests == ["gaming"]
     assert len(chat.messages) == 1

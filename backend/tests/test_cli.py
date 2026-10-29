@@ -1,5 +1,6 @@
 import importlib.machinery
 import json
+import re
 import sys
 import types
 from dataclasses import replace
@@ -7,13 +8,14 @@ from dataclasses import replace
 import pytest
 from langgraph.errors import GraphRecursionError
 
-from app.cli import main
+from app.cli import main, summarize_update
 from app.graph import build_graph
 from app.integrations import mock_integrations
 from app.integrations.kol_enricher_live import ApifyKolEnricher
 from app.integrations.kol_search_live import ApifyKolSearch
 from app.integrations.web_reader import MockWebReader
 from app.integrations.web_reader_live import CachedWebReader
+from app.models import FacebookPage
 
 _WEBSITE = "https://example-brand.co.th"
 _FACEBOOK = "https://www.facebook.com/examplebrand"
@@ -23,6 +25,32 @@ def _pretend_embed_extra_installed(monkeypatch):
     module = types.ModuleType("sentence_transformers")
     module.__spec__ = importlib.machinery.ModuleSpec("sentence_transformers", None)
     monkeypatch.setitem(sys.modules, "sentence_transformers", module)
+
+
+def test_summarize_update_shows_source_warnings_and_brand_sources():
+    page = FacebookPage(
+        page_name="ExampleBrand",
+        title="ExampleBrand",
+        url="https://www.facebook.com/examplebrand",
+        source_warning="Apify page item error not_available: gone",
+    )
+    warning = summarize_update(
+        {
+            "facebook_page": page,
+            "errors": ["scrape_facebook: warning: Apify page item error not_available: gone"],
+        },
+        node="scrape_facebook",
+    )
+    assert warning.endswith("; warning: Apify page item error not_available: gone")
+
+    sources = summarize_update(
+        {
+            "brand_profile": object(),
+            "brand_sources": ["website: skipped", "facebook: used"],
+        },
+        node="analyze_brand",
+    )
+    assert "sources: website skipped, facebook used" in sources
 
 
 def test_json_output(capsys):
@@ -44,9 +72,29 @@ def test_json_output(capsys):
     assert exit_code == 0
     assert payload["stage"] == "done"
     assert len(payload["results"]) == 5
-    assert {"discovered", "candidates", "shortlisted", "ranked"} <= set(
+    assert {"discovered", "candidates", "ranked", "results"} <= set(
         payload["counts"]
     )
+    assert payload["cost_log"]
+    assert payload["brief"]["tier_reason"]
+    assert payload["brief"]["tier_label"]
+    assert payload["rejected"]
+    first = payload["results"][0]
+    assert {"final", "quality", "flags", "evidence_urls", "profile_url", "reason"} <= set(
+        first
+    )
+    assert {
+        "F",
+        "E",
+        "T",
+        "A_eff",
+        "F_conf",
+        "E_conf",
+        "T_conf",
+        "A_conf",
+    } <= set(first["scores"])
+    assert first["profile_url"].startswith("https://www.tiktok.com/@")
+    assert first["evidence_urls"]
 
 
 def test_human_output_prints_table_and_progress(capsys):
@@ -63,14 +111,26 @@ def test_human_output_prints_table_and_progress(capsys):
     captured = capsys.readouterr()
 
     assert exit_code == 0
+    assert "brief: tier=micro target=30000 conf=0.70" in captured.out
+    assert "a small Bangkok online shop" in captured.out
     assert "rank" in captured.out
+    assert "final" in captured.out
+    assert "A_eff" in captured.out
+    assert "conf F/E/T/A" in captured.out
+    assert "profile_url" in captured.out
+    assert "https://www.tiktok.com/@" in captured.out
+    assert re.search(r"https://www\.tiktok\.com/@[^/\s]+/video/\d+", captured.out)
+    assert re.search(r"\d\.\d/\d\.\d/\d\.\d/\d\.\d", captured.out)
+    assert "  1. " in captured.out
+    assert re.search(r"rejected: .+=\d+", captured.out)
+    assert "cost log:" in captured.out
+    assert "llm: analyze_brand 1 call" in captured.out
     assert "[ 1]" in captured.err
     assert "scrape_" in captured.err
     # Merged unique totals, not the raw row count from the node update.
-    assert "discovered=22 (+22 new)" in captured.err
-    assert "discovered=36 (+14 new)" in captured.err
+    assert "discovered=25 (+25 new)" in captured.err
+    assert "discovered=48 (+23 new)" in captured.err
     assert "discovered+" not in captured.err
-    assert "@" not in captured.out
 
 
 def test_invalid_url_returns_exit_code_2(capsys):
@@ -148,7 +208,7 @@ def test_search_failure_exits_1_without_traceback(monkeypatch, capsys):
     assert "Traceback" not in captured.out
 
 
-def test_website_scrape_failure_exits_1(monkeypatch, capsys):
+def test_website_scrape_failure_warns_and_uses_facebook(monkeypatch, capsys):
     class BoomReader:
         def read(self, url: str) -> str:
             raise RuntimeError("boom")
@@ -170,8 +230,9 @@ def test_website_scrape_failure_exits_1(monkeypatch, capsys):
     )
 
     captured = capsys.readouterr()
-    assert exit_code == 1
+    assert exit_code == 0
     assert "scrape_website: boom" in captured.err
+    assert "analyze_brand: missing website_content" in captured.err
     assert "Traceback" not in captured.err
     assert "Traceback" not in captured.out
 
@@ -422,7 +483,7 @@ def test_live_kols_flag_wires_apify_without_running_it(monkeypatch, capsys):
     assert isinstance(captured["integrations"].enricher, ApifyKolEnricher)
     assert captured["integrations"].kol_search.max_results == 4
     assert captured["integrations"].enricher.max_videos == 6
-    assert captured["kwargs"]["enrich_limit"] == 3
+    assert captured["kwargs"]["cfg"].enrich_top_n == 3
     assert "cli-test-token" not in captured_io.out
     assert "cli-test-token" not in captured_io.err
     assert json.loads(captured_io.out)["stage"] == "done"
@@ -549,88 +610,28 @@ def test_help_mentions_live_embed(capsys):
     assert exc.value.code == 0
     help_text = capsys.readouterr().out
     assert "--live-embed" in help_text
-    assert "--prefilter-limit" in help_text
+    assert "--prefilter-limit" not in help_text
     assert "google/embeddinggemma-2" in help_text
     assert "Ollama" not in help_text
     assert "OLLAMA" not in help_text
 
 
-def test_prefilter_limit_validation(monkeypatch, capsys):
-    def fail_build(*args, **kwargs):
-        raise AssertionError("graph should not run")
+def test_removed_prefilter_flag_is_rejected(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(
+            [
+                "match",
+                "--website",
+                _WEBSITE,
+                "--facebook",
+                _FACEBOOK,
+                "--prefilter-limit",
+                "8",
+            ]
+        )
 
-    monkeypatch.setattr("app.cli.build_graph", fail_build)
-    exit_code = main(
-        [
-            "match",
-            "--website",
-            _WEBSITE,
-            "--facebook",
-            _FACEBOOK,
-            "--prefilter-limit",
-            "0",
-        ]
-    )
-    assert exit_code == 2
+    assert exc.value.code == 2
     assert "--prefilter-limit" in capsys.readouterr().err
-
-    monkeypatch.setenv("PREFILTER_LIMIT", "nope")
-    exit_code = main(
-        [
-            "match",
-            "--website",
-            _WEBSITE,
-            "--facebook",
-            _FACEBOOK,
-        ]
-    )
-    assert exit_code == 2
-    assert "PREFILTER_LIMIT" in capsys.readouterr().err
-
-
-def test_prefilter_limit_flag_overrides_env(monkeypatch):
-    monkeypatch.setenv("PREFILTER_LIMIT", "12")
-    captured: dict = {}
-
-    def spy(integrations=None, **kwargs):
-        captured["kwargs"] = kwargs
-
-        class _Graph:
-            def stream(self, *args, **kwargs):
-                return iter([("values", {"stage": "done", "results": [], "errors": []})])
-
-        return _Graph()
-
-    monkeypatch.setattr("app.cli.build_graph", spy)
-    exit_code = main(
-        [
-            "match",
-            "--website",
-            _WEBSITE,
-            "--facebook",
-            _FACEBOOK,
-            "--json",
-            "--prefilter-limit",
-            "8",
-            "--top-k",
-            "40",
-        ]
-    )
-    assert exit_code == 0
-    assert captured["kwargs"]["prefilter_n"] == 8
-
-    exit_code = main(
-        [
-            "match",
-            "--website",
-            _WEBSITE,
-            "--facebook",
-            _FACEBOOK,
-            "--json",
-        ]
-    )
-    assert exit_code == 0
-    assert captured["kwargs"]["prefilter_n"] == 12
 
 
 def test_live_embed_flag_does_not_load_the_model(monkeypatch, capsys):
@@ -676,7 +677,7 @@ def test_live_embed_flag_does_not_load_the_model(monkeypatch, capsys):
     assert embedder.device == "cpu"
     assert embedder.dim == 768
     assert embedder._model is None
-    assert captured["kwargs"]["prefilter_n"] == 25
+    assert "prefilter_n" not in captured["kwargs"]
     assert "OLLAMA" not in captured_io.out
     assert "OLLAMA" not in captured_io.err
 

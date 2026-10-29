@@ -36,23 +36,24 @@ import openai
 from openai import OpenAI
 from pydantic import Field, ValidationError
 
+from ..brand_match import MIN_ALIAS_CHARS, normalize_for_match
 from ..brand_tidy import tidy_brand_profile
 from ..models import (
     BrandProfile,
     DomainModel,
     FacebookPage,
+    Judgement,
     KolProfile,
-    ScoreBreakdown,
     normalize_handle,
 )
 from ..prompts import (
     JSON_RETRY_USER,
     MAX_QUERIES,
     brand_messages,
+    judge_messages,
     query_messages,
-    rerank_messages,
 )
-from .llm import ChatClient, heuristic_score
+from .llm import ChatClient
 
 DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
@@ -61,7 +62,6 @@ DEFAULT_MAX_RETRIES = 2
 DEFAULT_RETRY_BACKOFF = 2.0
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.2
-DEFAULT_RERANK_BATCH_SIZE = 5
 DEFAULT_NO_THINK_MESSAGE = "/no_think"
 
 _MAX_RETRY_AFTER = 30.0
@@ -104,7 +104,6 @@ class LlmSettings:
     temperature: float = DEFAULT_TEMPERATURE
     reasoning: ReasoningMode = "off"
     no_think_message: str = DEFAULT_NO_THINK_MESSAGE
-    rerank_batch_size: int = DEFAULT_RERANK_BATCH_SIZE
 
     @classmethod
     def from_env(cls, *, api_key: str | None = None) -> LlmSettings:
@@ -123,11 +122,6 @@ class LlmSettings:
         )
         max_tokens = _env_int("LLM_MAX_TOKENS", DEFAULT_MAX_TOKENS, minimum=1)
         temperature = _env_float("LLM_TEMPERATURE", DEFAULT_TEMPERATURE, minimum=0.0)
-        batch_size = _env_int(
-            "LLM_RERANK_BATCH_SIZE",
-            DEFAULT_RERANK_BATCH_SIZE,
-            minimum=1,
-        )
         reasoning = _reasoning_mode(os.environ.get("LLM_DISABLE_REASONING"))
         if reasoning is None:
             # Unset: turn thinking off only for the default endpoint and model,
@@ -146,7 +140,6 @@ class LlmSettings:
             temperature=temperature,
             reasoning=reasoning,
             no_think_message=no_think,
-            rerank_batch_size=batch_size,
         )
 
 
@@ -239,14 +232,17 @@ class QueryBatch(DomainModel):
     queries: list[str] = Field(min_length=1)
 
 
-class RelevanceScore(DomainModel):
+class JudgementItem(DomainModel):
     handle: str = Field(min_length=1)
-    relevance: float = Field(ge=0, le=1)
-    reason: str = Field(min_length=1, max_length=400)
+    judge: float
+    audience: float
+    audience_confidence: float
+    reason: str = ""
+    risky: bool = False
 
 
-class RelevanceBatch(DomainModel):
-    scores: list[RelevanceScore] = Field(min_length=1)
+class JudgementBatch(DomainModel):
+    creators: list[JudgementItem] = Field(min_length=1)
 
 
 class OpenAIChatClient:
@@ -375,12 +371,7 @@ class OpenAIChatClient:
 
 
 class LiveBrandAnalyzer:
-    """Brand analysis, query generation, and relevance scoring via chat completions.
-
-    Engagement, audience fit, and tier fit stay on ``heuristic_score``. Only
-    relevance and the short reason come from the model, and the graph still
-    applies the request weights to the full breakdown.
-    """
+    """Brand analysis, query generation, and batched creator judging."""
 
     def __init__(
         self,
@@ -430,9 +421,14 @@ class LiveBrandAnalyzer:
         previous = {query.strip().casefold() for query in previous_queries}
 
         def accept(batch: QueryBatch) -> None:
-            if not _new_queries(batch.queries, set(previous)):
+            new = _new_queries(batch.queries, set(previous))
+            if not new:
                 raise ValueError(
                     "no new queries; every query repeats an earlier round"
+                )
+            if all(_contains_brand_alias(query, brand) for query in new):
+                raise ValueError(
+                    "every query names the brand; search for the topic instead"
                 )
 
         batch = self._structured(
@@ -440,59 +436,65 @@ class LiveBrandAnalyzer:
             QueryBatch,
             accept,
         )
-        fresh = _new_queries(batch.queries, set(previous))
-        if not fresh:
-            raise LlmOutputError(
-                f"LLM returned no new search queries for round {round}"
-            )
+        fresh = [
+            query
+            for query in _new_queries(batch.queries, set(previous))
+            if not _contains_brand_alias(query, brand)
+        ]
         return fresh[:MAX_QUERIES]
 
-    def rerank(
+    def judge(
         self,
-        brand: BrandProfile,
+        brief: BrandProfile,
         kols: list[KolProfile],
-        *,
-        similarities: list[float] | None = None,
-    ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
-        if similarities is not None and len(similarities) != len(kols):
-            raise ValueError("similarities must have one score per creator")
+    ) -> list[Judgement]:
+        """Judge all creators in one chat call and clamp every score.
+
+        Creators the model leaves out are asked for once more in a smaller
+        call. Any still missing are returned unjudged; the caller reports them.
+        """
         if not kols:
             return []
-        scored: list[tuple[KolProfile, ScoreBreakdown, str]] = []
-        size = self._settings.rerank_batch_size
-        for start in range(0, len(kols), size):
-            batch = kols[start : start + size]
-            batch_scores = None if similarities is None else similarities[start : start + size]
-            scored.extend(self._rerank_batch(brand, batch, batch_scores))
-        return scored
-
-    def _rerank_batch(
-        self,
-        brand: BrandProfile,
-        kols: list[KolProfile],
-        similarities: list[float] | None = None,
-    ) -> list[tuple[KolProfile, ScoreBreakdown, str]]:
-        def accept(batch: RelevanceBatch) -> None:
-            seen = {normalize_handle(item.handle) for item in batch.scores}
-            missing = [kol.handle for kol in kols if normalize_handle(kol.handle) not in seen]
-            if missing:
-                raise ValueError(f"missing scores for: {', '.join(missing)}")
-
-        batch = self._structured(
-            rerank_messages(brand, kols, similarities),
-            RelevanceBatch,
-            accept,
-        )
-        by_score = {normalize_handle(item.handle): item for item in batch.scores}
-        results: list[tuple[KolProfile, ScoreBreakdown, str]] = []
-        for kol in kols:
-            item = by_score[normalize_handle(kol.handle)]
-            heuristic, _heuristic_reason = heuristic_score(brand, kol)
-            scores = heuristic.model_copy(
-                update={"relevance": round(float(item.relevance), 4)}
+        by_handle = self._judge_items(brief, kols)
+        missing = [
+            kol for kol in kols if normalize_handle(kol.handle) not in by_handle
+        ]
+        if missing:
+            logger.warning(
+                "judge skipped %d of %d creators; asking again", len(missing), len(kols)
             )
-            results.append((kol, scores, item.reason))
-        return results
+            by_handle.update(self._judge_items(brief, missing))
+
+        judgements: list[Judgement] = []
+        for kol in kols:
+            item = by_handle.get(normalize_handle(kol.handle))
+            if item is None:
+                continue
+            judgements.append(
+                Judgement(
+                    handle=kol.handle,
+                    judge=_unit(item.judge),
+                    audience=_unit(item.audience),
+                    audience_confidence=_unit(item.audience_confidence),
+                    reason=item.reason.strip(),
+                    risky=item.risky,
+                )
+            )
+        return judgements
+
+    def _judge_items(
+        self,
+        brief: BrandProfile,
+        kols: list[KolProfile],
+    ) -> dict[str, JudgementItem]:
+        batch = self._structured(judge_messages(brief, kols), JudgementBatch)
+        known = {normalize_handle(kol.handle) for kol in kols}
+        by_handle: dict[str, JudgementItem] = {}
+        for item in batch.creators:
+            key = normalize_handle(item.handle)
+            if key in known and key not in by_handle:
+                by_handle[key] = item
+        return by_handle
 
     def _structured(
         self,
@@ -601,11 +603,11 @@ def _has_reasoning(message: Any) -> bool:
 
 _BRAND_LIST_FIELDS = (
     "brand_names",
-    "products",
-    "keywords_th",
-    "keywords_en",
-    "hashtags",
-    "preferred_tiers",
+    "key_products",
+    "topic_keywords_th",
+    "topic_keywords_en",
+    "competitors",
+    "brand_handles",
 )
 
 
@@ -638,6 +640,23 @@ def _coerce_brand_lists(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _contains_brand_alias(query: str, brand: BrandProfile) -> bool:
+    """True when a query repeats the brand's own name or handle.
+
+    Uses the same minimum alias length as the graph's recall guard, so a short
+    brand name such as "Sun" cannot knock out every topic query.
+    """
+    text = normalize_for_match(query)
+    return any(
+        alias in text
+        for alias in (
+            normalize_for_match(value)
+            for value in (*brand.brand_names, *brand.brand_handles)
+        )
+        if len(alias) >= MIN_ALIAS_CHARS
+    )
+
+
 def _new_queries(queries: list[str], previous: set[str]) -> list[str]:
     fresh: list[str] = []
     seen = set(previous)
@@ -656,6 +675,14 @@ def _clip_error(text: str) -> str:
     if len(compact) > 1500:
         return compact[:1497] + "..."
     return compact
+
+
+def _unit(value: float) -> float:
+    """Clamp a model score into [0, 1]; non-finite values become 0."""
+    number = float(value)
+    if not math.isfinite(number):
+        return 0.0
+    return min(1.0, max(0.0, number))
 
 
 def _env_float(name: str, default: float, *, minimum: float, positive: bool = False) -> float:

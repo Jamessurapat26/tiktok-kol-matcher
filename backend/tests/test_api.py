@@ -16,7 +16,7 @@ from app.graph import _NODE_ORDER
 from app.integrations import mock_integrations
 from app.integrations.apify import ApifyClient
 from app.integrations.web_reader import MockWebReader
-from app.models import MatchRequest
+from app.models import FacebookPage, MatchRequest
 
 _ENV_VARS = (
     "DEMO_MODE",
@@ -101,8 +101,26 @@ def test_job_runs_to_succeeded_with_top_k_results(make_client):
     assert job["stage"] == "done"
     assert len(job["results"]) == 5
     assert job["request"]["top_k"] == 5
-    assert job["results"][0]["kol"]["handle"]
     assert job["brand_profile"]["category"]
+    assert job["brand_profile"]["tier_reason"]
+    assert job["brand_profile"]["tier_label"]
+    assert job["rejected"]
+    assert job["cost_log"]
+    first = job["results"][0]
+    assert first["kol"]["handle"]
+    assert first["profile_url"].startswith("https://www.tiktok.com/@")
+    assert first["evidence_urls"]
+    assert {"flags", "reason", "final", "quality"} <= set(first)
+    assert {
+        "F",
+        "E",
+        "T",
+        "A_eff",
+        "F_conf",
+        "E_conf",
+        "T_conf",
+        "A_conf",
+    } <= set(first["scores"])
 
 
 @pytest.mark.parametrize(
@@ -179,6 +197,12 @@ def test_list_jobs_newest_first_with_limit(make_client):
         listed = client.get("/api/jobs", params={"limit": 2}).json()
 
     assert [job["id"] for job in listed] == ids[::-1][:2]
+    latest = listed[0]
+    assert latest["brand_profile"]["tier_reason"]
+    assert latest["rejected"]
+    assert latest["cost_log"]
+    assert {"flags", "evidence_urls", "profile_url"} <= set(latest["results"][0])
+    assert {"F", "E", "T", "A_eff"} <= set(latest["results"][0]["scores"])
 
 
 def test_health_without_env_is_demo(make_client):
@@ -315,6 +339,8 @@ def test_runner_passes_discovery_env_to_the_graph(make_client, monkeypatch):
     assert job["status"] == "succeeded"
     assert captured["kwargs"]["min_candidates"] == 12
     assert captured["kwargs"]["max_search_rounds"] == 2
+    assert "enrich_limit" not in captured["kwargs"]
+    assert "cfg" not in captured["kwargs"]
 
 
 @pytest.mark.parametrize(
@@ -373,6 +399,32 @@ def test_events_stream_every_node_then_done(make_client):
     assert finished_order[2:] == list(_NODE_ORDER[2:])
     discover = next(e for e in node_events if e["node"] == "discover_kols" and e["summary"])
     assert "discovered+" in discover["summary"]
+
+
+def test_scrape_facebook_source_warning_is_a_finished_event(make_client):
+    class WarningFacebook:
+        def fetch_page(self, url: str) -> FacebookPage:
+            return FacebookPage(
+                page_name="ExampleBrand",
+                title="ExampleBrand",
+                url=url,
+                source_warning="Apify page item error not_available: gone",
+            )
+
+    integrations = replace(mock_integrations(), facebook=WarningFacebook())
+    with make_client(integrations=integrations) as client:
+        job_id = client.post("/api/jobs", json=_BODY).json()["job_id"]
+        job = client.get(f"/api/jobs/{job_id}").json()
+        events = read_events(client, job_id)
+
+    assert job["status"] == "succeeded"
+    event = next(
+        e
+        for e in events
+        if e["node"] == "scrape_facebook" and e["status"] == "finished"
+    )
+    assert "warning" in event["summary"]
+    assert "not_available" in event["summary"]
 
 
 def test_events_reconnect_replays_only_later_events(make_client):
@@ -500,3 +552,39 @@ def test_events_stream_live_while_job_runs(tmp_path):
 
     assert types[0] == "node"
     assert types[-1] == "done"
+
+
+def test_jobs_stored_before_matching_v2_still_load(tmp_path):
+    store = JobStore(tmp_path / "jobs.db")
+    legacy = {
+        "id": "legacy",
+        "status": "succeeded",
+        "stage": "done",
+        "request": {
+            **_BODY,
+            "top_k": 5,
+            "weights": {"relevance": 0.4, "engagement": 0.25, "audience": 0.2, "tier": 0.15},
+        },
+        "flags": {},
+        "errors": [],
+        "brand_profile": {"category": "eyewear", "products": ["glasses"], "keywords_th": []},
+        "results": [{"kol": {"handle": "old"}, "total_score": 0.8}],
+        "created_at": "2026-10-01T00:00:00+00:00",
+        "updated_at": "2026-10-01T00:00:00+00:00",
+    }
+    with sqlite3.connect(tmp_path / "jobs.db") as conn:
+        conn.execute(
+            "INSERT INTO jobs (id, status, created_at, data) VALUES (?, ?, ?, ?)",
+            ("legacy", "succeeded", legacy["created_at"], json.dumps(legacy)),
+        )
+    store.create(MatchRequest(**_BODY), flags=LiveFlags())
+
+    jobs = store.recent(10)
+
+    old = next(job for job in jobs if job.id == "legacy")
+    assert len(jobs) == 2
+    assert old.request.top_k == 5
+    assert old.brand_profile is None
+    assert old.results == []
+    assert any("earlier version" in error for error in old.errors)
+    assert store.get("legacy") == old

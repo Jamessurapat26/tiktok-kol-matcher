@@ -51,8 +51,10 @@ def main(_argv: list[str] | None = None) -> int:
         return redact_secret(text, key)
 
     print(f"category: {clean(profile.category)}")
-    print(f"keywords_th: {clean(', '.join(profile.keywords_th))}")
-    print(f"keywords_en: {clean(', '.join(profile.keywords_en))}")
+    print(f"topic_keywords_th: {clean(', '.join(profile.topic_keywords_th))}")
+    print(f"topic_keywords_en: {clean(', '.join(profile.topic_keywords_en))}")
+    print(f"tier: {clean(profile.tier_label)} ({profile.target_followers} followers)")
+    print(f"tier_reason: {clean(profile.tier_reason)}")
     return 0
 
 

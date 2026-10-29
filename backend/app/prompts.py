@@ -7,7 +7,6 @@ the instructions say the JSON belongs in the answer itself.
 
 from __future__ import annotations
 
-from .brand_match import mentions_brand, normalize_for_match
 from .models import BrandProfile, FacebookPage, KolProfile
 
 _SOURCE_CHARS = 12_000
@@ -34,30 +33,41 @@ The object must contain exactly these keys:
 - brand_names: the brand's own proper names and common aliases or
   abbreviations as written in social posts, in Latin and Thai script, at
   most 8 items. Proper names only, never generic words like the category.
-- products: the brand's own core product lines or categories, at most 8 items.
-  Each item is a short noun phrase of at most 4 words.
+- key_products: the brand's own core product lines or categories, at most 8
+  items. Each item is a short noun phrase of at most 4 words.
   Prefer the primary sources over posts.
-- target_audience: object with age_min (integer or null), age_max (integer or
-  null), gender ("male", "female", or "any"), interests (at most 8 short
-  phrases of at most 3 words each), and location
+- price_tier: one of "budget", "mid", "premium", or "luxury".
+- target_audience: object with gender ("male", "female", or "any"),
+  age_range (a short string such as "18-34" or "any"), and interests
+  (at most 8 short phrases of at most 3 words each)
 - tone: how the brand speaks
-- content_style: the kind of social content that fits the brand
-- keywords_th: Thai search phrases in Thai script, at most 12 items.
+- topic_keywords_th: Thai search phrases in Thai script, at most 12 items.
   Each is a short search phrase of at most 3 words, written
   without sentence structure, without verbs with clauses, and without
   punctuation.
-- keywords_en: English search phrases, at most 12 items. Each is a
+- topic_keywords_en: English search phrases, at most 12 items. Each is a
   short search phrase of at most 3 words, without sentence
   structure or punctuation.
-- hashtags: at most 10 hashtags. Each starts with # and has no
-  spaces.
-- preferred_tiers: list using only "nano", "micro", "macro", and "mega"
-- reasoning: one or two sentences on how you read the sources
+- competitors: names of competing brands, at most 8 items. Proper names only.
+- brand_handles: the brand's own social handles, at most 8 items, with or
+  without a leading @.
+- target_followers: your best integer estimate of the creator follower count
+  this brand should target. It must be between 10000 and 2000000.
+- tier_label: one of "nano", "micro", "mid", or "macro".
+- tier_confidence: a number from 0 to 1 for how sure you are of the tier.
+- tier_reason: one short sentence explaining the tier choice.
 
-Give a best-estimate age_min and age_max from the brand type and audience cues.
-Use null for an age bound only when there is truly no signal. Prefer the
-primary sources over guesses. If Facebook text is missing, say so in reasoning
-and still return the profile.
+Tier guidance:
+- SME or small online shop -> micro, about 30,000 followers.
+- Nationwide Thai brand -> mid, about 150,000 followers.
+- Multinational or very large brand -> macro, about 800,000 followers.
+Use the price tier, the sales channels (online-only, small stores, or
+nationwide convenience stores), whether the brand is local or multinational,
+and the brand page follower count when it is available. Show the tier_label
+and tier_reason in the JSON.
+
+Prefer the primary sources over guesses. If Facebook text is missing, still
+return the best brief you can from the website.
 """
 
 # Each query becomes one paid Apify actor run, so the live analyzer enforces
@@ -71,38 +81,39 @@ trace. Do not wrap it in markdown.
 
 Shape: {{"queries": ["...", "..."]}}
 
-Each query is a short TikTok search string. Mix Thai (Thai script) and
-English. Do not repeat any query from the previous list, even with different
-casing or extra spaces. Round 1 is broad product and audience searches. Later
-rounds expand into hashtags, adjacent topics, and creator-style searches that
-were not used yet. Return between 6 and {MAX_QUERIES} queries.
+Each query is a short TikTok search string built from the brand's topic
+keywords or competitor names. Mix Thai (Thai script) and English. Never use
+the brand's own name, brand names, or brand handles in a query. Do not repeat
+any query from the previous list, even with different casing or extra spaces.
+Round 1 is broad topic and competitor searches. Later rounds expand into
+adjacent topics and creator-style searches that were not used yet. Return
+between 6 and {MAX_QUERIES} queries.
 """
 
-RERANK_SYSTEM = """\
-You score how relevant each TikTok creator is to a brand. Reply with one JSON
-object and nothing else, in the visible reply, not only in a reasoning trace.
-Do not wrap it in markdown.
+JUDGE_SYSTEM = """\
+You judge how well TikTok creators fit a brand. Reply with one JSON object and
+nothing else, in the visible reply, not only in a reasoning trace. Do not wrap it
+in markdown.
 
-Shape: {"scores": [{"handle": "...", "relevance": 0.0, "reason": "..."}]}
+Shape: {"creators": [{"handle": "...", "judge": 0.0, "audience": 0.0,
+"audience_confidence": 0.0, "reason": "...", "risky": false}]}
 
-relevance is a number from 0 to 1. 1 means the creator clearly covers the
-brand's products or audience. 0 means unrelated. The goal is to find creators
-who could promote the brand, so score the brand's own account, other shops, and
-competing brands low, however closely their products match. reason is one
-short sentence in Thai or English. Include every handle from the input exactly
-once. Copy each handle unchanged.
-
-Only say a creator posts about the brand when one of brand_names appears in
-their content or bio and mentions_brand is yes. A similar promotion, stamp, or
-coupon campaign from another store or brand is not about this brand; do not
-attribute it to the brand. When mentions_brand is no, score only niche and
-audience fit, at most 0.6, and do not claim brand content in the reason.
-"""
-
-_RERANK_SIMILARITY_NOTE = """
-Each creator includes embedding_similarity, the cosine similarity between the
-brand and that creator. Higher means closer. Use it as a hint and still set
-relevance from the creator's content.
+Rubric:
+- judge is 0 to 1: category match, tone match, and no risky content. 1 means the
+  creator clearly covers the brand's category in a fitting tone with no risky
+  content. 0 means unrelated or clearly unsuitable. The brand's own account,
+  other shops, and competing brands are low fits however closely their products
+  match.
+- audience is 0 to 1: does the creator's content, captions, and bio suggest an
+  audience that matches target_audience? Use text/content/bio ONLY. Never infer
+  age or gender from faces, appearance, or photos.
+- audience_confidence is 0 to 1: how much the available text supports the
+  audience estimate.
+- risky is true when the creator's content shows gambling, casino, or similar
+  unsafe content.
+- reason is one short sentence. Only say a creator posts about the brand when a
+  brand name appears in their text. Copy every handle from the input unchanged.
+  Include each creator you judge exactly once.
 """
 
 JSON_RETRY_USER = (
@@ -149,37 +160,19 @@ def query_messages(
     ]
 
 
-def rerank_messages(
-    brand: BrandProfile,
+def judge_messages(
+    brief: BrandProfile,
     kols: list[KolProfile],
-    similarities: list[float] | None = None,
 ) -> list[dict[str, str]]:
-    if similarities is not None and len(similarities) != len(kols):
-        raise ValueError("similarities must have one score per creator")
-    aliases = [normalize_for_match(name) for name in brand.brand_names]
-    check_mentions = bool(brand.brand_names)
-
-    def card(kol: KolProfile, similarity: float | None = None) -> str:
-        mentions = mentions_brand(kol, aliases) if check_mentions else None
-        return _kol_card(kol, similarity, mentions=mentions)
-
-    if similarities is None:
-        cards = "\n\n".join(card(kol) for kol in kols)
-        system = RERANK_SYSTEM
-    else:
-        cards = "\n\n".join(
-            card(kol, similarity)
-            for kol, similarity in zip(kols, similarities, strict=True)
-        )
-        system = RERANK_SYSTEM + _RERANK_SIMILARITY_NOTE
+    cards = "\n\n".join(_kol_card(kol) for kol in kols)
     user = (
         "Brand:\n"
-        f"{_brand_summary(brand)}\n\n"
+        f"{_brand_summary(brief)}\n\n"
         "Creators:\n"
         f"{cards}"
     )
     return [
-        {"role": "system", "content": system},
+        {"role": "system", "content": JUDGE_SYSTEM},
         {"role": "user", "content": user},
     ]
 
@@ -190,18 +183,18 @@ def _brand_summary(brand: BrandProfile) -> str:
         [
             f"category: {brand.category}",
             f"brand_names: {', '.join(brand.brand_names)}",
-            f"products: {', '.join(brand.products)}",
+            f"key_products: {', '.join(brand.key_products)}",
+            f"price_tier: {brand.price_tier}",
             f"tone: {brand.tone}",
-            f"content_style: {brand.content_style}",
             (
-                f"audience: {audience.gender}, ages {audience.age_min}-{audience.age_max}, "
-                f"{audience.location}"
+                f"audience: {audience.gender}, ages {audience.age_range}, "
+                f"interests {', '.join(audience.interests)}"
             ),
-            f"interests: {', '.join(audience.interests)}",
-            f"keywords_th: {', '.join(brand.keywords_th)}",
-            f"keywords_en: {', '.join(brand.keywords_en)}",
-            f"hashtags: {' '.join(brand.hashtags)}",
-            f"preferred_tiers: {', '.join(brand.preferred_tiers)}",
+            f"topic_keywords_th: {', '.join(brand.topic_keywords_th)}",
+            f"topic_keywords_en: {', '.join(brand.topic_keywords_en)}",
+            f"competitors: {', '.join(brand.competitors)}",
+            f"tier: {brand.tier_label} (target {brand.target_followers} followers)",
+            f"tier_reason: {brand.tier_reason}",
         ]
     )
 
@@ -233,30 +226,24 @@ def _facebook_text(page: FacebookPage | None) -> str:
     return "\n".join(lines)
 
 
-def _kol_card(
-    kol: KolProfile,
-    similarity: float | None = None,
-    *,
-    mentions: bool | None = None,
-) -> str:
-    if kol.median_engagement_rate is None:
-        rate = "unknown"
-    else:
-        rate = f"{kol.median_engagement_rate:.4f}"
+def _kol_card(kol: KolProfile) -> str:
+    captions = [
+        _clip(video.caption, MAX_PROMPT_POST_CHARS)
+        for video in kol.videos[:3]
+        if video.caption.strip()
+    ]
     lines = [
         f"handle: {kol.handle}",
         f"nickname: {kol.nickname or ''}",
         f"followers: {kol.followers}",
         f"language: {kol.language or ''}",
         f"region: {kol.region or ''}",
-        f"engagement_rate: {rate}",
+        f"stats_source: {kol.stats_source}",
         f"bio: {_clip(kol.bio, _BIO_CHARS)}",
         f"content: {_clip(kol.content_summary, _SUMMARY_CHARS)}",
     ]
-    if mentions is not None:
-        lines.append(f"mentions_brand: {'yes' if mentions else 'no'}")
-    if similarity is not None:
-        lines.append(f"embedding_similarity: {similarity:.4f}")
+    if captions:
+        lines.append("recent_captions: " + " | ".join(captions))
     return "\n".join(lines)
 
 

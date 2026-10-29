@@ -27,13 +27,14 @@ from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from ..models import MAX_RECENT_POSTS, FacebookPage
 from .apify import ApifyBudget, ApifyBudgetExceeded, ApifyClient, ApifyError, as_count
-from .web_reader import WebReader, WebReadError
+from .web_reader import WebReader, WebReadError, blocked_page_reason
 from .web_reader_live import _DEFAULT_TTL_SECONDS, _normalize_url
 
 PAGES_ACTOR = "apify/facebook-pages-scraper"
 POSTS_ACTOR = "apify/facebook-posts-scraper"
 
 _FALLBACK_INTRO_CHARS = 4_000
+_ERROR_DESCRIPTION_CHARS = 160
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.MULTILINE)
 _HTTP_URL = TypeAdapter(HttpUrl)
 
@@ -55,6 +56,9 @@ def page_from_items(url: str, items: list[Any]) -> FacebookPage:
     named = (i for i in items if _usable(i) and (_text(i.get("title")) or _text(i.get("pageName"))))
     item = next(named, None)
     if item is None:
+        detail = _item_error(items)
+        if detail is not None:
+            raise ApifyError(f"Apify page item error {detail}")
         raise ApifyError(f"Apify returned no usable page item for {url}")
     page_name = _text(item.get("pageName")) or _text(item.get("title"))
     followers = as_count(item.get("followers"))
@@ -81,6 +85,8 @@ def page_from_text(url: str, text: str) -> FacebookPage:
     """Build a minimal page from web-reader text when Apify has nothing."""
     if not text.strip():
         raise WebReadError(f"web reader returned no text for {url}")
+    if reason := blocked_page_reason(text):
+        raise WebReadError(f"web reader returned a blocked page for {url}: {reason}")
     parts = urlsplit(url)
     segment = next((s for s in parts.path.split("/") if s), "")
     page_name = segment or parts.netloc
@@ -96,6 +102,24 @@ def page_from_text(url: str, text: str) -> FacebookPage:
 
 def _usable(item: Any) -> bool:
     return isinstance(item, dict) and not item.get("error") and not item.get("errorCode")
+
+
+def _item_error(items: list[Any]) -> str | None:
+    """Name the first item-level error, e.g. ``not_available: ...``."""
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        code = _text(item.get("errorCode")) or _text(item.get("error"))
+        if code is None:
+            continue
+        description = _text(item.get("errorDescription")) or _text(item.get("error")) or ""
+        description = " ".join(description.split())
+        if len(description) > _ERROR_DESCRIPTION_CHARS:
+            description = description[: _ERROR_DESCRIPTION_CHARS - 3].rstrip() + "..."
+        if description and description != code:
+            return f"{code}: {description}"
+        return code
+    return None
 
 
 def _text(value: Any) -> str | None:
@@ -205,7 +229,8 @@ class ApifyFacebookScraper:
         else:
             apify_note = f"Apify failed ({apify_error})"
         try:
-            return page_from_text(url, self._fallback.read(url))
+            page = page_from_text(url, self._fallback.read(url))
+            return page.model_copy(update={"source_warning": str(apify_error)})
         except WebReadError as exc:
             raise WebReadError(
                 f"Could not read Facebook page {url}: {apify_note}; "

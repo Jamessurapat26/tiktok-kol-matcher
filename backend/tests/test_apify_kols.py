@@ -567,7 +567,10 @@ def test_missing_token_raises_a_config_error(monkeypatch):
 
 
 def test_live_kols_factory_uses_apify_and_keeps_other_services_mocked(monkeypatch, tmp_path):
+    for name in ("TIKTOK_RESULTS_PER_QUERY", "TIKTOK_PROFILE_VIDEOS"):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("KOL_CACHE_DIR", str(tmp_path))
+    monkeypatch.setenv("TIKTOK_PROFILE_VIDEOS", "6")
     bundle = build_integrations(
         live_kols=True,
         apify_token=_TOKEN,
@@ -583,7 +586,9 @@ def test_live_kols_factory_uses_apify_and_keeps_other_services_mocked(monkeypatc
     assert isinstance(bundle.kol_search, ApifyKolSearch)
     assert isinstance(bundle.enricher, ApifyKolEnricher)
     assert bundle.kol_search.max_results == 4
-    assert bundle.enricher.max_videos == 4
+    assert bundle.enricher.max_videos == 6
+    assert both.kol_search.max_results == 20
+    assert both.enricher.max_videos == 6
     assert isinstance(bundle.facebook, MockFacebookScraper)
     assert isinstance(bundle.llm, MockBrandAnalyzer)
     assert isinstance(bundle.embedder, MockEmbedder)
@@ -594,6 +599,50 @@ def test_live_kols_factory_uses_apify_and_keeps_other_services_mocked(monkeypatc
     bundle.enricher._apify._client.close()
     both.kol_search._apify._client.close()
     both.enricher._apify._client.close()
+
+
+def test_live_sizes_come_from_env_in_the_actor_inputs(monkeypatch, tmp_path):
+    for name in (
+        "TIKTOK_RESULTS_PER_QUERY",
+        "TIKTOK_PROFILE_VIDEOS",
+        "APIFY_ENRICH_RESERVE_USD",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("TIKTOK_RESULTS_PER_QUERY", "7")
+    monkeypatch.setenv("TIKTOK_PROFILE_VIDEOS", "3")
+    monkeypatch.setenv("KOL_CACHE_DIR", str(tmp_path))
+    seen: list[tuple[str, object, dict]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(
+            (request.url.path, request.url.params, json.loads(request.content))
+        )
+        if "profile-scraper" in request.url.path:
+            return httpx.Response(201, json=_profile_sample())
+        return httpx.Response(201, json=_search_sample())
+
+    bundle = build_integrations(live_kols=True, apify_token=_TOKEN)
+    bundle.kol_search._apify._client.close()
+    bundle.kol_search._apify._client = _client(handler)
+    bundle.enricher._apify._client.close()
+    bundle.enricher._apify._client = _client(handler)
+
+    rows = bundle.kol_search.search(["ootd"], round=1)
+    bundle.enricher.enrich(_kol("apifytech"))
+
+    search_path, search_params, search_body = seen[0]
+    profile_path, profile_params, profile_body = seen[1]
+    assert "clockworks~tiktok-scraper" in search_path
+    assert search_body["resultsPerPage"] == 7
+    assert search_params["maxItems"] == "7"
+    assert "clockworks~tiktok-profile-scraper" in profile_path
+    assert profile_body["resultsPerPage"] == 3
+    assert profile_params["maxItems"] == "3"
+    assert any(row.get("handle") == "gretalynnhihi" for row in rows)
+    assert bundle.kol_search._apify._reserve_usd == pytest.approx(0.30)
+
+    bundle.kol_search._apify._client.close()
+    bundle.enricher._apify._client.close()
 
 
 def test_default_apify_cache_dir(monkeypatch, tmp_path):

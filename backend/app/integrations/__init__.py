@@ -1,7 +1,13 @@
 import os
 from dataclasses import dataclass
 
-from .apify import ApifyBudget, ApifyBudgetExceeded, ApifyConfigError, ApifyLimits
+from .apify import (
+    ApifyBudget,
+    ApifyBudgetExceeded,
+    ApifyConfigError,
+    ApifyLimits,
+    DiscoveryLimits,
+)
 from .embeddings import Embedder, MockEmbedder
 from .facebook import FacebookScraper, MockFacebookScraper
 from .kol_enricher import KolEnricher, MockKolEnricher
@@ -30,7 +36,7 @@ def build_integrations(
     live_embed: bool = False,
     live_fb: bool = False,
     kol_fixtures: list[dict] | None = None,
-    max_results_per_query: int = 10,
+    max_results_per_query: int | None = None,
     apify_token: str | None = None,
     llm_api_key: str | None = None,
     apify_limits: ApifyLimits | None = None,
@@ -54,8 +60,12 @@ def build_integrations(
     TikTok search, and enrichment. ``apify_limits`` defaults to
     ``ApifyLimits.from_env()``; the API builds this bundle per job, so the
     budget lasts one job, and the CLI gets one per run.
+
+    Search uses ``TIKTOK_RESULTS_PER_QUERY`` unless ``max_results_per_query``
+    overrides it. Enrichment always uses ``TIKTOK_PROFILE_VIDEOS``, and search
+    keeps ``APIFY_ENRICH_RESERVE_USD`` free for it.
     """
-    if max_results_per_query < 1:
+    if max_results_per_query is not None and max_results_per_query < 1:
         raise ValueError("max_results_per_query must be at least 1")
 
     limits = apify_limits
@@ -131,7 +141,7 @@ def _live_facebook(
 
 def _live_kol_services(
     token: str,
-    max_results: int,
+    max_results: int | None,
     budget: ApifyBudget | None,
     limits: ApifyLimits | None,
 ) -> tuple[KolSearch, KolEnricher]:
@@ -140,16 +150,19 @@ def _live_kol_services(
 
     if limits is None:
         limits = ApifyLimits.from_env()
+    if max_results is None:
+        max_results = limits.tiktok_results_per_query
     return (
         ApifyKolSearch(
             token=token,
             max_results=max_results,
             max_charge_usd=limits.tiktok_search_max_charge_usd,
             budget=budget,
+            reserve_usd=limits.enrich_reserve_usd,
         ),
         ApifyKolEnricher(
             token=token,
-            max_videos=max_results,
+            max_videos=limits.tiktok_profile_videos,
             max_charge_usd=limits.tiktok_profile_max_charge_usd,
             budget=budget,
         ),
@@ -189,6 +202,7 @@ __all__ = [
     "ApifyConfigError",
     "ApifyLimits",
     "BrandAnalyzer",
+    "DiscoveryLimits",
     "Embedder",
     "FacebookScraper",
     "Integrations",

@@ -3,7 +3,7 @@ from typing import Any
 
 from ..cli import summarize_update
 from ..graph import build_graph, initial_state
-from ..integrations import Integrations
+from ..integrations import DiscoveryLimits, Integrations
 from .store import JobStore
 
 _SUMMARY_LIMIT = 160
@@ -27,16 +27,25 @@ def run_job(
     integrations: Integrations,
     *,
     enrich_limit: int | None = None,
+    discovery_limits: DiscoveryLimits | None = None,
 ) -> None:
     """Run one job's graph to completion, recording per-node events.
 
     Never raises: any failure ends the job as ``failed`` whenever the store
     accepts the write, so the event stream always gets its terminal event.
+    ``discovery_limits`` comes from the API request so bad env values are a
+    request error; a direct call falls back to ``DISCOVERY_*`` env values.
     """
     final: dict[str, Any] = {}
     try:
         job = store.transition(job_id, "running")
-        graph = build_graph(integrations, enrich_limit=enrich_limit)
+        discovery = discovery_limits or DiscoveryLimits.from_env()
+        graph = build_graph(
+            integrations,
+            min_candidates=discovery.min_thai_candidates,
+            max_search_rounds=discovery.max_rounds,
+            enrich_limit=enrich_limit,
+        )
         for mode, payload in graph.stream(
             initial_state(job.request),
             stream_mode=["tasks", "values"],

@@ -27,14 +27,15 @@ _RUN_SYNC_ITEMS = (
 # sync HTTP call gave up, but the paid run may still be executing.
 _RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
-# Conservative estimates. The sync endpoint returns dataset items only, not
-# the run usage or cost, so these numbers cannot be exact.
-_FIXED_RUN_USD = 0.01
+# Measured run costs on this account times about 1.5, so the estimate stays
+# above real spend. The sync endpoint returns dataset items only, not the run
+# usage or cost, so these numbers cannot be exact.
+_FIXED_RUN_USD = 0.005
 _DEFAULT_ITEM_USD = 0.01
 ESTIMATED_USD_PER_ITEM: dict[str, float] = {
-    "clockworks/tiktok-scraper": 0.005,
-    "clockworks/tiktok-profile-scraper": 0.005,
-    "apify/facebook-pages-scraper": 0.01,
+    "clockworks/tiktok-scraper": 0.0025,
+    "clockworks/tiktok-profile-scraper": 0.002,
+    "apify/facebook-pages-scraper": 0.015,
     "apify/facebook-posts-scraper": 0.005,
 }
 
@@ -92,14 +93,24 @@ class ApifyBudget:
         with self._lock:
             return self._skipped
 
-    def check(self, actor: str) -> None:
-        """Raise ``ApifyBudgetExceeded`` once the estimated spend is used up."""
+    def check(self, actor: str, reserve_usd: float = 0.0) -> None:
+        """Raise ``ApifyBudgetExceeded`` once spend (plus any reserve) is used up.
+
+        ``reserve_usd`` keeps part of the budget free for a later stage. Search
+        passes the enrichment reserve so it cannot spend the money that profile
+        enrichment still needs.
+        """
         with self._lock:
-            if self._spent >= self._limit:
+            if self._spent + reserve_usd >= self._limit:
                 self._skipped += 1
+                detail = (
+                    f"${reserve_usd:.2f} is kept for enrichment; "
+                    if reserve_usd > 0
+                    else ""
+                )
                 raise ApifyBudgetExceeded(
                     f"Apify job budget of ${self._limit:.2f} reached "
-                    f"(estimated spend ${self._spent:.2f}); skipping {actor}"
+                    f"(estimated spend ${self._spent:.2f}); {detail}skipping {actor}"
                 )
 
     def record(self, actor: str, usd: float) -> None:
@@ -145,14 +156,51 @@ def _positive_env(name: str, default: float) -> float:
     return value
 
 
+def _non_negative_env(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ApifyConfigError(f"{name} must be zero or greater") from None
+    if not math.isfinite(value) or value < 0:
+        raise ApifyConfigError(f"{name} must be zero or greater")
+    return value
+
+
+def _int_env(
+    name: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int | None = None,
+) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw, 10)
+    except ValueError:
+        raise ApifyConfigError(f"{name} must be an integer") from None
+    if value < minimum:
+        raise ApifyConfigError(f"{name} must be at least {minimum}")
+    if maximum is not None and value > maximum:
+        raise ApifyConfigError(f"{name} must be at most {maximum}")
+    return value
+
+
 @dataclass(frozen=True)
 class ApifyLimits:
-    """Per-run caps and the shared job budget for live Apify calls."""
+    """Per-run caps, sizes, and the shared job budget for live Apify calls."""
 
     job_budget_usd: float
     tiktok_search_max_charge_usd: float
     tiktok_profile_max_charge_usd: float
     facebook_max_charge_usd: float
+    tiktok_results_per_query: int = 20
+    tiktok_profile_videos: int = 10
+    enrich_reserve_usd: float = 0.30
 
     @classmethod
     def from_env(cls) -> ApifyLimits:
@@ -160,6 +208,19 @@ class ApifyLimits:
         tiktok_search = _positive_env("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", 0.50)
         tiktok_profile = _positive_env("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", 0.50)
         facebook = _positive_env("APIFY_FACEBOOK_MAX_CHARGE_USD", 0.50)
+        results_per_query = _int_env(
+            "TIKTOK_RESULTS_PER_QUERY",
+            20,
+            minimum=1,
+            maximum=50,
+        )
+        profile_videos = _int_env(
+            "TIKTOK_PROFILE_VIDEOS",
+            10,
+            minimum=1,
+            maximum=30,
+        )
+        enrich_reserve = _non_negative_env("APIFY_ENRICH_RESERVE_USD", 0.30)
         for name, value in (
             ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", tiktok_search),
             ("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", tiktok_profile),
@@ -169,16 +230,95 @@ class ApifyLimits:
                     f"{name} must be at least 0.50, the minimum the TikTok "
                     "actors accept"
                 )
+        if enrich_reserve >= job_budget:
+            raise ApifyConfigError(
+                "APIFY_ENRICH_RESERVE_USD must be below APIFY_JOB_BUDGET_USD"
+            )
         return cls(
             job_budget_usd=job_budget,
             tiktok_search_max_charge_usd=tiktok_search,
             tiktok_profile_max_charge_usd=tiktok_profile,
             facebook_max_charge_usd=facebook,
+            tiktok_results_per_query=results_per_query,
+            tiktok_profile_videos=profile_videos,
+            enrich_reserve_usd=enrich_reserve,
         )
 
     def budget(self) -> ApifyBudget:
         """Return a new budget for one job or CLI run."""
         return ApifyBudget(self.job_budget_usd)
+
+
+@dataclass(frozen=True)
+class DiscoveryLimits:
+    """Thai-creator target and search-round cap for one discovery run.
+
+    Defaults match ``graph.MIN_CANDIDATES`` and ``graph.MAX_SEARCH_ROUNDS``.
+    """
+
+    min_thai_candidates: int
+    max_rounds: int
+
+    @classmethod
+    def from_env(cls) -> DiscoveryLimits:
+        return cls(
+            min_thai_candidates=_int_env(
+                "DISCOVERY_MIN_THAI_CANDIDATES",
+                30,
+                minimum=1,
+            ),
+            max_rounds=_int_env(
+                "DISCOVERY_MAX_ROUNDS",
+                3,
+                minimum=1,
+                maximum=5,
+            ),
+        )
+
+
+def estimate_default_job_usd(
+    limits: ApifyLimits,
+    queries: int = 8,
+) -> float:
+    """Estimate the Apify cost of one default live job.
+
+    The estimate uses the same per-run estimator and assumes one Facebook page
+    item, 20 Facebook posts, at most ``queries`` TikTok search runs (stopping
+    early once the enrichment reserve would be eaten), and 10 profile
+    enrichment runs at ``TIKTOK_PROFILE_VIDEOS`` videos each. Search runs use
+    ``TIKTOK_RESULTS_PER_QUERY`` videos. This is deliberately conservative and
+    is only used for planning and tests, never for billing.
+    """
+    if queries < 0:
+        raise ValueError("queries must be zero or greater")
+
+    spent = estimate_run_cost(
+        "apify/facebook-pages-scraper",
+        1,
+        limits.facebook_max_charge_usd,
+    )
+    spent += estimate_run_cost(
+        "apify/facebook-posts-scraper",
+        20,
+        limits.facebook_max_charge_usd,
+    )
+
+    search_run = estimate_run_cost(
+        "clockworks/tiktok-scraper",
+        limits.tiktok_results_per_query,
+        limits.tiktok_search_max_charge_usd,
+    )
+    for _ in range(queries):
+        if spent + limits.enrich_reserve_usd >= limits.job_budget_usd:
+            break
+        spent += search_run
+
+    enrichment_run = estimate_run_cost(
+        "clockworks/tiktok-profile-scraper",
+        limits.tiktok_profile_videos,
+        limits.tiktok_profile_max_charge_usd,
+    )
+    return spent + 10 * enrichment_run
 
 
 def actor_run_sync_url(actor: str) -> str:
@@ -236,6 +376,7 @@ class ApifyClient:
         backoff: float = 1.0,
         max_charge_usd: float = 0.50,
         budget: ApifyBudget | None = None,
+        reserve_usd: float = 0.0,
         sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
         resolved = token if token is not None else os.environ.get("APIFY_TOKEN")
@@ -250,6 +391,8 @@ class ApifyClient:
             raise ValueError("max_retries must be zero or greater")
         if max_charge_usd <= 0:
             raise ValueError("max_charge_usd must be positive")
+        if reserve_usd < 0:
+            raise ValueError("reserve_usd must be zero or greater")
 
         self._token = resolved
         self._run_timeout = timeout
@@ -257,6 +400,7 @@ class ApifyClient:
         self._backoff = backoff
         self._max_charge_usd = max_charge_usd
         self._budget = budget
+        self._reserve_usd = reserve_usd
         self._sleeper = sleeper
         # The sync endpoint can sit until ``timeout``. Give the socket a little
         # longer so httpx does not cancel the request first.
@@ -275,7 +419,7 @@ class ApifyClient:
         if max_items < 1:
             raise ValueError("max_items must be at least 1")
         if self._budget is not None:
-            self._budget.check(actor)
+            self._budget.check(actor, reserve_usd=self._reserve_usd)
 
         url = actor_run_sync_url(actor)
         params = {

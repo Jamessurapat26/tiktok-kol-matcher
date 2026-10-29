@@ -253,6 +253,7 @@ class ApifyKolSearch:
         backoff: float = 1.0,
         max_charge_usd: float = 0.50,
         budget: ApifyBudget | None = None,
+        reserve_usd: float = 0.0,
         sleeper: Any = None,
     ) -> None:
         if max_results < 1:
@@ -265,6 +266,7 @@ class ApifyKolSearch:
             "backoff": backoff,
             "max_charge_usd": max_charge_usd,
             "budget": budget,
+            "reserve_usd": reserve_usd,
         }
         if sleeper is not None:
             client_kwargs["sleeper"] = sleeper

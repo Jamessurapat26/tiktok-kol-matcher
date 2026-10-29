@@ -19,28 +19,11 @@ from .integrations.apify import (
     ApifyLimits,
     estimate_run_cost,
 )
-from .integrations.embeddings import (
-    brand_query_text,
-    kol_document_text,
-    kol_title,
-)
 from .integrations.web_reader import truncate
 from .matching_config import DEFAULT_CONFIG, MatchingConfig
-from .models import (
-    BrandProfile,
-    Judgement,
-    KolProfile,
-    RankedKol,
-    Scores,
-    normalize_handle,
-)
-from .scoring import (
-    mmr_select,
-    recent_videos,
-    score_pool,
-    tier_of,
-    video_matches_brief,
-)
+from .models import BrandProfile, KolProfile, normalize_handle
+from .ranking import diversify, rank_candidates, similarities
+from .scoring import score_pool
 from .state import MatchState
 from .thai import is_thai_creator
 
@@ -48,7 +31,6 @@ Node = Callable[[MatchState], dict[str, Any]]
 
 _SEARCH_ACTOR = "clockworks/tiktok-scraper"
 _PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
-_MAX_EVIDENCE_URLS = 3
 
 
 def _guarded(name: str, *, stage_on_error: bool = True) -> Callable[[Node], Node]:
@@ -130,36 +112,6 @@ def _with_url_aliases(
     return profile.model_copy(update={"brand_names": names})
 
 
-def _evidence_urls(
-    kol: KolProfile,
-    brief: BrandProfile,
-    cfg: MatchingConfig,
-) -> list[str]:
-    """Up to three high-view URLs, preferring on-topic recent videos."""
-    videos = [
-        video
-        for video in recent_videos(kol, cfg)
-        if video.url is not None
-    ]
-    on_topic = [
-        video for video in videos if video_matches_brief(video, brief)
-    ]
-    chosen = sorted(on_topic or videos, key=lambda video: -video.views)
-    return [str(video.url) for video in chosen[:_MAX_EVIDENCE_URLS]]
-
-
-def _unjudged_reason(
-    scores: Scores,
-    kol: KolProfile,
-    cfg: MatchingConfig,
-) -> str:
-    return (
-        f"On-topic in {scores.on_topic:.0%} of recent videos; "
-        f"engagement percentile {scores.E:.2f} in "
-        f"{tier_of(kol.followers, cfg)} tier; not judged."
-    )
-
-
 def make_nodes(
     integrations: Integrations,
     *,
@@ -171,18 +123,6 @@ def make_nodes(
     """Build the graph nodes with integrations and tuning closed over."""
     if enrich_limit is not None and enrich_limit < 1:
         raise ValueError("enrich_limit must be at least 1")
-
-    def _similarities(
-        brand: BrandProfile,
-        kols: list[KolProfile],
-    ) -> list[float]:
-        if not kols:
-            return []
-        return integrations.embedder.similarity(
-            brand_query_text(brand),
-            [kol_document_text(kol) for kol in kols],
-            titles=[kol_title(kol) for kol in kols],
-        )
 
     def _alias_sets(state: MatchState) -> tuple[list[str], list[str]]:
         if state.brand_profile is None:
@@ -382,7 +322,11 @@ def make_nodes(
         if state.brand_profile is None:
             raise ValueError("brand_profile is required before first-pass ranking")
         brand_alias_list, competitor_alias_list = _alias_sets(state)
-        sims = _similarities(state.brand_profile, state.candidates)
+        sims = similarities(
+            integrations.embedder,
+            state.brand_profile,
+            state.candidates,
+        )
         scored = score_pool(
             state.candidates,
             state.brand_profile,
@@ -478,112 +422,38 @@ def make_nodes(
         """Judge the first-pass leaders once, then score every candidate."""
         if state.brand_profile is None:
             raise ValueError("brand_profile is required before judging")
-        brief = state.brand_profile
         brand_alias_list, competitor_alias_list = _alias_sets(state)
-        now = datetime.now(UTC)
-        sims = _similarities(brief, state.candidates)
-
-        first_pass = score_pool(
+        outcome = rank_candidates(
+            state.brand_profile,
             state.candidates,
-            brief,
-            sims,
-            None,
-            brand_alias_list,
-            competitor_alias_list,
-            cfg,
-            now,
-        )
-        first_pass.sort(
-            key=lambda item: (-item.final, normalize_handle(item.kol.handle))
-        )
-        to_judge = [item.kol for item in first_pass[: cfg.judge_top_n]]
-
-        errors: list[str] = []
-        cost_log: list[str] = []
-        judgements: dict[str, Judgement] = {}
-        if to_judge:
-            cost_log.append(
-                f"llm: judge 1 call ({len(to_judge)} creators)"
-            )
-            try:
-                for judgement in integrations.llm.judge(brief, to_judge):
-                    judgements[normalize_handle(judgement.handle)] = judgement
-            except Exception as exc:  # noqa: BLE001 - judging is an optional stage
-                errors.append(f"judge: {exc}")
-
-        scored = score_pool(
-            state.candidates,
-            brief,
-            sims,
-            judgements,
-            brand_alias_list,
-            competitor_alias_list,
-            cfg,
-            now,
-        )
-        ranked: list[RankedKol] = []
-        for item in scored:
-            judgement = judgements.get(normalize_handle(item.kol.handle))
-            reason = (
-                judgement.reason
-                if judgement is not None
-                else _unjudged_reason(item.scores, item.kol, cfg)
-            )
-            ranked.append(
-                RankedKol(
-                    kol=item.kol,
-                    scores=item.scores,
-                    quality=item.quality,
-                    final=item.final,
-                    flags=item.flags,
-                    reason=reason,
-                    evidence_urls=_evidence_urls(item.kol, brief, cfg),
-                    profile_url=(
-                        str(item.kol.url)
-                        or f"https://www.tiktok.com/@{normalize_handle(item.kol.handle)}"
-                    ),
-                )
-            )
-        ranked.sort(
-            key=lambda item: (-item.final, normalize_handle(item.kol.handle))
+            embedder=integrations.embedder,
+            judge_fn=integrations.llm.judge,
+            brand_aliases=brand_alias_list,
+            competitor_aliases=competitor_alias_list,
+            cfg=cfg,
+            now=datetime.now(UTC),
         )
         update: dict[str, Any] = {
-            "ranked": ranked,
+            "ranked": outcome.ranked,
             "stage": "judging",
         }
-        if cost_log:
-            update["cost_log"] = cost_log
-        if errors:
-            update["errors"] = errors
+        if outcome.judged_count:
+            update["cost_log"] = [
+                f"llm: judge 1 call ({outcome.judged_count} creators)"
+            ]
+        if outcome.errors:
+            update["errors"] = outcome.errors
         return update
 
     @_guarded("rank_and_output")
     def rank_and_output(state: MatchState) -> dict[str, Any]:
-        # Bound the MMR similarity work to a small pool around the requested k.
-        pool = state.ranked[: max(3 * state.request.top_k, 30)]
-        docs = [kol_document_text(item.kol) for item in pool]
-        rows: dict[int, list[float]] = {}
-
-        def row(index: int) -> list[float]:
-            if index not in rows:
-                rows[index] = integrations.embedder.similarity(
-                    docs[index],
-                    docs,
-                )
-            return rows[index]
-
-        def sim(left: int, right: int) -> float:
-            return row(left)[right]
-
-        selected = mmr_select(
-            [item.final for item in pool],
-            sim,
+        results = diversify(
+            state.ranked,
+            integrations.embedder,
             state.request.top_k,
-            cfg.mmr_lambda,
+            cfg,
         )
-        update: dict[str, Any] = {
-            "results": [pool[index] for index in selected],
-        }
+        update: dict[str, Any] = {"results": results}
         if state.stage != "failed":
             update["stage"] = "done"
         return update

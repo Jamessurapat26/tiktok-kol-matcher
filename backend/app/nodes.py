@@ -7,6 +7,7 @@ from langgraph.graph import END
 from pydantic import ValidationError
 
 from .brand_match import (
+    MIN_ALIAS_CHARS,
     aliases_from_urls,
     brand_aliases,
     normalize_for_match,
@@ -191,7 +192,7 @@ def make_nodes(
                 str(state.request.website_url),
                 str(state.request.facebook_url),
             )
-            if len(alias) >= 5
+            if len(alias) >= MIN_ALIAS_CHARS
         ]
         kept_queries: list[str] = []
         dropped = 0

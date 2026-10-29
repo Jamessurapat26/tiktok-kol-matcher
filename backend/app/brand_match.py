@@ -11,8 +11,8 @@ from .models import BrandProfile, KolProfile
 # or "." and only when the remaining alias is long enough to stand alone.
 _ALIAS_SUFFIXES = frozenset({"th", "thai", "thailand", "official", "shop", "store"})
 _ALIAS_MIN_CHARS = 3
-_STRIPPED_ALIAS_MIN_CHARS = 5
-_MENTION_ALIAS_MIN_CHARS = 5
+# A stripped or mentioned alias must be long enough to stand on its own.
+MIN_ALIAS_CHARS = 5
 # A suffix-stripped alias must stand on its own. Generic words are not a
 # brand, even when they happen to be five characters long.
 _GENERIC_ALIAS_BASES = frozenset(
@@ -79,7 +79,7 @@ def _alias_variants(raw: str) -> list[str]:
             break
         normalized_base = normalize_for_match(base)
         if (
-            len(normalized_base) < _STRIPPED_ALIAS_MIN_CHARS
+            len(normalized_base) < MIN_ALIAS_CHARS
             or normalized_base in _GENERIC_ALIAS_BASES
         ):
             break
@@ -179,7 +179,7 @@ def mentions_brand(
         alias = normalize_for_match(str(raw))
         if not alias:
             continue
-        if len(alias) < _MENTION_ALIAS_MIN_CHARS and alias not in full_names:
+        if len(alias) < MIN_ALIAS_CHARS and alias not in full_names:
             continue
         if alias in text:
             return True

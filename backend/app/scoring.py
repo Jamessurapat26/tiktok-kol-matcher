@@ -13,7 +13,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from .brand_match import normalize_for_match
+from .brand_match import MIN_ALIAS_CHARS, normalize_for_match
 from .matching_config import MatchingConfig
 from .models import (
     BrandProfile,
@@ -33,8 +33,6 @@ _SPONSOR_MARKERS = (
     "#รีวิว",
     "ได้รับการสนับสนุน",
 )
-
-_MENTION_ALIAS_MIN_CHARS = 5
 
 
 @dataclass(frozen=True)
@@ -297,7 +295,7 @@ def _mention_terms(
         alias = normalize_for_match(str(raw))
         if not alias or alias in seen:
             continue
-        if len(alias) < _MENTION_ALIAS_MIN_CHARS and alias not in trusted_short:
+        if len(alias) < MIN_ALIAS_CHARS and alias not in trusted_short:
             continue
         seen.add(alias)
         terms.append(alias)

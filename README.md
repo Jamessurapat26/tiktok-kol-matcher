@@ -151,12 +151,12 @@ messages, and `/api/health` reports each one only as set or missing.
 | --- | --- | --- |
 | `DEMO_MODE` | `1` forces demo, `0` forces live | unset: live only when `APIFY_TOKEN` is set |
 | `APIFY_TOKEN` | Apify, for Facebook, TikTok search, and enrichment | unset |
-| `APIFY_JOB_BUDGET_USD` | Soft, estimated Apify budget for one job or CLI run | `1.00` |
+| `APIFY_JOB_BUDGET_USD` | Estimated Apify budget for one job or CLI run | `1.00` |
 | `APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD` | Per-run cap for each TikTok search, at least 0.50 | `0.50` |
 | `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD` | Per-run cap for each profile enrichment, at least 0.50 | `0.50` |
 | `APIFY_FACEBOOK_MAX_CHARGE_USD` | Per-run cap for each Facebook page or posts run | `0.50` |
-| `APIFY_ENRICH_RESERVE_USD` | Budget TikTok search must leave for enrichment, below the job budget | `0.30` |
-| `TIKTOK_RESULTS_PER_QUERY` | Videos per TikTok search query, 1-50 | `20` |
+| `APIFY_ENRICH_RESERVE_USD` | Budget TikTok search must leave for enrichment, below the job budget | `0.35` |
+| `TIKTOK_RESULTS_PER_QUERY` | Videos per TikTok search query, 1-50 | `15` |
 | `TIKTOK_PROFILE_VIDEOS` | Recent videos fetched per enriched profile, 1-30 | `10` |
 | `DISCOVERY_MIN_THAI_CANDIDATES` | Thai creators discovery aims for before it stops | `30` |
 | `DISCOVERY_MAX_ROUNDS` | Most query and search rounds, 1-5 | `3` |
@@ -225,7 +225,7 @@ flowchart TD
 3. **Discovery loop.** Query generation and TikTok search repeat until 30
    unique creators that pass the Thai filter are found, or three rounds have
    run. Each round asks the LLM only for 6-10 queries it has not tried yet, and
-   each query returns up to 20 videos. Videos are deduped by author, and up to
+   each query returns up to 15 videos. Videos are deduped by author, and up to
    three captions per author are kept.
 4. **Thai filter.** Keeps a creator when the video language is Thai, the
    account region is Thailand, or the nickname, bio, or search captions contain
@@ -237,8 +237,11 @@ flowchart TD
    hashtags with a local model, and keeps the closest 25 (or `top_k` if that is
    larger) by cosine similarity.
 7. **Rerank.** The LLM scores relevance from 0 to 1 with a short reason, in
-   batches of 5. Engagement, audience fit, and tier fit are deterministic
-   heuristics. The total is the weighted sum, with ties broken by engagement,
+   batches of 5. Each creator card says whether the creator's nickname, bio, or
+   captions name the brand (`mentions_brand`), and the prompt forbids crediting
+   another store's campaign to the brand. After the model replies, a creator who
+   never names the brand has relevance capped at 0.6 and the reason says so.
+   Engagement, audience fit, and tier fit are deterministic heuristics. The total is the weighted sum, with ties broken by engagement,
    then followers.
 
 A fatal node error sets `stage` to `failed` and ends the graph. A partial
@@ -294,25 +297,48 @@ repeatable, and easy to explain. Only relevance, which needs judgement, goes to
 the model. The weights are part of the request model (`weights` in
 `POST /api/jobs`) and are normalised to sum to 1.
 
-**A soft Apify budget plus per-run caps.** Every Apify run sets `maxItems`,
+**An estimated Apify budget plus per-run caps.** Every Apify run sets `maxItems`,
 `limit`, and `maxTotalChargeUsd`. The TikTok actors reject a cap below $0.50,
 so the TikTok caps default to that minimum and a lower value is rejected
 with an error before any run starts. On top of that, `APIFY_JOB_BUDGET_USD` (default $1.00) covers the
 whole job. The sync endpoint returns items but not usage, so spend is
-estimated from the items returned. Once the estimate crosses the budget, the
-remaining Apify calls are skipped and recorded as warnings, and the job still
-finishes with what it has. Enrichment goes to the largest accounts first, so
+estimated from the items returned. A run starts only if its worst-case
+estimate, from the item count it asks for, still fits in the budget. Runs that
+do not fit are skipped and recorded as warnings, and the job still finishes
+with what it has. Enrichment goes to the largest accounts first, so
 the budget is spent on the creators most likely to matter.
 
-**A reserve so search cannot starve enrichment.** Search stops starting new
-runs once the estimated spend plus `APIFY_ENRICH_RESERVE_USD` ($0.30) reaches
-the budget, so the 10 profile runs always have room. The per-item estimates are
-the costs measured on real runs times about 1.5. With the defaults, a job
-estimates about $0.13 for Facebook, up to 11 search runs at $0.055 (about 220
-videos), and $0.25 for enrichment: about $0.98 at most, inside the $1.00
-budget. Real spend should be lower, since the estimates carry the 1.5 margin.
-`estimate_default_job_usd` in `backend/app/integrations/apify.py` reproduces
-this sum.
+**A reserve so search cannot starve enrichment.** A search run starts only
+if the estimated spend, plus that run, plus `APIFY_ENRICH_RESERVE_USD` ($0.35)
+fits in the budget, so the 10 profile runs always have room. Each estimate is
+$0.005 per run plus a per-item rate (TikTok search $0.004, profile $0.003,
+Facebook page $0.015, Facebook posts $0.005), so it follows
+`TIKTOK_RESULTS_PER_QUERY` and `TIKTOK_PROFILE_VIDEOS`. The rates sit a little
+above measured live costs: a 20-video search cost $0.075 (estimate $0.085), and
+a 10-video profile run cost $0.03 (estimate $0.035). With the defaults, the
+worst case is:
+
+| Step | Estimate |
+| --- | --- |
+| Facebook page (1 item) and posts (20 items), uncached | 0.02 + 0.105 = $0.125 |
+| TikTok search, 15 videos per run: 0.005 + 15 × 0.004 = $0.065; 8 runs fit (0.125 + 8 × 0.065 + 0.35 = 0.995) | $0.52 |
+| Profile enrichment, 10 videos: 0.005 + 10 × 0.003 = $0.035, 10 runs | $0.35 |
+| **Total** | **$0.995**, within $1.00 |
+
+A ninth search run would bring it to $1.06, so it is skipped. At measured
+prices the same job costs about $0.86: up to $0.11 for Facebook, about $0.45
+for search, and $0.30 for enrichment. `estimate_default_job_usd` in
+`backend/app/integrations/apify.py` reproduces the table.
+
+**A brand-name check on relevance.** In one live run the model scored a
+creator 0.95 for "collecting the brand's stamps" when the caption was about a
+different retailer's stamp campaign. The brand profile now carries
+`brand_names` (names and aliases in Latin and Thai script from the LLM, plus
+the website's domain label and the Facebook page slug). Matching ignores case,
+spaces, and punctuation, so `Example-Brand`, `#ExampleBrandThailand`, and `examplebrand` are
+one name. A creator whose nickname, bio, and sampled captions never name the
+brand keeps a relevance of at most 0.6. Creators who are a good fit without
+having posted about the brand still rank, just below those who have.
 
 **SSE instead of polling from the browser.** Progress is a one-way stream of
 small events, which is what server-sent events are for. `EventSource`
@@ -337,9 +363,9 @@ and the web reader checks resolved addresses before a direct fetch.
 
 ## Known limitations
 
-- **The Apify budget is an estimate.** It is computed from returned items plus a
-  per-run allowance, not from Apify's billing, and the run that crosses it
-  still finishes. Real spend can land a little over the budget.
+- **The Apify budget is an estimate.** It is computed from item counts and
+  per-item rates measured on this account, not from Apify's billing. If Apify's
+  prices rise, real spend can pass the budget until the rates are updated.
 - **No warning when the budget skips the Facebook run.** If the budget stops a
   Facebook run, the reader quietly falls back to the web reader, or keeps the
   page without posts, and the job shows no warning about it.
@@ -348,11 +374,20 @@ and the web reader checks resolved addresses before a direct fetch.
   may get login text instead of the page's "about".
 - **The ranking weights are not tuned.** 40/25/20/15 is a reasoned starting
   point, not a value fitted to labelled data.
-- **The candidate pool is not yet measured live at the new defaults.** The
-  live run above used the old settings (10 videos per query, a filter on
-  language and region only, a loop that counted every creator), which found 48
-  creators and kept 12. The defaults now aim for 30 Thai creators within the
-  budget, but a live job has not confirmed how many a typical brand gets.
+- **The candidate pool is measured on one brand only.** Two live runs on the
+  same retail brand:
+  - The run in the screenshots used the first settings (10 videos per query, a
+    language-and-region filter, a loop that counted every creator). It found 48
+    creators and kept 12.
+  - A run with 20 videos per query and the Thai-script filter found 210 and kept
+    60 after two rounds. It spent $0.93 of real Apify credit, which showed that
+    the cost estimates were too low. A spend guard in the test harness blocked 9
+    of the 10 profile runs, so the results had no engagement data. The current
+    defaults (15 videos per query, recalibrated estimates, the brand-name check)
+    have not been run live yet.
+- **The brand-name check is literal.** A creator who refers to the brand only
+  in video speech, an image, or an unlisted nickname counts as not naming it,
+  and an alias the LLM misses is not matched.
 - **The Thai filter is a heuristic.** A Thai creator with English-only text and
   no TH region is missed, and a non-Thai account that writes in Thai is kept.
 - **Audience fit is a proxy.** It uses the creator's language and region, not
@@ -363,7 +398,7 @@ and the web reader checks resolved addresses before a direct fetch.
 ## Testing
 
 ```bash
-cd backend && uv run pytest          # 312 tests
+cd backend && uv run pytest          # 338 tests
 cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 41 Vitest tests
 ```
 

@@ -247,7 +247,10 @@ flowchart TD
 4. **Hard filters.** Free rules drop the brand's own accounts, competitor
    accounts, shop and media accounts, creators who are not Thai, creators
    outside 1k–5M followers, and creators whose latest post is over 60 days
-   old. Each rejection is counted by reason for the CLI and API output.
+   old. The activity rule waits until after enrichment, because a search hit
+   is not a creator's newest video; every rule then runs again on the
+   enriched profiles. Each rejection is counted by reason for the CLI and API
+   output.
 5. **First-pass rank.** Every survivor is scored with data already in hand:
    embedding similarity, on-topic share, and search-derived engagement. The
    judge has not run yet, so `judge = sim percentile` and `A_eff = 0.5`. The
@@ -259,7 +262,10 @@ flowchart TD
    stats, get lower engagement confidence, and carry the `search_stats_only`
    flag.
 7. **Judge.** The top 15 go to one batched LLM call. It returns `judge`, `A`,
-   and a confidence `c` per creator. The rubric checks category match, tone
+   and a confidence `c` per creator. Creators the reply leaves out are asked
+   for once more; any still missing are reported and ranked unjudged, with
+   `judge` capped at a neutral 0.5 so they cannot pass the judged leaders on
+   similarity alone. The rubric checks category match, tone
    match, and no risky content. Audience is estimated from text, captions, and
    bio only, never from faces. Risky content becomes a flag.
 8. **Output.** Every candidate is scored again now that judged values exist.

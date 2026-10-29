@@ -206,3 +206,34 @@ def test_normal_creator_passes():
     brief = _brief()
 
     assert _filter(_kol("normalkol", nickname="Normal KOL"), brief) is None
+
+
+def test_short_shop_media_tokens_do_not_match_inside_ordinary_words():
+    brief = _brief()
+
+    assert _filter(_kol("smallgirl"), brief) is None
+    assert _filter(_kol("itvlogs"), brief) is None
+    assert _filter(_kol("dailyclip", nickname="Small Things"), brief) is None
+    assert _filter(_kol("small_things"), brief) is None
+    assert _filter(_kol("gamer.tv"), brief) == SHOP_MEDIA_ACCOUNT
+    assert _filter(_kol("channeltv"), brief) == SHOP_MEDIA_ACCOUNT
+    assert _filter(_kol("dailyclip", nickname="Gamer News"), brief) == SHOP_MEDIA_ACCOUNT
+
+
+def test_activity_can_be_left_for_after_enrichment():
+    brief = _brief()
+    kol = _kol("viralhit.creator", videos=[_video(90)])
+
+    assert _filter(kol, brief) == INACTIVE
+    assert (
+        hard_filter(
+            kol,
+            brief,
+            _aliases(brief),
+            normalized_aliases(brief.competitors),
+            DEFAULT_CONFIG,
+            NOW,
+            check_activity=False,
+        )
+        is None
+    )

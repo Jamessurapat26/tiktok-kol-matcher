@@ -552,3 +552,39 @@ def test_events_stream_live_while_job_runs(tmp_path):
 
     assert types[0] == "node"
     assert types[-1] == "done"
+
+
+def test_jobs_stored_before_matching_v2_still_load(tmp_path):
+    store = JobStore(tmp_path / "jobs.db")
+    legacy = {
+        "id": "legacy",
+        "status": "succeeded",
+        "stage": "done",
+        "request": {
+            **_BODY,
+            "top_k": 5,
+            "weights": {"relevance": 0.4, "engagement": 0.25, "audience": 0.2, "tier": 0.15},
+        },
+        "flags": {},
+        "errors": [],
+        "brand_profile": {"category": "eyewear", "products": ["glasses"], "keywords_th": []},
+        "results": [{"kol": {"handle": "old"}, "total_score": 0.8}],
+        "created_at": "2026-10-01T00:00:00+00:00",
+        "updated_at": "2026-10-01T00:00:00+00:00",
+    }
+    with sqlite3.connect(tmp_path / "jobs.db") as conn:
+        conn.execute(
+            "INSERT INTO jobs (id, status, created_at, data) VALUES (?, ?, ?, ?)",
+            ("legacy", "succeeded", legacy["created_at"], json.dumps(legacy)),
+        )
+    store.create(MatchRequest(**_BODY), flags=LiveFlags())
+
+    jobs = store.recent(10)
+
+    old = next(job for job in jobs if job.id == "legacy")
+    assert len(jobs) == 2
+    assert old.request.top_k == 5
+    assert old.brand_profile is None
+    assert old.results == []
+    assert any("earlier version" in error for error in old.errors)
+    assert store.get("legacy") == old

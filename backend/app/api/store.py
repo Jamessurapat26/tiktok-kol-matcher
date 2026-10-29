@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import threading
 import uuid
@@ -6,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from ..models import BrandProfile, MatchRequest, RankedKol
 from .settings import LiveFlags
@@ -63,6 +64,41 @@ class Job(BaseModel):
     updated_at: str
 
 
+LEGACY_JOB_NOTE = (
+    "stored by an earlier version; its brand profile and results use an old "
+    "format and are not shown"
+)
+
+
+def _parse_job(data: str) -> Job:
+    """Load a stored job, downgrading rows written before matching-v2.
+
+    Older rows carry ``request.weights``, an old brand profile, and old result
+    rows. They stay listable: the request is kept, the old profile and results
+    are dropped, and the job says why.
+    """
+    try:
+        return Job.model_validate_json(data)
+    except ValidationError:
+        raw = json.loads(data)
+        if not isinstance(raw, dict):
+            raise
+    request = raw.get("request")
+    if isinstance(request, dict):
+        raw["request"] = {
+            key: request[key]
+            for key in ("website_url", "facebook_url", "top_k")
+            if key in request
+        }
+    raw["brand_profile"] = None
+    raw["results"] = []
+    errors = raw.get("errors") if isinstance(raw.get("errors"), list) else []
+    if LEGACY_JOB_NOTE not in errors:
+        errors = [*errors, LEGACY_JOB_NOTE]
+    raw["errors"] = errors
+    return Job.model_validate(raw)
+
+
 class Event(BaseModel):
     job_id: str
     seq: int
@@ -116,7 +152,7 @@ class JobStore:
     def get(self, job_id: str) -> Job | None:
         with closing(self._connect()) as conn:
             row = conn.execute("SELECT data FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        return Job.model_validate_json(row[0]) if row else None
+        return _parse_job(row[0]) if row else None
 
     def recent(self, limit: int) -> list[Job]:
         with closing(self._connect()) as conn:
@@ -124,7 +160,7 @@ class JobStore:
                 "SELECT data FROM jobs ORDER BY created_at DESC, rowid DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        return [Job.model_validate_json(row[0]) for row in rows]
+        return [_parse_job(row[0]) for row in rows]
 
     def progress(
         self,
@@ -214,7 +250,7 @@ class JobStore:
         row = conn.execute("SELECT data FROM jobs WHERE id = ?", (job_id,)).fetchone()
         if row is None:
             raise KeyError(job_id)
-        return Job.model_validate_json(row[0])
+        return _parse_job(row[0])
 
     def _save(self, conn: sqlite3.Connection, job: Job, **changes: object) -> Job:
         job = Job.model_validate({**job.model_dump(), **changes, "updated_at": _now()})

@@ -99,11 +99,13 @@ Shape: {"creators": [{"handle": "...", "judge": 0.0, "audience": 0.0,
 "audience_confidence": 0.0, "reason": "...", "risky": false}]}
 
 Rubric:
-- judge is 0 to 1: category match, tone match, and no risky content. 1 means the
-  creator clearly covers the brand's category in a fitting tone with no risky
-  content. 0 means unrelated or clearly unsuitable. The brand's own account,
-  other shops, and competing brands are low fits however closely their products
-  match.
+- judge is 0 to 1: score content fit to the brand using category match, tone
+  match, and brand safety (no risky content). 1 means the creator clearly covers
+  the brand's category in a fitting tone with no risky content. 0 means unrelated
+  or clearly unsuitable. A creator not mentioning the brand is normal and must
+  NOT lower the judge score; brand mentions are not required. The brand's own
+  account, other shops, and competing brands are low fits however closely their
+  products match.
 - audience is 0 to 1: does the creator's content, captions, and bio suggest an
   audience that matches target_audience? Use text/content/bio ONLY. Never infer
   age or gender from faces, appearance, or photos.
@@ -112,8 +114,9 @@ Rubric:
 - risky is true when the creator's content shows gambling, casino, or similar
   unsafe content.
 - reason is one short sentence. Only say a creator posts about the brand when a
-  brand name appears in their text. Copy every handle from the input unchanged.
-  Include each creator you judge exactly once.
+  brand name appears in their text; never claim that without that evidence. This
+  rule only governs the reason wording, not the judge score. Copy every handle
+  from the input unchanged. Include each creator you judge exactly once.
 """
 
 JSON_RETRY_USER = (

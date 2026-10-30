@@ -7,7 +7,10 @@ Each query is one synchronous run of
 A query that is only hashtags (an optional trailing "tiktok" is ignored) is
 sent as ``hashtags``. Every other query is sent as ``searchQueries`` with
 ``searchSection`` ``/video``, so each dataset item is a video that carries
-``authorMeta`` (handle, profile URL, ``fans``, ``signature``).
+``authorMeta`` (handle, profile URL, ``fans``, ``signature``) and the creator's
+avatar under ``authorMeta.originalAvatarUrl`` / ``authorMeta.avatar``. The
+avatar URL is kept as ``avatar_url`` even though ``shouldDownloadAvatars`` stays
+off (the actor reports URL fields by default).
 
 Videos are deduped by author. The higher follower count wins; empty bio,
 nickname, language, and region are filled from the other video. Every item's
@@ -36,6 +39,7 @@ from .apify import (
     ApifyClient,
     ApifyError,
     as_count,
+    avatar_from_item,
     dig,
 )
 from .tiktok_videos import video_from_item
@@ -45,7 +49,7 @@ SEARCH_ACTOR = "clockworks/tiktok-scraper"
 _HASHTAG_TOKEN = re.compile(r"#([\w\u0E00-\u0E7F]+)")
 _TIKTOK_WORD = re.compile(r"tiktok", re.IGNORECASE)
 _UNKNOWN_LANG = frozenset({"un", "und", "unknown", "none", "null"})
-_PROFILE_FIELDS = ("nickname", "bio", "text_language", "location_created")
+_PROFILE_FIELDS = ("nickname", "bio", "text_language", "location_created", "avatar_url")
 _CAPTION_CHARS = 300
 _SUMMARY_CHARS = 500
 _MAX_CAPTIONS = 3
@@ -141,6 +145,9 @@ def map_search_item(item: Any) -> dict[str, Any]:
     nickname = dig(item, "authorMeta", "nickName")
     if isinstance(nickname, str) and nickname.strip():
         row["nickname"] = nickname.strip()
+    avatar = avatar_from_item(item)
+    if avatar:
+        row["avatar_url"] = avatar
     signature = dig(item, "authorMeta", "signature")
     if isinstance(signature, str):
         bio = re.sub(r"\s+", " ", signature).strip()

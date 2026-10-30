@@ -184,6 +184,7 @@ class KolProfile(DomainModel):
     handle: str
     url: HttpUrl
     nickname: str | None = None
+    avatar_url: str | None = None
     followers: int = Field(default=0, ge=0)
     bio: str | None = None
     language: str | None = None

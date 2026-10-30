@@ -78,6 +78,7 @@ def _kol_from_fixture(raw: dict) -> KolProfile:
         handle=str(raw["handle"]),
         url=str(raw["url"]),
         nickname=raw.get("nickname"),
+        avatar_url=raw.get("avatar_url"),
         followers=int(raw.get("followers", 0)),
         bio=raw.get("bio"),
         language=raw.get("text_language"),

@@ -1,0 +1,78 @@
+import { fireEvent, render, screen } from '@testing-library/react'
+import type { RankedKol } from '@/api/types'
+import { initials } from '@/lib/format'
+import { ResultsCard } from './ResultsCard'
+
+function ranked(handle: string, avatarUrl?: string | null): RankedKol {
+  return {
+    kol: {
+      handle,
+      url: `https://www.tiktok.com/@${handle}`,
+      nickname: null,
+      ...(avatarUrl === undefined ? {} : { avatar_url: avatarUrl }),
+      followers: 1000,
+      bio: null,
+      language: 'th',
+      region: 'TH',
+      posts_per_week: 2,
+      content_summary: null,
+      videos: [],
+      stats_source: 'search',
+      source: 'seed',
+    },
+    scores: {
+      F: 0.5,
+      E: 0.25,
+      T: 1,
+      A_eff: 0.75,
+      F_conf: 0.9,
+      E_conf: 0.8,
+      T_conf: 0.7,
+      A_conf: 0.6,
+      sim: 0.4,
+      on_topic: 0.3,
+      judge: 0.5,
+      er_star: 0.1,
+      reach: 0.2,
+      judged: true,
+    },
+    quality: 0.5,
+    final: 0.5,
+    flags: [],
+    reason: 'Good fit.',
+    evidence_urls: [],
+    profile_url: `https://www.tiktok.com/@${handle}`,
+  }
+}
+
+function renderCard(row: RankedKol) {
+  render(<ResultsCard jobId="job" results={[row]} pending={false} failed={false} />)
+}
+
+describe('ResultsCard avatar', () => {
+  it('renders the profile picture when avatar_url is set', () => {
+    renderCard(ranked('avatarkol', 'https://example.com/a.jpg'))
+
+    const img = screen.getByRole('img', { name: 'avatarkol' })
+    expect(img).toHaveAttribute('src', 'https://example.com/a.jpg')
+    expect(img).toHaveAttribute('loading', 'lazy')
+    expect(img).toHaveAttribute('referrerpolicy', 'no-referrer')
+    expect(screen.queryByTestId('kol-initials')).not.toBeInTheDocument()
+  })
+
+  it('falls back to initials when the picture fails to load', () => {
+    renderCard(ranked('brokenkol', 'https://example.com/a.jpg'))
+
+    fireEvent.error(screen.getByRole('img', { name: 'brokenkol' }))
+
+    expect(screen.queryByRole('img', { name: 'brokenkol' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('kol-initials')).toHaveTextContent(initials('brokenkol'))
+  })
+
+  it.each([undefined, null])('shows initials when avatar_url is %s', (avatarUrl) => {
+    renderCard(ranked('plainkol', avatarUrl))
+
+    expect(screen.queryByRole('img', { name: 'plainkol' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('kol-initials')).toHaveTextContent(initials('plainkol'))
+  })
+})

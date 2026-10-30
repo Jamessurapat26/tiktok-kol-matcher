@@ -395,6 +395,25 @@ def dig(item: dict[str, Any], *path: str) -> Any:
     return None
 
 
+def avatar_from_item(item: dict[str, Any]) -> str | None:
+    """Read a creator's avatar URL from the documented aliases.
+
+    The original (un-resized) URL wins when the actor returned it; the shared
+    ``dig`` also covers the flat ``authorMeta.avatar`` overview-view keys.
+    """
+    for candidate in (
+        dig(item, "authorMeta", "originalAvatarUrl"),
+        dig(item, "authorMeta", "avatar"),
+        dig(item, "avatar"),
+    ):
+        if not isinstance(candidate, str):
+            continue
+        url = candidate.strip()
+        if url.startswith(("http://", "https://")):
+            return url
+    return None
+
+
 def as_count(value: object) -> int | None:
     """Coerce a documented count field to a non-negative int."""
     if isinstance(value, bool) or value is None:

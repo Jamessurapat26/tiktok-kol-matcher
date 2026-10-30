@@ -766,3 +766,57 @@ def test_smoke_script_exits_2_without_a_token(monkeypatch):
     assert result.returncode == 2
     assert "APIFY_TOKEN" in result.stderr
     assert result.stdout == ""
+
+
+def _avatar_item(**author) -> dict:
+    return {
+        "id": 7543693751290481001,
+        "text": "gaming glasses",
+        "createTimeISO": "2026-10-20T10:00:00.000Z",
+        "authorMeta": {"name": "avatar_user", "fans": 10, **author},
+    }
+
+
+def test_map_search_item_prefers_the_original_avatar_url():
+    row = map_search_item(
+        _avatar_item(
+            avatar="https://example.com/small.jpg",
+            originalAvatarUrl="https://example.com/a.jpg",
+        )
+    )
+
+    assert row["avatar_url"] == "https://example.com/a.jpg"
+
+
+def test_map_search_item_falls_back_to_the_avatar_field():
+    row = map_search_item(_avatar_item(avatar="https://example.com/a.jpg"))
+
+    assert row["avatar_url"] == "https://example.com/a.jpg"
+
+
+def test_map_search_item_skips_a_missing_or_non_http_avatar():
+    assert "avatar_url" not in map_search_item(_avatar_item())
+    assert "avatar_url" not in map_search_item(_avatar_item(avatar="not-a-url"))
+
+
+def test_enrich_from_items_returns_the_profile_avatar_url():
+    items = [
+        {**_avatar_item(originalAvatarUrl="https://example.com/a.jpg"), "id": 1},
+        {**_avatar_item(avatar="https://example.com/b.jpg"), "id": 2},
+    ]
+
+    update = enrich_from_items(items, followers=10)
+
+    assert update["avatar_url"] == "https://example.com/a.jpg"
+
+
+def test_kol_profile_without_avatar_url_defaults_to_none():
+    kol = KolProfile.model_validate(
+        {
+            "handle": "noavatar",
+            "url": "https://www.tiktok.com/@noavatar",
+            "source": "apify",
+        }
+    )
+
+    assert kol.avatar_url is None

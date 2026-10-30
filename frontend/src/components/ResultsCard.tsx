@@ -1,5 +1,6 @@
 import { Download, ExternalLink } from 'lucide-react'
-import type { RankedKol } from '@/api/types'
+import { useState } from 'react'
+import type { KolProfile, RankedKol } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,6 +66,32 @@ export function ResultsCard({ jobId, results, pending, failed }: Props) {
   )
 }
 
+/** Profile picture, falling back to the initials circle when missing or broken. */
+function KolAvatar({ kol }: { kol: KolProfile }) {
+  const [failed, setFailed] = useState(false)
+  if (kol.avatar_url && !failed) {
+    return (
+      <img
+        src={kol.avatar_url}
+        alt={kol.handle}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className="size-10 shrink-0 rounded-full bg-accent-soft object-cover"
+      />
+    )
+  }
+  return (
+    <span
+      aria-hidden
+      data-testid="kol-initials"
+      className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-body-sm font-bold text-info"
+    >
+      {initials(kol.handle)}
+    </span>
+  )
+}
+
 function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
   const { kol, scores } = row
   const scoreRows = [
@@ -81,12 +108,7 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
           <span className="sr-only">Rank </span>
           {rank}
         </span>
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-soft text-body-sm font-bold text-info"
-        >
-          {initials(kol.handle)}
-        </span>
+        <KolAvatar kol={kol} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <a

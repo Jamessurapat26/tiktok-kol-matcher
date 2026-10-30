@@ -89,6 +89,8 @@ export interface KolProfile {
   handle: string
   url: string
   nickname: string | null
+  /** TikTok profile picture URL. Absent on rows stored before the field existed. */
+  avatar_url?: string | null
   followers: number
   bio: string | null
   language: string | null

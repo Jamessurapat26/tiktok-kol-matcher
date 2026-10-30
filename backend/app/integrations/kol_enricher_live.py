@@ -38,7 +38,7 @@ import httpx
 from pydantic import ValidationError
 
 from ..models import KolProfile, VideoStats, normalize_handle
-from .apify import ApifyBudget, ApifyClient, ApifyError, dig
+from .apify import ApifyBudget, ApifyClient, ApifyError, avatar_from_item, dig
 from .tiktok_videos import video_from_item
 
 PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
@@ -135,7 +135,21 @@ def enrich_from_items(items: list[Any], *, followers: int) -> dict[str, Any]:
     summary = content_summary(videos)
     if summary:
         update["content_summary"] = summary
+    avatar = _profile_avatar(items)
+    if avatar:
+        update["avatar_url"] = avatar
     return update
+
+
+def _profile_avatar(items: list[Any]) -> str | None:
+    """First avatar URL found on the returned profile items."""
+    for item in items:
+        if not isinstance(item, dict) or item.get("errorCode"):
+            continue
+        avatar = avatar_from_item(item)
+        if avatar:
+            return avatar
+    return None
 
 
 def _author_handle(item: dict[str, Any]) -> str | None:
@@ -216,6 +230,9 @@ def _clean_update(update: dict[str, Any]) -> dict[str, Any]:
     posts = update.get("posts_per_week")
     if isinstance(posts, (int, float)) and not isinstance(posts, bool) and float(posts) >= 0:
         clean["posts_per_week"] = float(posts)
+    avatar = update.get("avatar_url")
+    if isinstance(avatar, str) and avatar.strip():
+        clean["avatar_url"] = avatar.strip()
     summary = update.get("content_summary")
     if isinstance(summary, str) and summary.strip():
         clean["content_summary"] = summary.strip()

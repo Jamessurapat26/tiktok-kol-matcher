@@ -64,6 +64,7 @@ export default function App() {
             <>
               <BrandProfileCard
                 websiteUrl={job.data?.request.website_url ?? null}
+                logoUrl={job.data?.brand_logo_url ?? null}
                 profile={job.data?.brand_profile ?? null}
                 unavailable={terminal && !job.data?.brand_profile}
               />

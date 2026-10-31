@@ -50,11 +50,13 @@ def run_job(
         ):
             if mode == "values":
                 final = payload
+                facebook_page = payload.get("facebook_page")
                 store.progress(
                     job_id,
                     stage=payload["stage"],
                     errors=payload["errors"],
                     brand_profile=payload.get("brand_profile"),
+                    brand_logo_url=facebook_page.logo_url if facebook_page else None,
                     rejected=payload.get("rejected") or {},
                     cost_log=payload.get("cost_log") or [],
                 )

@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import type { BrandProfile, TargetAudience, Tier } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatCompact, hostOf } from '@/lib/format'
+import { formatCompact, hostOf, initials } from '@/lib/format'
 
 const GENDER_LABELS: Record<TargetAudience['gender'], string> = {
   any: 'ทุกเพศ',
@@ -43,21 +43,49 @@ function Keywords({ words }: { words: string[] }) {
   )
 }
 
+/** Brand logo, falling back to the initials square when missing or broken. */
+function BrandLogo({ url, name }: { url: string | null; name: string }) {
+  const [failed, setFailed] = useState(false)
+  if (url && !failed) {
+    return (
+      <img
+        src={url}
+        alt={`โลโก้ ${name}`}
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className="row-span-2 size-14 self-center rounded-xl bg-accent-soft object-cover"
+      />
+    )
+  }
+  return (
+    <span
+      aria-hidden
+      data-testid="brand-initials"
+      className="row-span-2 flex size-14 items-center justify-center self-center rounded-xl bg-accent-soft text-heading-sm font-bold text-info"
+    >
+      {initials(name)}
+    </span>
+  )
+}
+
 interface Props {
   websiteUrl: string | null
+  logoUrl: string | null
   profile: BrandProfile | null
   /** The search stopped before a profile was made. */
   unavailable: boolean
 }
 
-export function BrandProfileCard({ websiteUrl, profile, unavailable }: Props) {
+export function BrandProfileCard({ websiteUrl, logoUrl, profile, unavailable }: Props) {
   // The API has no brand name field; the website host names the brand.
   const name = websiteUrl ? hostOf(websiteUrl) : 'แบรนด์'
   const interests = profile ? thai(profile.interests_th, profile.target_audience.interests) : []
   const keywords = profile ? [...new Set([...profile.topic_keywords_th, ...profile.topic_keywords_en])] : []
   return (
     <Card aria-busy={!profile && !unavailable}>
-      <CardHeader>
+      <CardHeader className="grid-cols-[auto_minmax(0,1fr)] gap-x-4">
+        {/* The key clears a past load failure when another search is opened. */}
+        <BrandLogo key={logoUrl} url={logoUrl} name={name} />
         <CardTitle className="text-heading-md">{name}</CardTitle>
         <CardDescription>
           {profile ? thai(profile.category_th, profile.category) : 'ข้อมูลแบรนด์'}

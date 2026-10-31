@@ -74,6 +74,7 @@ def page_from_items(url: str, items: list[Any]) -> FacebookPage:
         followers=followers or 0,
         website=_website(item),
         ad_running="currently running ads" in ad_status and "not currently" not in ad_status,
+        logo_url=_logo_url(item),
     )
 
 
@@ -145,6 +146,12 @@ def _website(item: dict[str, Any]) -> str | None:
         except ValidationError:
             continue
     return None
+
+
+def _logo_url(item: dict[str, Any]) -> str | None:
+    # ``profilePhoto`` is a Facebook photo page, not an image file.
+    url = _text(item.get("profilePictureUrl"))
+    return url if url and url.startswith(("http://", "https://")) else None
 
 
 def default_facebook_cache_dir() -> Path:

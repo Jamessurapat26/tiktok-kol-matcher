@@ -57,6 +57,7 @@ class Job(BaseModel):
     flags: LiveFlags
     errors: list[str] = []
     brand_profile: BrandProfile | None = None
+    brand_logo_url: str | None = None
     rejected: dict[str, int] = Field(default_factory=dict)
     cost_log: list[str] = Field(default_factory=list)
     results: list[RankedKol] = []
@@ -169,6 +170,7 @@ class JobStore:
         stage: str,
         errors: list[str],
         brand_profile: BrandProfile | None = None,
+        brand_logo_url: str | None = None,
         rejected: dict[str, int] | None = None,
         cost_log: list[str] | None = None,
     ) -> None:
@@ -177,6 +179,7 @@ class JobStore:
             "stage": stage,
             "errors": errors,
             "brand_profile": brand_profile,
+            "brand_logo_url": brand_logo_url,
         }
         if rejected is not None:
             changes["rejected"] = rejected

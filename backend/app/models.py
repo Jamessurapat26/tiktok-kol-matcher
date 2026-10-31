@@ -67,6 +67,8 @@ class FacebookPage(DomainModel):
     price_range: str | None = None
     website: HttpUrl | None = None
     ad_running: bool = False
+    # Direct link to the page's profile picture, which is usually the brand logo.
+    logo_url: str | None = None
     recent_posts: list[str] = Field(default_factory=list)
     # Set only when Apify failed and the web fallback produced the page.
     source_warning: str | None = None

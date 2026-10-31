@@ -100,6 +100,9 @@ docker build --build-arg INSTALL_EMBED=true -t tkm-backend backend
 You need Python 3.13 with [uv](https://docs.astral.sh/uv/), and Node 24 with
 pnpm 11.
 
+`./start.sh` loads `.env` and runs both servers; Ctrl-C stops them. Add `--demo`
+to force demo mode. To run them separately:
+
 ```bash
 # terminal 1: API in demo mode on :8000
 cd backend

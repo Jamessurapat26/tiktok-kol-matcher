@@ -1,35 +1,50 @@
-import { Check, ChevronDown, Circle, Loader2, X } from 'lucide-react'
-import { useState } from 'react'
+import { Check, Circle, Loader2, X } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatDateTime, formatDuration } from '@/lib/format'
-import { type Progress, STAGE_LABELS, type Step, type StepStatus, stepDuration } from '@/lib/steps'
+import { failureMessage, type Progress, type StepStatus, type VisibleStep, visibleSteps } from '@/lib/steps'
 import { cn } from '@/lib/utils'
 
-export function ProgressCard({ progress, connected }: { progress: Progress; connected: boolean }) {
+const STATUS_LABELS: Record<StepStatus, string> = {
+  pending: 'รอดำเนินการ',
+  running: 'กำลังทำงาน',
+  finished: 'เสร็จแล้ว',
+  failed: 'ไม่สำเร็จ',
+}
+
+interface Props {
+  progress: Progress
+  connected: boolean
+  /** How many KOLs the finished Search ranked, once the job has been refetched. */
+  resultCount?: number
+}
+
+export function ProgressCard({ progress, connected, resultCount }: Props) {
   const { outcome } = progress
-  const running = progress.steps.find((s) => s.status === 'running')
+  const steps = visibleSteps(progress)
+  const running = steps.find((step) => step.status === 'running')
   const status = outcome
     ? outcome.type === 'done'
-      ? `Done: ${outcome.summary}`
-      : `Failed: ${outcome.summary}`
+      ? resultCount === undefined
+        ? 'จัดอันดับ KOL เสร็จแล้ว'
+        : `จัดอันดับ KOL แล้ว ${resultCount} คน`
+      : failureMessage(progress)
     : running
-      ? `Running: ${STAGE_LABELS[running.stage]}`
+      ? `กำลัง${running.label}`
       : connected
-        ? 'Waiting for the pipeline to start'
-        : 'Connecting…'
+        ? 'กำลังเริ่มการค้นหา'
+        : 'กำลังเชื่อมต่อ…'
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Progress</CardTitle>
+        <CardTitle>ความคืบหน้า</CardTitle>
         <CardDescription aria-live="polite" className={cn(outcome?.type === 'failed' && 'text-error')}>
           {status}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <ol className="flex flex-col">
-          {progress.steps.map((step, i) => (
-            <StepRow key={step.stage} step={step} last={i === progress.steps.length - 1} />
+          {steps.map((step, i) => (
+            <StepRow key={step.label} step={step} last={i === steps.length - 1} />
           ))}
         </ol>
       </CardContent>
@@ -37,82 +52,24 @@ export function ProgressCard({ progress, connected }: { progress: Progress; conn
   )
 }
 
-function StepRow({ step, last }: { step: Step; last: boolean }) {
-  const [open, setOpen] = useState(false)
-  const duration = stepDuration(step)
-  const detailId = `step-${step.stage}-detail`
-  const hasDetail = step.runs > 0
-
+function StepRow({ step, last }: { step: VisibleStep; last: boolean }) {
   return (
     <li className="relative flex gap-3 pb-4 last:pb-0">
       {!last && <span aria-hidden className="absolute top-7 bottom-0 left-3 w-px bg-border" />}
       <StepIcon status={step.status} />
       <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          className="flex w-full items-start justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-default"
-          aria-expanded={hasDetail ? open : undefined}
-          aria-controls={hasDetail ? detailId : undefined}
-          disabled={!hasDetail}
-          onClick={() => setOpen((o) => !o)}
+        <span
+          className={cn(
+            'block text-body-sm font-bold',
+            step.status === 'pending' ? 'text-muted-foreground' : 'text-ink',
+            step.status === 'running' && 'text-primary',
+          )}
         >
-          <span className="min-w-0">
-            <span
-              className={cn(
-                'flex flex-wrap items-center gap-x-2 text-body-sm font-bold',
-                step.status === 'pending' ? 'text-muted-foreground' : 'text-ink',
-                step.status === 'running' && 'text-primary',
-              )}
-            >
-              {STAGE_LABELS[step.stage]}
-              {step.runs > 1 && (
-                <span className="rounded-full bg-accent-soft px-2 py-0.5 text-body-xs whitespace-nowrap text-info">
-                  round {step.runs}
-                </span>
-              )}
-              <span className="sr-only">, {step.status}</span>
-            </span>
-            {step.status === 'failed' && step.error ? (
-              <span className="block text-body-xs break-words text-error">{step.error}</span>
-            ) : (
-              step.summary && (
-                <span className="block truncate text-body-xs text-muted-foreground">{step.summary}</span>
-              )
-            )}
-          </span>
-          <span className="flex shrink-0 items-center gap-1 text-body-xs text-muted-foreground">
-            {duration !== null && formatDuration(duration)}
-            {hasDetail && (
-              <ChevronDown aria-hidden className={cn('size-4 transition-transform', open && 'rotate-180')} />
-            )}
-          </span>
-        </button>
-        {hasDetail && open && (
-          <dl
-            id={detailId}
-            className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body-xs text-muted-foreground"
-          >
-            <dt>Stage</dt>
-            <dd className="font-mono">{step.stage}</dd>
-            {step.startedAt && (
-              <>
-                <dt>Started</dt>
-                <dd>{formatDateTime(step.startedAt)}</dd>
-              </>
-            )}
-            {step.runs > 1 && (
-              <>
-                <dt>Runs</dt>
-                <dd>{step.runs} (the latest run is shown)</dd>
-              </>
-            )}
-            {step.summary && (
-              <>
-                <dt>Summary</dt>
-                <dd className="break-words">{step.summary}</dd>
-              </>
-            )}
-          </dl>
+          {step.label}
+          <span className="sr-only">, {STATUS_LABELS[step.status]}</span>
+        </span>
+        {step.partial && (
+          <span className="block text-body-xs text-warning">ทำได้บางส่วน ระบบทำงานต่อแล้ว</span>
         )}
       </div>
     </li>

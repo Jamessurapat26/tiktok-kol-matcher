@@ -3,7 +3,7 @@
 Give it a brand's website and Facebook page, and it returns a ranked, explained
 shortlist of Thai TikTok creators who fit the brand.
 
-![Ranked results from a live run](docs/screenshots/live-results.png)
+![Ranked results in demo mode](docs/screenshots/demo-overview.png)
 
 KOL Matcher is a LangGraph pipeline behind a FastAPI service and a React web
 app. It reads the brand's own pages, has an LLM build a structured brand brief,
@@ -24,9 +24,12 @@ competitor accounts, shop and media accounts, creators who are not Thai,
 creators outside 1k–5M followers, and creators whose latest post is over 60
 days old.
 
-Every result shows F, E, T, A_eff, their confidences, flags, quality, final, a
-one-line reason, up to three evidence video links, and the profile URL. The
-whole pipeline also runs offline in demo mode, with no keys.
+The API and CLI return F, E, T, A_eff, their confidences, flags, quality, final,
+a one-line reason, up to three evidence video links, and the profile URL. The web
+app is in Thai and written for marketers: it shows the scores out of 100, marks
+low-confidence scores as limited data, and names flags in plain words (see
+[GLOSSARY.md](GLOSSARY.md)). The whole pipeline also runs offline in demo mode,
+with no keys.
 
 ## Contents
 
@@ -44,24 +47,21 @@ whole pipeline also runs offline in demo mode, with no keys.
 
 ## Screenshots
 
-These come from one live run with every integration on (website, Facebook,
-TikTok search, LLM, and embeddings). The brand URL is only sample input. That
-run used 10 videos per query, found 48 creators, and took about three minutes
-for a top 10; it predates matching v2. No live run has used matching v2 yet.
+These come from demo mode, so the brand and every result are sample data.
 
-| Brand form | Live progress |
+| Brand form | Progress |
 | --- | --- |
-| ![Brand form with the live toggles](docs/screenshots/live-form.png) | ![Stepper mid-run, with the brand profile already shown](docs/screenshots/live-progress.png) |
+| ![Brand form](docs/screenshots/demo-form.png) | ![Stepper mid-run, with the brand profile already shown](docs/screenshots/demo-progress.png) |
 
 The brand profile appears as soon as `analyze_brand` finishes, while discovery
-is still running. Each step shows its duration and a short summary such as
-`queries+6` or `candidates=12`.
+is still running. The web app folds the pipeline stages into five steps; the
+API's event stream and the CLI keep the per-node detail.
 
 | Score breakdown | Mobile |
 | --- | --- |
-| ![Expanded row with the component scores](docs/screenshots/live-score-breakdown.png) | <img src="docs/screenshots/live-mobile.png" alt="Results on a phone-width screen" width="220"> |
+| ![A result row with its component scores](docs/screenshots/demo-score-breakdown.png) | <img src="docs/screenshots/demo-mobile.png" alt="Results on a phone-width screen" width="220"> |
 
-Demo mode runs the same UI on fixtures. The history sheet reopens earlier jobs,
+The history sheet reopens earlier jobs,
 and the job id stays in the URL as `?job=`, so a reload or a shared link opens
 the same job.
 
@@ -79,7 +79,7 @@ docker compose up --build
 ```
 
 Open http://localhost:5173. With no `.env`, or no `APIFY_TOKEN` in it, the
-service starts in demo mode. Press **Try demo** to fill the form with the
+service starts in demo mode. Press **ลองดูตัวอย่าง** to fill the form with the
 example brand.
 
 Both services bind to `127.0.0.1` only (frontend on 5173, API on 8000), because

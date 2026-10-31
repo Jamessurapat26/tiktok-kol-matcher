@@ -5,30 +5,24 @@ export function formatCompact(value: number): string {
   return compact.format(value)
 }
 
-/** A 0..1 fraction as a percent with one decimal: 0.091 -> "9.1%". */
-export function formatPercent(fraction: number | null): string {
-  return fraction === null ? 'n/a' : `${(fraction * 100).toFixed(1)}%`
+/** A 0..1 score on a 0..100 scale: 0.5875 -> 59. */
+export function scoreOutOf100(score: number): number {
+  return Math.round(score * 100)
 }
 
-/** A 0..1 score with two decimals: 0.5875 -> "0.59". */
-export function formatScore(score: number): string {
-  return score.toFixed(2)
-}
-
-/** 420 -> "420 ms", 1530 -> "1.5 s", 95000 -> "1m 35s". Rounds before picking the unit. */
-export function formatDuration(ms: number): string {
-  const whole = Math.round(ms)
-  if (whole < 1000) return `${whole} ms`
-  const tenths = Math.round(ms / 100) / 10
-  if (tenths < 60) return `${tenths.toFixed(1)} s`
-  const seconds = Math.round(ms / 1000)
-  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-}
-
-const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+const dateTime = new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
 
 export function formatDateTime(iso: string): string {
   return dateTime.format(new Date(iso))
+}
+
+/** "https://www.example.co.th/shop" -> "example.co.th". Anything unparsable comes back as is. */
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
 }
 
 /** Two-letter fallback avatar from a handle: "BankZaGaming" -> "BA". */

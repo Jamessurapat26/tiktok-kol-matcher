@@ -1,5 +1,5 @@
 import body422 from '@/test/error-422.json'
-import { ApiError } from './client'
+import { ApiError, friendlyError } from './client'
 
 describe('ApiError', () => {
   it('maps a real 422 body to per-field messages', () => {
@@ -19,5 +19,19 @@ describe('ApiError', () => {
 
   it('falls back to the status for a body without detail', () => {
     expect(new ApiError(502, null).message).toBe('Request failed (502)')
+  })
+})
+
+describe('friendlyError', () => {
+  it.each([
+    [
+      new ApiError(429, { detail: '20 jobs are queued (MAX_QUEUED_JOBS)' }),
+      'ระบบกำลังทำงานเต็มคิว กรุณารอสักครู่แล้วลองใหม่',
+    ],
+    [new ApiError(404, { detail: 'job x not found' }), 'ไม่พบการค้นหานี้'],
+    [new ApiError(400, { detail: 'APIFY_TOKEN is not set' }), 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'],
+    [new TypeError('Failed to fetch'), 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'],
+  ])('hides the raw message of %s', (error, expected) => {
+    expect(friendlyError(error)).toBe(expected)
   })
 })

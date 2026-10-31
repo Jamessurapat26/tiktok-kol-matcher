@@ -76,25 +76,22 @@ describe('job progress over SSE', () => {
     const { source, invalidate } = renderHarness()
     expect(source.url).toBe(`/api/jobs/${events[0].job_id}/events`)
     act(() => source.onopen?.())
-    expect(screen.getByText('Waiting for the pipeline to start')).toBeInTheDocument()
+    expect(screen.getByText('กำลังเริ่มการค้นหา')).toBeInTheDocument()
 
     source.emit(events.slice(0, 8))
-    expect(row('Analyze brand').getByText('brand=profile')).toBeInTheDocument()
-    expect(row('Analyze brand').getByText(', finished')).toBeInTheDocument()
-    expect(row('Generate search queries').getByText('queries+8')).toBeInTheDocument()
+    expect(row('วิเคราะห์แบรนด์').getByText(', เสร็จแล้ว')).toBeInTheDocument()
+    expect(row('ค้นหา KOL บน TikTok').getByText(', กำลังทำงาน')).toBeInTheDocument()
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['jobs', events[0].job_id] })
-    expect(row('Discover KOLs').getByText(', pending')).toBeInTheDocument()
+    expect(row('คัดกรองและประเมิน KOL').getByText(', รอดำเนินการ')).toBeInTheDocument()
   })
 
-  it('shows the discovery loop as round 2 of the same step', () => {
+  it('keeps the discovery loop inside one step and hides its internals', () => {
     const { source } = renderHarness()
     source.emit(events.slice(0, 13))
-    expect(row('Discover KOLs').getByText('round 2')).toBeInTheDocument()
-    expect(row('Discover KOLs').getByText(', running')).toBeInTheDocument()
-    expect(screen.getByText('Running: Discover KOLs')).toBeInTheDocument()
-
-    source.emit(events.slice(13, 14))
-    expect(row('Discover KOLs').getByText('round=2 discovered+18')).toBeInTheDocument()
+    expect(row('ค้นหา KOL บน TikTok').getByText(', กำลังทำงาน')).toBeInTheDocument()
+    expect(screen.getByText('กำลังค้นหา KOL บน TikTok')).toBeInTheDocument()
+    expect(screen.queryByText(/round/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/queries\+/)).not.toBeInTheDocument()
   })
 
   it('survives a dropped connection whose replay overlaps, then closes on done', () => {
@@ -104,10 +101,8 @@ describe('job progress over SSE', () => {
     // The server resumes after Last-Event-ID, but a replay may still overlap.
     source.emit(events.slice(9))
 
-    expect(screen.getByText('Done: ranked 3 KOLs')).toBeInTheDocument()
-    expect(screen.getAllByText(', finished')).toHaveLength(11)
-    expect(row('Discover KOLs').getByText('round 2')).toBeInTheDocument()
-    expect(screen.queryByText('round 3')).not.toBeInTheDocument()
+    expect(screen.getByText('จัดอันดับ KOL เสร็จแล้ว')).toBeInTheDocument()
+    expect(screen.getAllByText(', เสร็จแล้ว')).toHaveLength(5)
     expect(source.closed).toBe(true)
   })
 
@@ -135,9 +130,8 @@ describe('job progress over SSE', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['jobs', events[0].job_id] })
 
     reopened.emit(events.slice(9))
-    expect(screen.getByText('Done: ranked 3 KOLs')).toBeInTheDocument()
-    expect(screen.getAllByText(', finished')).toHaveLength(11)
-    expect(screen.queryByText('round 3')).not.toBeInTheDocument()
+    expect(screen.getByText('จัดอันดับ KOL เสร็จแล้ว')).toBeInTheDocument()
+    expect(screen.getAllByText(', เสร็จแล้ว')).toHaveLength(5)
     expect(reopened.closed).toBe(true)
   })
 })

@@ -9,13 +9,12 @@ export function EmptyState({ onTryDemo }: { onTryDemo: () => void }) {
         <span className="flex size-12 items-center justify-center rounded-full bg-accent-soft text-info">
           <Sparkles aria-hidden />
         </span>
-        <h2 className="text-heading-md text-ink">Find Thai TikTok creators for a brand</h2>
+        <h2 className="text-heading-md text-ink">ค้นหา KOL ไทยบน TikTok ที่เหมาะกับแบรนด์</h2>
         <p className="max-w-prose text-body-md text-ink">
-          Enter the brand&apos;s website and Facebook page, and the pipeline returns a ranked shortlist of
-          creators.
+          ใส่ลิงก์เว็บไซต์และเพจ Facebook ของแบรนด์ แล้วระบบจะจัดอันดับ KOL ที่เหมาะสมพร้อมเหตุผล
         </p>
         <Button variant="outline" size="lg" onClick={onTryDemo}>
-          Try demo
+          ลองดูตัวอย่าง
         </Button>
       </CardContent>
     </Card>

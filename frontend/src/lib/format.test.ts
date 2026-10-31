@@ -1,4 +1,4 @@
-import { formatCompact, formatDuration, formatPercent, formatScore, initials } from './format'
+import { formatCompact, formatDateTime, hostOf, initials, scoreOutOf100 } from './format'
 
 describe('number formatting', () => {
   it.each([
@@ -12,29 +12,19 @@ describe('number formatting', () => {
     expect(formatCompact(value)).toBe(expected)
   })
 
-  it('formats an engagement fraction as a percent', () => {
-    expect(formatPercent(0.091)).toBe('9.1%')
-    expect(formatPercent(0.0434)).toBe('4.3%')
-    expect(formatPercent(0)).toBe('0.0%')
-    expect(formatPercent(null)).toBe('n/a')
+  it('puts a score on a 0 to 100 scale', () => {
+    expect(scoreOutOf100(0.5875)).toBe(59)
+    expect(scoreOutOf100(1)).toBe(100)
+    expect(scoreOutOf100(0)).toBe(0)
   })
 
-  it('formats scores with two decimals', () => {
-    expect(formatScore(0.5875)).toBe('0.59')
-    expect(formatScore(1)).toBe('1.00')
+  it('writes dates the Thai way', () => {
+    expect(formatDateTime('2026-10-31T05:00:00Z')).toContain('ต.ค. 2569')
   })
 
-  it('formats durations by magnitude', () => {
-    expect(formatDuration(3.4)).toBe('3 ms')
-    expect(formatDuration(1530)).toBe('1.5 s')
-    expect(formatDuration(95_000)).toBe('1m 35s')
-  })
-
-  it('rounds a duration before choosing its unit', () => {
-    expect(formatDuration(999.4)).toBe('999 ms')
-    expect(formatDuration(999.6)).toBe('1.0 s')
-    expect(formatDuration(59_940)).toBe('59.9 s')
-    expect(formatDuration(59_950)).toBe('1m 0s')
+  it('names a site by its host', () => {
+    expect(hostOf('https://www.example-brand.co.th/shop')).toBe('example-brand.co.th')
+    expect(hostOf('not a url')).toBe('not a url')
   })
 
   it('builds avatar initials from a handle', () => {

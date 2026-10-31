@@ -98,6 +98,10 @@ class BrandProfile(DomainModel):
     live analyzer drops any model-supplied value before validation.
     ``competitors`` are competing brands only; shops and chains that sell the
     brand go in ``retailers`` and never feed the competitor rules.
+
+    The ``*_th`` fields are Thai text for the web app only. Search, scoring,
+    and the judge prompt read the original fields, so these cannot move a
+    score. They are empty on jobs stored before they existed.
     """
 
     category: str
@@ -115,6 +119,11 @@ class BrandProfile(DomainModel):
     tier_label: Literal["nano", "micro", "mid", "macro"]
     tier_confidence: float = Field(ge=0, le=1)
     tier_reason: str
+    category_th: str = Field(default_factory=str)
+    key_products_th: list[str] = Field(default_factory=list)
+    tone_th: str = Field(default_factory=str)
+    interests_th: list[str] = Field(default_factory=list)
+    tier_reason_th: str = Field(default_factory=str)
 
     @model_validator(mode="before")
     @classmethod

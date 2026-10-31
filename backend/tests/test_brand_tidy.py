@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.brand_tidy import tidy_brand_profile
+from app.brand_tidy import MAX_INTERESTS, MAX_KEY_PRODUCTS, tidy_brand_profile
 from app.models import BrandProfile
 
 
@@ -193,3 +193,15 @@ def test_input_profile_is_not_mutated():
     assert tidied.key_products == ["Blue Light Glasses"]
     assert tidied.topic_keywords_en == ["blue light glasses", "gaming glasses"]
     assert tidied.target_audience.interests == ["Gaming"]
+
+
+def test_thai_display_lists_are_capped():
+    brand = _brand(
+        key_products_th=[f"สินค้า {i}" for i in range(20)],
+        interests_th=[f"ความสนใจ {i}" for i in range(20)],
+    )
+
+    tidy = tidy_brand_profile(brand)
+
+    assert len(tidy.key_products_th) == MAX_KEY_PRODUCTS
+    assert len(tidy.interests_th) == MAX_INTERESTS

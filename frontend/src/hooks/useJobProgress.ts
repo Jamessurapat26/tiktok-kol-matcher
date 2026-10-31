@@ -5,15 +5,12 @@ import { queryKeys } from '@/api/queries'
 import type { JobEvent } from '@/api/types'
 import { applyEvent, initialProgress, type Progress } from '@/lib/steps'
 
-// The runner saves brand_profile right after analyze_brand's finished event and
-// before the next node starts, so generate_queries starting is the first event
-// that guarantees the profile is readable.
+// The runner saves a node's output right after its finished event and before the
+// next node starts. So analyze_brand starting guarantees the logo is readable, and
+// generate_queries starting guarantees the profile is.
 function refreshesJob(event: JobEvent): boolean {
   if (event.type !== 'node') return true
-  return (
-    (event.node === 'analyze_brand' && event.status !== 'started') ||
-    (event.node === 'generate_queries' && event.status === 'started')
-  )
+  return event.node === 'analyze_brand' || (event.node === 'generate_queries' && event.status === 'started')
 }
 
 interface State {

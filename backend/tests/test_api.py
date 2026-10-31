@@ -89,6 +89,29 @@ class FailingAnalyzer:
         raise RuntimeError("model unavailable")
 
 
+def test_job_keeps_the_facebook_logo(make_client):
+    logo = "https://scontent.fbcdn.net/v/logo.jpg"
+
+    class LogoFacebook:
+        def fetch_page(self, url):
+            return FacebookPage(page_name="Brand", title="Brand", url=url, logo_url=logo)
+
+    with make_client(replace(mock_integrations(), facebook=LogoFacebook())) as client:
+        job_id = client.post("/api/jobs", json=_BODY).json()["job_id"]
+        job = client.get(f"/api/jobs/{job_id}").json()
+
+    assert job["status"] == "succeeded"
+    assert job["brand_logo_url"] == logo
+
+
+def test_job_without_a_logo_reports_null(make_client):
+    with make_client() as client:
+        job_id = client.post("/api/jobs", json=_BODY).json()["job_id"]
+        job = client.get(f"/api/jobs/{job_id}").json()
+
+    assert job["brand_logo_url"] is None
+
+
 def test_job_runs_to_succeeded_with_top_k_results(make_client):
     with make_client() as client:
         created = client.post("/api/jobs", json=_BODY)

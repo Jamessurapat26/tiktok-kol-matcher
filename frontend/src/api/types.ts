@@ -165,6 +165,8 @@ export interface Job {
   flags: LiveFlags
   errors: string[]
   brand_profile: BrandProfile | null
+  /** Facebook page picture. Absent on jobs stored before the field existed. */
+  brand_logo_url?: string | null
   rejected: Record<string, number>
   cost_log: string[]
   results: RankedKol[]

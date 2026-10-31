@@ -36,7 +36,9 @@ curl -X POST localhost:8000/api/jobs -H 'content-type: application/json' -d '{
 
 A job moves from `queued` to `running` to `succeeded` or `failed`.
 `brand_profile` is `null` until `analyze_brand` finishes, and is saved before
-the next node starts.
+the next node starts. `brand_logo_url` is the Facebook page's profile picture.
+It is `null` until `scrape_facebook` finishes, and stays `null` when Apify did
+not read the page. The link comes from Facebook's CDN and can expire.
 
 ```bash
 curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
@@ -54,6 +56,7 @@ curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
   },
   "flags": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false},
   "errors": [],
+  "brand_logo_url": null,
   "brand_profile": {
     "category": "gaming eyewear / blue-light glasses",
     "key_products": ["blue-light glasses", "gaming glasses", "clip-on blue-light lenses"],

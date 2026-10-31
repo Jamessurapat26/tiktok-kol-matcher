@@ -228,6 +228,20 @@ def test_bare_website_domain_and_follower_fallback(tmp_path):
     assert page.recent_posts == []
 
 
+def test_page_logo_comes_from_the_profile_picture_image():
+    picture = "https://scontent.fbcdn.net/v/logo.jpg"
+    photo_page = "https://www.facebook.com/photo/?fbid=1"
+
+    item = {**_PAGE_ITEM, "profilePictureUrl": picture, "profilePhoto": photo_page}
+    assert page_from_items(_URL, [item]).logo_url == picture
+
+    item = {**_PAGE_ITEM, "profilePictureUrl": None, "profilePhoto": photo_page}
+    assert page_from_items(_URL, [item]).logo_url is None
+
+    item = {**_PAGE_ITEM, "profilePictureUrl": "javascript:alert(1)"}
+    assert page_from_items(_URL, [item]).logo_url is None
+
+
 def test_apify_error_falls_back_to_web_reader(tmp_path):
     router = _Router(pages=500)
     reader = _Reader()

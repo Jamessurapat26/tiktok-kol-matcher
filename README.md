@@ -6,9 +6,9 @@ shortlist of Thai TikTok creators who fit the brand.
 ![Ranked results in demo mode](docs/screenshots/demo-overview.png)
 
 KOL Matcher is a LangGraph pipeline behind a FastAPI service and a React web
-app. It reads the brand's own pages, has an LLM build a structured brand brief,
-searches TikTok for creators, removes accounts that cannot fit, and scores each
-survivor on four signals:
+app. It reads the brand's own pages, researches the brand on the web, has an LLM
+build a structured brand brief, searches TikTok for creators, removes accounts
+that cannot fit, and scores each survivor on four signals:
 
 | Score | Meaning | How it is computed |
 | --- | --- | --- |
@@ -25,8 +25,9 @@ creators outside 1k–5M followers, and creators whose latest post is over 60
 days old.
 
 The API and CLI return F, E, T, A_eff, their confidences, flags, quality, final,
-a one-line reason, up to three evidence video links, and the profile URL. The web
-app is in Thai and written for marketers: it shows the scores out of 100, marks
+a one-line reason, up to three evidence video links, and the profile URL. Judged
+creators also get an unscored content analysis: formats, style, and a style fit
+that must cite a video. The web app is in Thai and written for marketers: it shows the scores out of 100, marks
 low-confidence scores as limited data, and names flags in plain words (see
 [GLOSSARY.md](GLOSSARY.md)). The whole pipeline also runs offline in demo mode,
 with no keys.
@@ -37,7 +38,7 @@ This prototype answers the Convert Cake AI Engineer case study.
 
 | Brief | What the tool does | Limit |
 | --- | --- | --- |
-| Analyze a client's Facebook page and website | Reads both and has the LLM build a brief: category, products, audience, tone, keywords, competitors, and creator tier | Content style is the brand's `tone` only, with no breakdown of content formats |
+| Analyze a client's Facebook page and website | Reads both, researches the brand on the web, and has the LLM build a brief: category, products, audience, tone, content formats and style, keywords, competitors, and creator tier | Content style comes from text, not from watching videos |
 | Identify and evaluate Thai TikTok KOLs | Searches TikTok, removes accounts that cannot fit, fetches recent videos, and has the LLM judge the leaders | Sellers are caught by rules and the judge, but some detection can still misfire; see [Known limitations](#known-limitations) |
 | Rank by relevance, engagement, and audience demographics | Scores F, E, T, and A_eff, then selects with MMR | Audience is estimated from text. TikTok does not expose demographics to scrapers |
 | Present a curated list with profile information | Returns profile links, followers, scores, a reason, flags, and evidence videos in the Thai web app, API, CLI, and CSV | |
@@ -75,7 +76,7 @@ API's event stream and the CLI keep the per-node detail.
 
 | Score breakdown | Mobile |
 | --- | --- |
-| ![A result row with its component scores](docs/screenshots/demo-score-breakdown.png) | <img src="docs/screenshots/demo-mobile.png" alt="Results on a phone-width screen" width="220"> |
+| ![A result row with its component scores and content style](docs/screenshots/demo-score-breakdown.png) | <img src="docs/screenshots/demo-mobile.png" alt="Results on a phone-width screen" width="220"> |
 
 The history sheet reopens earlier jobs,
 and the job id stays in the URL as `?job=`, so a reload or a shared link opens
@@ -106,7 +107,7 @@ in the `backend-data` volume. The backend runs as a non-root user with a health
 check on `/api/health`.
 
 Compose installs the local embedding packages, including the CPU build of
-torch, so the backend image is about 2.15 GB. The model itself downloads into
+torch, so the backend image is about 2.16 GB. The model itself downloads into
 the `backend-data` volume the first time a live job embeds. Demo mode does not
 use it. A plain `docker build` of `backend/` leaves the packages out unless you
 pass `--build-arg INSTALL_EMBED=true`.
@@ -171,6 +172,21 @@ instead. Add `--live-web`, `--live-fb`, `--live-kols`, `--live-llm`, `--live-emb
   variable, for example `live_kols is unavailable: APIFY_TOKEN is not set`.
 
 Each job stores the flags it actually ran with.
+
+### LLM model
+
+Unless `.env` says otherwise, the code uses NVIDIA Nemotron on NVIDIA's API. The
+live setup for this project overrides that with DeepSeek on OpenRouter, and this
+is the configuration to use when reproducing it:
+
+```bash
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=deepseek/deepseek-v4.1-flash-1017
+LLM_API_KEY=your-openrouter-key
+```
+
+`GET /api/health` shows the model and host in use. Jobs do not store the model,
+so older results cannot be traced to one.
 
 ### Environment variables
 
@@ -256,8 +272,8 @@ flowchart TD
    notes with source URLs. Each search costs about 10,000 Jina tokens. Notes exist
    only when a search returned results, and a research failure is only a warning.
 2. **Structured brief.** One LLM call returns category, key products, price
-   tier, target audience, tone, Thai and English topic keywords, competitors,
-   `brand_handles`, and a tier guess: `target_followers`, `tier_label`,
+   tier, target audience, tone, content formats, content style, Thai and English
+   topic keywords, competitors, `brand_handles`, and a tier guess: `target_followers`, `tier_label`,
    `tier_confidence`, and `tier_reason`. The tier guess maps an SME or small
    online shop to micro (~30k), a nationwide brand to mid (~150k), and a
    multinational to macro (~800k), and clamps `target_followers` to the
@@ -426,7 +442,7 @@ brand of any size to mid (~150k), and a multinational to macro (~800k). The resu
 clamped to 10k–2M and shown with `tier_label`, `tier_confidence`, and
 `tier_reason`.
 
-**Judge before stage 6.** Until the batched judge call runs, `judge = sim` and
+**Scores before the judge.** Until the batched judge call runs, `judge = sim` and
 `A_eff = 0.5`. That keeps first-pass ranking cheap and confirmatory: it only
 decides which 20 candidates deserve profile enrichment. The judge then changes
 F for the top 20 or top k, and the final ranking is recomputed for everyone.
@@ -478,44 +494,49 @@ first-pass leader the config asks for gets profile stats. Leaders outside the
 top 20 keep stats from their search videos, score E with lower confidence, and
 carry `search_stats_only`. They are not dropped.
 
-LLM calls per job are one brand brief, one per query round (one in each recent
-live run, three at most), and one judge call: three to five calls in total,
-plus any retries and up to two judge refill calls. The CLI prints a cost
-log with one line per stage, for example:
+LLM calls per job are up to four for brand research, one brand brief, one to
+three for query rounds, and one to three for the judge, which includes up to two
+refill calls. That is at most 11, plus any retries and the follow-up for creators
+a judge reply leaves out. Each web search also uses about 10,000 Jina tokens. The
+CLI and API report a cost log with one line per stage. This one is from the
+newest live job:
 
 ```text
 cost log:
+  llm: research_brand 3 calls
+  web search: 3 queries
   llm: analyze_brand 1 call
   llm: generate_queries round 1 1 call
-  search round 1: est $0.56 (8 queries)
-  llm: generate_queries round 2 1 call
-  search round 2: est $0.14 (2 queries)
+  search round 1: est $0.70 (10 queries)
   enrich: est $0.70 (20 profiles)
-  llm: judge 1 call (20 creators)
+  llm: judge 2 calls (23 creators)
 ```
 
 ## Live results
 
-These are the five most recent successful live jobs, with every service live.
-They ran before the switch to TikTok Data Extractor with a Thai proxy on search,
-so their run times, filter counts, and costs come from the previous actors.
-Each one ran one discovery round and logged 20 profile runs. Apify cost is the logged estimate for search and enrichment, so it leaves
-out Facebook (about $0.125).
+These are the six most recent successful live jobs, with every service live and
+the newest first. Each one ran one discovery round and logged 20 profile runs.
+Apify cost is the logged estimate for search and enrichment, so it leaves out
+Facebook (about $0.125).
 
-| Brand | Top k | Run time | Accounts filtered out | Estimated Apify cost |
-| --- | --- | --- | --- | --- |
-| Akha Ama Coffee | 7 | 9 min 5 s | 106 | $1.35 |
-| Siam Kubota | 10 | 11 min 0 s | 65 | $1.22 |
-| InnovestX | 10 | 10 min 3 s | 82 | $1.35 |
-| InnovestX | 5 | 11 min 3 s | 58 | $1.35 |
-| Dime | 10 | 11 min 4 s | 82 | $1.28 |
+| Brand | Top k | Run time | Accounts filtered out | Estimated Apify cost | Actor |
+| --- | --- | --- | --- | --- | --- |
+| InnovestX | 10 | 6 min 40 s | 57 | $1.40 | TikTok Data Extractor |
+| Akha Ama Coffee | 7 | 9 min 5 s | 106 | $1.35 | Previous |
+| Siam Kubota | 10 | 11 min 0 s | 65 | $1.22 | Previous |
+| InnovestX | 10 | 10 min 3 s | 82 | $1.35 | Previous |
+| InnovestX | 5 | 11 min 3 s | 58 | $1.35 | Previous |
+| Dime | 10 | 11 min 4 s | 82 | $1.28 | Previous |
 
-Only the Akha Ama job ran on the current commit. The others ran on earlier
-commits that used matching v2. The results are uneven, and the
-[known limitations](#known-limitations) describe what went wrong:
+The newest job started five minutes after the commit that added brand research
+and content style analysis, and its cost log uses the current Thai-proxy rate.
+The other five ran on earlier commits and previous actors. The results are
+uneven, and the [known limitations](#known-limitations) describe what went wrong:
 
-- **InnovestX and Dime** returned mostly finance and investing creators. A
-  competitor-sponsored post appeared in one reason without raising a flag.
+- **InnovestX and Dime** returned mostly finance and investing creators. In the
+  newest InnovestX job, the first-ranked creator's caption said "Sponsored by
+  Dime" and Dime was a listed competitor, but no `competitor_sponsored` flag was
+  raised.
 - **Akha Ama** returned coffee creators, but also a coffee shop promoting
   itself, a general lifestyle account, and creators far below the mid-tier
   target.
@@ -529,7 +550,7 @@ first shortlist they can review, so their time goes to judging and contacting
 creators rather than searching for them.
 
 - **Speed.** A live job took about 9-11 minutes on the previous actors, without
-  anyone watching it. The current actor has not been timed on a full job.
+  anyone watching it. The one recorded job on the current actor took 6 min 40 s.
 - **Known cost per brief.** Apify is budgeted at up to $1.55 per job, with a hard
   check before each run. LLM cost is separate and not tracked.
 - **Reasoning the team can check.** Each creator comes with component scores, a
@@ -538,7 +559,7 @@ creators rather than searching for them.
 - **Consistent criteria.** Every client goes through the same filters and scoring,
   which also gives the team one place to tune them.
 - **Fewer poor fits reaching a person.** Own-brand, competitor, inactive, non-Thai,
-  and out-of-range accounts are removed before review, 58-106 per live job.
+  and out-of-range accounts are removed before review, 57-106 per live job.
 
 The time saved has not been measured: there is no manual baseline, and the tool
 has not been used on a real campaign. A pilot should compare these on the same
@@ -553,12 +574,14 @@ briefs:
 ## Design decisions and trade-offs
 
 **An OpenAI-compatible LLM, chosen by configuration.** The live client speaks
-the chat completions API, so moving from the default NVIDIA-hosted Nemotron
-model to OpenAI or a local server means changing `LLM_BASE_URL`, `LLM_MODEL`,
-and the key. Every call asks for one JSON object, validates it with Pydantic,
-and retries once with the validation error in the prompt. The default model is
-a reasoning model, so thinking is turned off through `chat_template_kwargs`.
-That cut a brand-analysis call from 30-45 seconds to about 3.
+the chat completions API, so moving between the default NVIDIA-hosted Nemotron
+model, [DeepSeek on OpenRouter](#llm-model), OpenAI, or a local server means
+changing `LLM_BASE_URL`, `LLM_MODEL`, and the key. Every call asks for one JSON
+object, validates it with Pydantic, and retries once with the validation error
+in the prompt. Nemotron is a reasoning model, so for that default the client
+turns thinking off through `chat_template_kwargs`, which cut a brand-analysis
+call from 30-45 seconds to about 3. Other models get a plain request unless
+`LLM_DISABLE_REASONING` is set.
 
 **Local embeddings as a free similarity term.** embeddinggemma runs on CPU
 through sentence-transformers, with no per-call cost and no data leaving the
@@ -567,8 +590,9 @@ The trade-off is a heavy optional dependency (torch), so it sits behind the
 `embed` extra and the default install and tests stay light.
 
 **One judge, not one call per creator.** Only the top 20 or top k see the LLM judge, and
-they share one request. That keeps the expensive stage small and makes the
-rubric consistent across candidates.
+they share one request, with up to two refill requests when the judge removes
+accounts. That keeps the expensive stage small and makes the rubric consistent
+across candidates.
 
 **An estimated Apify budget plus per-run caps.** Every Apify run sets
 `maxItems`, `limit`, and `maxTotalChargeUsd`. On top of that,
@@ -632,7 +656,7 @@ use. It is not legal advice, and production use needs legal review.
   can identify a person. This tool treats them as personal data under Thailand's
   [PDPA](#references), even though they are public.
 - **Third parties.** Apify receives the Facebook URL, search queries, and creator
-  handles. Jina receives the website URL. Creator handles, nicknames, bios, and
+  handles. Jina receives the website URL and the web research queries. Creator handles, nicknames, bios, and
   captions go to the configured LLM host. Embeddings stay on the machine.
 - **Retention.** Jobs and creator data stay in SQLite, and the API has no delete
   endpoint. Web, Facebook, and profile caches stop being used after 7 days, but
@@ -673,12 +697,15 @@ permission for automated data collection.
   on every Search, so a brand near a boundary can move between neighbouring
   tiers, which changes T and the shortlist. This variation is accepted; the
   prompt only removes the overlap between large Thai brands and multinationals.
-- **Competitor sponsorship can be missed.** It depends on the competitors the LLM
-  lists. One InnovestX run gave a reason mentioning a Dime-sponsored post, but
-  raised no `competitor_sponsored` flag and did not list Dime as a competitor.
+- **Competitor sponsorship can be missed.** The flag needs a competitor the LLM
+  listed and a caption with `#ad`, `#sponsored`, or a listed Thai marker. It does
+  not recognize "Sponsored by Dime" and does not read TikTok's own ad label, so
+  two creators in the newest InnovestX job kept only `mentions_competitor`. That
+  mention also adds the `0.05` bonus to F.
 - **LLM replies can come back empty.** Two Akha Ama jobs failed at brand analysis
-  this way before `LLM_MAX_TOKENS` was raised to 16000. The fix has one successful
-  run behind it.
+  this way before `LLM_MAX_TOKENS` was raised to 16000. Two later live jobs
+  succeeded, but jobs do not store the model, so this does not show that the
+  setting alone fixed it.
 - **Content style reads text only.** Formats, style, and style fit come from
   captions and hashtags, not from what is said or shown in the videos. Style fit
   has no human-checked eval yet, so it is not part of the score.
@@ -718,9 +745,9 @@ permission for automated data collection.
 ## Testing
 
 ```bash
-cd backend && uv run pytest          # 451 tests
+cd backend && uv run pytest          # 510 tests
 cd backend && uv run python ../eval/run_eval.py   # NDCG@10, no network
-cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 77 Vitest tests
+cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 84 Vitest tests
 ```
 
 The tests make no network calls. The backend suite covers the graph routing and
@@ -748,15 +775,16 @@ embedder. They need real keys, and the Apify one spends credit.
 5. **More enrichment within budget.** Raise the profile cap only when the
    estimated spend allows it, and measure whether profile stats change the top
    10 enough to justify the cost.
-6. **Better signals.** Describe the brand's content formats, add comment language
-   as a weak audience signal, detect the Facebook login wall, and warn when the
-   budget skips a Facebook run.
+6. **Better signals.** Detect sponsorship from TikTok's ad label and "Sponsored
+   by" captions, stop giving competitor mentions the fit bonus, add comment
+   language as a weak audience signal, detect the Facebook login wall, and warn
+   when the budget skips a Facebook run.
 7. **Real spend tracking.** Read `usageTotalUsd` from Apify's run API after each
    run instead of estimating.
-10. **CI.** Run the backend and frontend suites and the Docker build on every
-    pull request.
-11. **Production shape.** A shared database and a job queue if it ever needs more
-    than one node.
+8. **CI.** Run the backend and frontend suites and the Docker build on every
+   pull request.
+9. **Production shape.** A shared database and a job queue if it ever needs more
+   than one node.
 
 ## Repo layout
 
@@ -770,8 +798,12 @@ backend/
     scoring.py        # F, E, T, A_eff, Quality, Final, flags, MMR helper
     ranking.py        # first pass, judge pass, RankedKol, MMR selection
     models.py         # MatchRequest, BrandProfile, KolProfile, RankedKol
+    state.py          # graph state and reducers
+    brand_match.py    # brand and competitor name matching
     brand_tidy.py     # cleanup of the LLM brand profile
-    prompts.py        # prompts for the brief, queries, and judge
+    thai.py           # decides whether a creator is Thai
+    topic_lexicon.py  # category terms for on_topic
+    prompts.py        # prompts for research, the brief, queries, and judge
     cli.py            # CLI (table or JSON)
     api/              # FastAPI app, settings, SQLite store, job runner
     integrations/     # Protocol + mock + live client per service, with caches
@@ -806,7 +838,9 @@ Data collection:
 
 AI and application:
 
+- [DeepSeek V4.1 Flash on OpenRouter](https://openrouter.ai/deepseek/deepseek-v4.1-flash-1017)
 - [NVIDIA Nemotron 3.5 Lightning](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b)
+- [Jina Search](https://s.jina.ai/)
 - [Google EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2) and
   [Sentence Transformers](https://sbert.net/)
 - [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview) and

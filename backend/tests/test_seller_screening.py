@@ -8,6 +8,7 @@ from app.filters import MEDIA_ACCOUNT, SELLER_ACCOUNT
 from app.graph import build_graph, initial_state
 from app.integrations import mock_integrations
 from app.integrations.llm import MockBrandAnalyzer
+from app.matching_config import DEFAULT_CONFIG
 from app.models import MatchRequest
 from app.nodes import make_nodes
 from app.prompts import BRAND_ANALYSIS_SYSTEM, JUDGE_SYSTEM
@@ -43,9 +44,11 @@ class _TypingJudge(MockBrandAnalyzer):
         self.types = types
         self.skip = skip
         self.sent: list[str] = []
+        self.calls = 0
 
     def judge(self, brief, kols):
-        self.sent = [kol.handle for kol in kols]
+        self.sent.extend(kol.handle for kol in kols)
+        self.calls += 1
         judgements = [
             item for item in super().judge(brief, kols) if item.handle not in self.skip
         ]
@@ -181,3 +184,73 @@ def test_large_thai_brands_have_one_tier_rule():
 
     assert "Nationwide Thai brand, however large" in prompt
     assert "very large" not in prompt
+
+
+def test_the_next_leaders_replace_accounts_the_judge_removes():
+    fixtures = [_fixture(f"creator{index:02d}") for index in range(25)]
+    llm = _RemoveFirstCall(17)
+    final = _run(fixtures, llm, top_k=10)
+
+    assert llm.calls == 2
+    assert len(llm.sent) == 25
+    assert len(final["results"]) == 8
+    assert all(item.scores.judged for item in final["results"])
+    assert final["rejected"][SELLER_ACCOUNT] == 17
+
+
+def test_refill_stops_at_the_call_limit():
+    fixtures = [_fixture(f"creator{index:02d}") for index in range(80)]
+    llm = _RemoveFirstCall(1_000)
+    final = _run(fixtures, llm, top_k=5)
+
+    assert llm.calls == 1 + DEFAULT_CONFIG.judge_refill_calls
+    assert final["stage"] == "done"
+    assert final["results"] == []
+
+
+def test_a_failed_refill_keeps_what_was_reviewed():
+    class _FailSecond(_RemoveFirstCall):
+        def judge(self, brief, kols):
+            if self.calls == 1:
+                raise RuntimeError("judge down")
+            return super().judge(brief, kols)
+
+    fixtures = [_fixture(f"creator{index:02d}") for index in range(25)]
+    final = _run(fixtures, _FailSecond(5), top_k=5)
+
+    assert any("judge: refill: judge down" in error for error in final["errors"])
+    assert len(final["results"]) == 5
+    assert all(item.scores.judged for item in final["results"])
+
+
+def test_removed_accounts_are_recorded_with_their_reason():
+    fixtures = [
+        _fixture("creator1"),
+        _fixture("farmer"),
+        _fixture("dealer", bio="ตัวแทนจำหน่ายแว่น"),
+    ]
+    final = _run(fixtures, _TypingJudge({"farmer": "seller"}))
+
+    removed = {item.handle: item for item in final["removed"]}
+    assert removed["dealer"].reason == SELLER_ACCOUNT
+    assert removed["dealer"].note == ""
+    assert removed["farmer"].reason == SELLER_ACCOUNT
+    assert removed["farmer"].note
+    assert "creator1" not in removed
+
+
+class _RemoveFirstCall(_TypingJudge):
+    """Types the first ``count`` creators it sees as sellers."""
+
+    def __init__(self, count: int) -> None:
+        super().__init__({})
+        self.count = count
+
+    def judge(self, brief, kols):
+        self.types.update(
+            {kol.handle: "seller" for kol in kols[: self.count - len(self.types)]}
+            if self.count > len(self.types)
+            else {}
+        )
+        return super().judge(brief, kols)
+

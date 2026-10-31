@@ -452,7 +452,10 @@ are removed and counted in `rejected`. The
 judge rubric covers category match, tone match, and no risky content. Audience
 is inferred from text, captions, and bio only, never from faces. Only the top
 20 candidates by first-pass score, or `top_k` when that is larger, are sent, in
-one request, and only those can be recommended. The returned
+one request, and only creators sent to the judge can be recommended. Up to two
+more calls judge the next candidates in place of removed accounts. Each seller or
+media account removed by a rule or the judge is listed in `removed` with its
+reason and, for the judge, its sentence. The returned
 values replace the `judge = sim` placeholder and the neutral `A_eff = 0.5`,
 and the final ranking is recomputed. Query generation returns only the new
 queries for that round, so the discovery loop and `last_queries` keep working.

@@ -88,6 +88,7 @@ def run_job(
                 stage="done",
                 errors=errors,
                 rejected=rejected,
+                removed=final.get("removed") or [],
                 cost_log=cost_log,
                 results=results,
                 summary=f"ranked {len(results)} KOLs",

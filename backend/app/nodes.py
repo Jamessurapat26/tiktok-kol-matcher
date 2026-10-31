@@ -13,7 +13,7 @@ from .brand_match import (
     normalize_for_match,
     normalized_aliases,
 )
-from .filters import SELLER_ACCOUNT, is_seller_account
+from .filters import MEDIA_ACCOUNT, SELLER_ACCOUNT, is_seller_account
 from .filters import hard_filter as apply_hard_filter
 from .integrations import Integrations
 from .integrations.apify import (
@@ -23,7 +23,7 @@ from .integrations.apify import (
 )
 from .integrations.web_reader import truncate
 from .matching_config import DEFAULT_CONFIG, MatchingConfig
-from .models import BrandProfile, KolProfile, normalize_handle
+from .models import BrandProfile, KolProfile, RemovedAccount, normalize_handle
 from .ranking import UNREVIEWED_FLAG, diversify, rank_candidates, similarities
 from .scoring import score_pool
 from .state import MatchState
@@ -336,12 +336,13 @@ def make_nodes(
         Activity is checked after enrichment instead: search hits are not a
         creator's newest videos, so one old viral hit must not reject them.
         """
-        candidates, rejected = _filter_candidates(
-            state, state.discovered, {}, check_activity=False
+        candidates, rejected, removed = _filter_candidates(
+            state, state.discovered, {}, [], check_activity=False
         )
         return {
             "candidates": candidates,
             "rejected": rejected,
+            "removed": removed,
             "stage": "filtering",
         }
 
@@ -349,15 +350,17 @@ def make_nodes(
         state: MatchState,
         kols: list[KolProfile],
         rejected: dict[str, int],
+        removed: list[RemovedAccount],
         *,
         check_activity: bool,
-    ) -> tuple[list[KolProfile], dict[str, int]]:
+    ) -> tuple[list[KolProfile], dict[str, int], list[RemovedAccount]]:
         if state.brand_profile is None:
             raise ValueError("brand_profile is required before hard filtering")
         now = datetime.now(UTC)
         brand_alias_list, competitor_alias_list = _alias_sets(state)
         kept: list[KolProfile] = []
         counts = dict(rejected)
+        removed_accounts = list(removed)
         for kol in kols:
             reason = apply_hard_filter(
                 kol,
@@ -372,10 +375,14 @@ def make_nodes(
                 kept.append(kol)
             else:
                 counts[reason] = counts.get(reason, 0) + 1
+                if reason in (SELLER_ACCOUNT, MEDIA_ACCOUNT):
+                    removed_accounts.append(
+                        RemovedAccount(handle=kol.handle, reason=reason)
+                    )
         # Finding only sellers is a real answer, not a failed Search.
         if not kept and not counts.get(SELLER_ACCOUNT):
             raise ValueError("no candidates passed the hard filters")
-        return kept, counts
+        return kept, counts, removed_accounts
 
     @_guarded("first_pass_rank")
     def first_pass_rank(state: MatchState) -> dict[str, Any]:
@@ -453,9 +460,10 @@ def make_nodes(
         # Re-apply every hard rule, activity included, now that enriched
         # profiles carry their real follower counts and newest videos.
         rejected = state.rejected
+        removed = state.removed
         if state.brand_profile is not None:
-            enriched, rejected = _filter_candidates(
-                state, enriched, rejected, check_activity=True
+            enriched, rejected, removed = _filter_candidates(
+                state, enriched, rejected, removed, check_activity=True
             )
         if skipped:
             noun = "profile" if skipped == 1 else "profiles"
@@ -466,6 +474,7 @@ def make_nodes(
         update: dict[str, Any] = {
             "candidates": enriched,
             "rejected": rejected,
+            "removed": removed,
             "stage": "enriching_kols",
         }
         if attempted:
@@ -506,11 +515,14 @@ def make_nodes(
         update: dict[str, Any] = {
             "ranked": outcome.ranked,
             "rejected": rejected,
+            "removed": [*state.removed, *outcome.removed],
             "stage": "judging",
         }
         if outcome.judged_count:
+            noun = "call" if outcome.judge_calls == 1 else "calls"
             update["cost_log"] = [
-                f"llm: judge 1 call ({outcome.judged_count} creators)"
+                f"llm: judge {outcome.judge_calls} {noun} "
+                f"({outcome.judged_count} creators)"
             ]
         if outcome.errors:
             update["errors"] = outcome.errors

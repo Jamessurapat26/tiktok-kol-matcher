@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
-from ..models import BrandProfile, MatchRequest, RankedKol
+from ..models import BrandProfile, MatchRequest, RankedKol, RemovedAccount
 from .settings import LiveFlags
 
 JobStatus = Literal["queued", "running", "succeeded", "failed"]
@@ -59,6 +59,7 @@ class Job(BaseModel):
     brand_profile: BrandProfile | None = None
     brand_logo_url: str | None = None
     rejected: dict[str, int] = Field(default_factory=dict)
+    removed: list[RemovedAccount] = Field(default_factory=list)
     cost_log: list[str] = Field(default_factory=list)
     results: list[RankedKol] = []
     created_at: str

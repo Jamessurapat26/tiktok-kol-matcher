@@ -241,7 +241,7 @@ flowchart TD
     D -->|"enough Thai creators or round cap"| HF["hard_filter<br/>rules only, counts rejections"]
     HF --> FP["first_pass_rank<br/>score with data already in hand"]
     FP --> E["enrich_kols<br/>first-pass top 20, not the largest accounts"]
-    E --> J["judge_and_rank<br/>one batched LLM judge call on the top 20 or top k"]
+    E --> J["judge_and_rank<br/>batched LLM judge on the top 20 or top k,<br/>with up to two refill calls"]
     J --> O(["rank_and_output<br/>MMR lambda 0.7, top k"])
 ```
 
@@ -285,8 +285,10 @@ flowchart TD
    flag.
 7. **Judge.** The top 20, or the top k when that is larger, go to one batched
    LLM call. It returns `judge`, `A`, a confidence `c`, and an `account_type` per
-   creator. Accounts typed `seller` or `media` are removed and counted. Only
-   creators sent to the judge can be recommended. Creators the reply leaves out
+   creator. Accounts typed `seller` or `media` are removed, counted, and listed
+   in `removed`. Up to two more calls judge the next leaders in their place,
+   using search stats when they were not enriched. Only creators sent to the
+   judge can be recommended. Creators the reply leaves out
    are asked for once more; any still missing, or everyone if the call fails,
    stay in the list with the `unreviewed` warning flag and
    `judge` capped at a neutral 0.5 so they cannot pass the judged leaders on
@@ -469,7 +471,7 @@ carry `search_stats_only`. They are not dropped.
 
 LLM calls per job are one brand brief, one per query round (one in each recent
 live run, three at most), and one judge call: three to five calls in total,
-plus any retries. The CLI prints a cost
+plus any retries and up to two judge refill calls. The CLI prints a cost
 log with one line per stage, for example:
 
 ```text

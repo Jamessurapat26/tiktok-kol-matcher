@@ -48,6 +48,15 @@ class Judgement(DomainModel):
     account_type: Literal["kol", "seller", "media"] = "kol"
 
 
+class RemovedAccount(DomainModel):
+    """An account screened out as a seller or media account, kept for review."""
+
+    handle: str
+    reason: str
+    # The judge's sentence, or empty when a rule removed the account.
+    note: str = ""
+
+
 class MatchRequest(DomainModel):
     website_url: HttpUrl
     facebook_url: HttpUrl

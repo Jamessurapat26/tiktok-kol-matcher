@@ -62,6 +62,8 @@ class MatchingConfig:
     max_search_queries: int = 10
     enrich_top_n: int = 20
     judge_top_n: int = 20
+    # Extra judge calls that replace accounts the judge removed.
+    judge_refill_calls: int = 2
     mmr_lambda: float = 0.7
 
     # Confidence before and after the LLM judge.
@@ -124,6 +126,7 @@ class MatchingConfig:
             "max_search_queries",
             "enrich_top_n",
             "judge_top_n",
+            "judge_refill_calls",
         ):
             value = getattr(self, name)
             if not isinstance(value, int) or isinstance(value, bool) or value < 1:

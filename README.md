@@ -449,13 +449,6 @@ reach blend, tier bounds, stage sizes, MMR lambda, and confidence values are
 frozen dataclass fields, validated at construction, instead of numbers spread
 through the code.
 
-**The eval harness.** [`eval/README.md`](eval/README.md) documents an offline
-NDCG@10 harness over cached candidate pools, with `--ablate F|E|T|A`. It needs
-no network. The labels in `eval/golden/` are drafts, not human-checked. On the
-example pool, ablating A raises mean NDCG@10 from 0.9134 to 0.9576, so the
-current A term is not yet justified by that set. The harness is the tool for
-tuning once real labels exist.
-
 ### Cost per job
 
 `estimate_run_cost` in `backend/app/integrations/apify.py` charges `$0.005`
@@ -682,9 +675,8 @@ permission for automated data collection.
 ## Known limitations
 
 - **The tuning values are not fitted.** The score weighting, the shrinkage constant,
-  and the MMR lambda are reasoned starting points. The eval labels are drafts,
-  and on the example pool ablating A does not lower NDCG@10, so that term is
-  not yet supported by evidence.
+  and the MMR lambda are reasoned starting points. No marketer has labeled
+  results yet, so no term is supported by evidence, including audience fit.
 - **Seller and media detection can misfire.** The rules match tokens such as
   `shop`, `official`, `news`, and `tv`, sales phrases in the bio, and business
   names in the handle or nickname, so a fan account named after a brand or a
@@ -742,8 +734,7 @@ permission for automated data collection.
 ## Testing
 
 ```bash
-cd backend && uv run pytest          # 510 tests
-cd backend && uv run python ../eval/run_eval.py   # NDCG@10, no network
+cd backend && uv run pytest          # 507 tests
 cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 84 Vitest tests
 ```
 
@@ -760,9 +751,8 @@ embedder. They need real keys, and the Apify one spends credit.
 
 ## Next steps
 
-1. **Human labels and tuning.** Replace the draft eval labels with a marketer's
-   labels for a few brands, then use [`eval/README.md`](eval/README.md) to
-   tune the scoring values and confirm that each term earns its place.
+1. **Human labels and tuning.** Have a marketer label results for a few brands,
+   then tune the scoring values and confirm that each term earns its place.
 2. **A pilot.** Run the [business value](#business-value) comparison on real
    briefs.
 3. **Real audience data.** Use creator-shared analytics or permitted data access,
@@ -807,7 +797,6 @@ backend/
     fixtures/         # demo website, Facebook page, creators, Apify samples
   scripts/            # live smoke checks
   tests/
-eval/                 # offline NDCG@10 harness, golden labels, cached pools
 frontend/
   src/
     api/              # wire types, fetch client, query hooks, SSE follower

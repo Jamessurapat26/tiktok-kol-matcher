@@ -276,7 +276,7 @@ def test_default_settings_and_key_fallback(monkeypatch):
     assert settings.timeout == DEFAULT_TIMEOUT == 60
     assert settings.max_retries == DEFAULT_MAX_RETRIES == 2
     assert settings.retry_backoff == DEFAULT_RETRY_BACKOFF == 2.0
-    assert settings.max_tokens == DEFAULT_MAX_TOKENS == 4096
+    assert settings.max_tokens == DEFAULT_MAX_TOKENS == 16000
     assert settings.temperature == DEFAULT_TEMPERATURE
     assert settings.reasoning == "extra_body"
     assert settings.api_key == ""
@@ -396,7 +396,7 @@ def test_success_parses_fenced_json_and_sends_configured_request():
     assert str(request.url) == "https://llm.test/v1/chat/completions"
     assert request.headers["authorization"] == f"Bearer {_KEY}"
     assert body["model"] == "test-model"
-    assert body["max_tokens"] == 4096
+    assert body["max_tokens"] == 16000
     assert body["temperature"] == 0.2
     assert "chat_template_kwargs" not in body
     assert body["messages"][0]["content"].startswith("You extract")

@@ -6,7 +6,7 @@ default NVIDIA endpoint or at any other ``/v1`` chat API.
 
 The default model is a reasoning model. It can return ``reasoning_content``
 and a null ``content`` when the completion budget is used up by the trace, so
-``max_tokens`` defaults to 4096 and empty content is retried once. Each request
+``max_tokens`` defaults to 16000 and empty content is retried once. Each request
 attempt times out after 60 seconds. Transport failures (timeouts, connection
 errors, 408, 429, and 5xx) are retried twice with doubling backoff, so the
 worst case for one call with the defaults is 3 x 60 s + 2 s + 4 s = 186 s.
@@ -60,7 +60,7 @@ DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
 DEFAULT_TIMEOUT = 60.0
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_RETRY_BACKOFF = 2.0
-DEFAULT_MAX_TOKENS = 4096
+DEFAULT_MAX_TOKENS = 16000
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_NO_THINK_MESSAGE = "/no_think"
 

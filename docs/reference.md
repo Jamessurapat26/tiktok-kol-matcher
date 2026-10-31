@@ -409,7 +409,7 @@ only: set `LLM_BASE_URL`, `LLM_MODEL`, and a key.
 | `LLM_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Chat model id |
 | `LLM_API_KEY` | unset | Bearer token. If empty, `NVIDIA_API_KEY` is used, then `OPENAI_API_KEY` |
 | `LLM_TIMEOUT` | `60` | Request timeout in seconds |
-| `LLM_MAX_TOKENS` | `4096` | Completion token budget, shared with any reasoning trace |
+| `LLM_MAX_TOKENS` | `16000` | Completion token budget, shared with any reasoning trace |
 | `LLM_TEMPERATURE` | `0.2` | Sampling temperature |
 | `LLM_DISABLE_REASONING` | `extra_body` for the default endpoint and model, otherwise `off` | Provider-specific reasoning control, below |
 | `LLM_NO_THINK_MESSAGE` | `/no_think` | System message used when reasoning control is `system` or `both` |
@@ -417,7 +417,7 @@ only: set `LLM_BASE_URL`, `LLM_MODEL`, and a key.
 The default model is a reasoning model. A short prompt can take tens of seconds
 and spend most of its completion tokens on `reasoning_content`. With a small
 `max_tokens`, `content` comes back null. The client defaults are sized for
-that: 4096 completion tokens and a 60 second timeout. Empty or missing
+that: 16000 completion tokens and a 60 second timeout. Empty or missing
 `content` is retried once.
 
 `LLM_DISABLE_REASONING` picks how thinking is turned off. When it is unset, the

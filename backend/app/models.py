@@ -45,6 +45,16 @@ class Judgement(DomainModel):
     audience_confidence: float = Field(ge=0, le=1)
     reason: str
     risky: bool = False
+    account_type: Literal["kol", "seller", "media"] = "kol"
+
+
+class RemovedAccount(DomainModel):
+    """An account screened out as a seller or media account, kept for review."""
+
+    handle: str
+    reason: str
+    # The judge's sentence, or empty when a rule removed the account.
+    note: str = ""
 
 
 class MatchRequest(DomainModel):

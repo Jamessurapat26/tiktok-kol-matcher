@@ -20,7 +20,7 @@ survivor on four signals:
 `Final = F × Quality` and `Quality = 0.45·E + 0.30·T + 0.25·A_eff`.
 
 Scoring runs only after hard filters remove the brand's own accounts,
-competitor accounts, shop and media accounts, creators who are not Thai,
+competitor accounts, seller and media accounts, creators who are not Thai,
 creators outside 1k–5M followers, and creators whose latest post is over 60
 days old.
 
@@ -38,7 +38,7 @@ This prototype answers the Convert Cake AI Engineer case study.
 | Brief | What the tool does | Limit |
 | --- | --- | --- |
 | Analyze a client's Facebook page and website | Reads both and has the LLM build a brief: category, products, audience, tone, keywords, competitors, and creator tier | Content style is the brand's `tone` only, with no breakdown of content formats |
-| Identify and evaluate Thai TikTok KOLs | Searches TikTok, removes accounts that cannot fit, fetches recent videos, and has the LLM judge the leaders | Some dealers and shops still get through; see [Known limitations](#known-limitations) |
+| Identify and evaluate Thai TikTok KOLs | Searches TikTok, removes accounts that cannot fit, fetches recent videos, and has the LLM judge the leaders | Sellers are caught by rules and the judge, but some detection can still misfire; see [Known limitations](#known-limitations) |
 | Rank by relevance, engagement, and audience demographics | Scores F, E, T, and A_eff, then selects with MMR | Audience is estimated from text. TikTok does not expose demographics to scrapers |
 | Present a curated list with profile information | Returns profile links, followers, scores, a reason, flags, and evidence videos in the Thai web app, API, CLI, and CSV | |
 
@@ -241,7 +241,7 @@ flowchart TD
     D -->|"enough Thai creators or round cap"| HF["hard_filter<br/>rules only, counts rejections"]
     HF --> FP["first_pass_rank<br/>score with data already in hand"]
     FP --> E["enrich_kols<br/>first-pass top 20, not the largest accounts"]
-    E --> J["judge_and_rank<br/>one batched LLM judge call on the top 15"]
+    E --> J["judge_and_rank<br/>batched LLM judge on the top 20 or top k,<br/>with up to two refill calls"]
     J --> O(["rank_and_output<br/>MMR lambda 0.7, top k"])
 ```
 
@@ -264,12 +264,15 @@ flowchart TD
    returns up to 15 videos. Creators are deduped, and every video's views,
    likes, comments, shares, date, caption, and URL are kept.
 4. **Hard filters.** Free rules drop the brand's own accounts, competitor
-   accounts, shop and media accounts, creators who are not Thai, creators
+   accounts, seller and media accounts, creators who are not Thai, creators
    outside 1k–5M followers, and creators whose latest post is over 60 days
    old. The activity rule waits until after enrichment, because a search hit
    is not a creator's newest video; every rule then runs again on the
    enriched profiles. Each rejection is counted by reason for the CLI and API
-   output.
+   output, and the web app shows the seller count. Plain sellers do not count
+   toward the discovery target, so a pool of dealers keeps the search going up
+   to its query cap. Finding only sellers ends the Search with an empty list and
+   an explanation, not a failure.
 5. **First-pass rank.** Every survivor is scored with data already in hand:
    embedding similarity, on-topic share, and search-derived engagement. The
    judge has not run yet, so `judge = sim percentile` and `A_eff = 0.5`. The
@@ -280,9 +283,14 @@ flowchart TD
    `MatchingConfig.enrich_top_n`. Leaders beyond that keep their search-derived
    stats, get lower engagement confidence, and carry the `search_stats_only`
    flag.
-7. **Judge.** The top 15 go to one batched LLM call. It returns `judge`, `A`,
-   and a confidence `c` per creator. Creators the reply leaves out are asked
-   for once more; any still missing are reported and ranked unjudged, with
+7. **Judge.** The top 20, or the top k when that is larger, go to one batched
+   LLM call. It returns `judge`, `A`, a confidence `c`, and an `account_type` per
+   creator. Accounts typed `seller` or `media` are removed, counted, and listed
+   in `removed`. Up to two more calls judge the next leaders in their place,
+   using search stats when they were not enriched. Only creators sent to the
+   judge can be recommended. Creators the reply leaves out
+   are asked for once more; any still missing, or everyone if the call fails,
+   stay in the list with the `unreviewed` warning flag and
    `judge` capped at a neutral 0.5 so they cannot pass the judged leaders on
    similarity alone. The rubric checks category match, tone
    match, and no risky content. Audience is estimated from text, captions, and
@@ -406,14 +414,14 @@ campaign have not. Recent competitor sponsorship is only a flag
 **How the tier is guessed.** The brief prompt asks the model to use price tier,
 sales channels, local versus multinational reach, and the brand page's follower
 count. An SME or small online shop maps to micro (~30k), a nationwide Thai
-brand to mid (~150k), and a multinational to macro (~800k). The result is
+brand of any size to mid (~150k), and a multinational to macro (~800k). The result is
 clamped to 10k–2M and shown with `tier_label`, `tier_confidence`, and
 `tier_reason`.
 
 **Judge before stage 6.** Until the batched judge call runs, `judge = sim` and
 `A_eff = 0.5`. That keeps first-pass ranking cheap and confirmatory: it only
 decides which 20 candidates deserve profile enrichment. The judge then changes
-F for the top 15, and the final ranking is recomputed for everyone.
+F for the top 20 or top k, and the final ranking is recomputed for everyone.
 
 **Every tuning value lives in `MatchingConfig`.** The score weighting, shrinkage `k`,
 reach blend, tier bounds, stage sizes, MMR lambda, and confidence values are
@@ -463,7 +471,7 @@ carry `search_stats_only`. They are not dropped.
 
 LLM calls per job are one brand brief, one per query round (one in each recent
 live run, three at most), and one judge call: three to five calls in total,
-plus any retries. The CLI prints a cost
+plus any retries and up to two judge refill calls. The CLI prints a cost
 log with one line per stage, for example:
 
 ```text
@@ -474,7 +482,7 @@ cost log:
   llm: generate_queries round 2 1 call
   search round 2: est $0.13 (2 queries)
   enrich: est $0.70 (20 profiles)
-  llm: judge 1 call (15 creators)
+  llm: judge 1 call (20 creators)
 ```
 
 ## Live results
@@ -546,7 +554,7 @@ machine. It supplies `sim` for F and the document similarity that MMR uses.
 The trade-off is a heavy optional dependency (torch), so it sits behind the
 `embed` extra and the default install and tests stay light.
 
-**One judge, not one call per creator.** Only the top 15 see the LLM judge, and
+**One judge, not one call per creator.** Only the top 20 or top k see the LLM judge, and
 they share one request. That keeps the expensive stage small and makes the
 rubric consistent across candidates.
 
@@ -581,7 +589,7 @@ time. Several API replicas would need a shared database and a real queue.
 **Demo mode by default.** Without an `APIFY_TOKEN`, the service runs the full
 graph on fixtures, so anyone can clone the repo and see the product in a minute
 without spending money. The fixtures cover the awkward cases: duplicate handles
-with different casing, non-Thai creators, the brand's own account, shop and
+with different casing, non-Thai creators, the brand's own account, seller and
 media accounts, and a second discovery round.
 
 **Guarding a public-URL fetcher.** The API only accepts Facebook URLs on
@@ -646,15 +654,15 @@ permission for automated data collection.
   and the MMR lambda are reasoned starting points. The eval labels are drafts,
   and on the example pool ablating A does not lower NDCG@10, so that term is
   not yet supported by evidence.
-- **Shop and media detection misses and misfires.** It matches tokens such as
-  `shop`, `store`, `official`, `news`, `media`, and `tv` inside handle segments
-  and the nickname. A legitimate creator with `official` or `tv` in the name can
-  be dropped. Dealers, salespeople, and shops without those tokens get through:
-  in the Siam Kubota run, the judge described the top five as dealers or
-  salespeople, and nothing removes a creator because of what the judge wrote.
-- **The tier guess is unstable.** Two InnovestX runs less than an hour apart
-  guessed macro (800k) and mid (150k), which changed T and the shortlist. Only
-  three creators appeared in both top fives.
+- **Seller and media detection can misfire.** The rules match tokens such as
+  `shop`, `official`, `news`, and `tv`, sales phrases in the bio, and business
+  names in the handle or nickname, so a fan account named after a brand or a
+  creator with `tv` in the name is dropped. The judge decides the unclear
+  accounts and can be wrong in either direction.
+- **The tier guess can still differ by one step.** The LLM reads the brand again
+  on every Search, so a brand near a boundary can move between neighbouring
+  tiers, which changes T and the shortlist. This variation is accepted; the
+  prompt only removes the overlap between large Thai brands and multinationals.
 - **Competitor sponsorship can be missed.** It depends on the competitors the LLM
   lists. One InnovestX run gave a reason mentioning a Dime-sponsored post, but
   raised no `competitor_sponsored` flag and did not list Dime as a competitor.
@@ -717,27 +725,22 @@ embedder. They need real keys, and the Apify one spends credit.
 
 ## Next steps
 
-1. **Remove sellers from the shortlist.** Have the judge return an account type
-   and filter dealers, salespeople, and shops, including the brand's own sales
-   channel.
-2. **A stable tier guess.** Keep the same brand from swinging between tiers, for
-   example by caching the brief or letting a marketer confirm the tier.
-3. **Human labels and tuning.** Replace the draft eval labels with a marketer's
+1. **Human labels and tuning.** Replace the draft eval labels with a marketer's
    labels for a few brands, then use [`eval/README.md`](eval/README.md) to
    tune the scoring values and confirm that each term earns its place.
-4. **A pilot.** Run the [business value](#business-value) comparison on real
+2. **A pilot.** Run the [business value](#business-value) comparison on real
    briefs.
-5. **Real audience data.** Use creator-shared analytics or permitted data access,
+3. **Real audience data.** Use creator-shared analytics or permitted data access,
    then replace A with measured demographics.
-6. **Privacy and access work.** Complete the
+4. **Privacy and access work.** Complete the
    [before-production list](#ethics-and-privacy).
-7. **More enrichment within budget.** Raise the profile cap only when the
+5. **More enrichment within budget.** Raise the profile cap only when the
    estimated spend allows it, and measure whether profile stats change the top
    10 enough to justify the cost.
-8. **Better signals.** Describe the brand's content formats, add comment language
+6. **Better signals.** Describe the brand's content formats, add comment language
    as a weak audience signal, detect the Facebook login wall, and warn when the
    budget skips a Facebook run.
-9. **Real spend tracking.** Read `usageTotalUsd` from Apify's run API after each
+7. **Real spend tracking.** Read `usageTotalUsd` from Apify's run API after each
    run instead of estimating.
 10. **CI.** Run the backend and frontend suites and the Docker build on every
     pull request.

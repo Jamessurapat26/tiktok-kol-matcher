@@ -76,7 +76,8 @@ curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
   "rejected": {
     "own_brand_account": 1,
     "competitor_account": 1,
-    "shop_media_account": 2,
+    "seller_account": 1,
+    "media_account": 1,
     "not_thai": 1,
     "inactive": 1,
     "followers_out_of_range": 2
@@ -88,7 +89,7 @@ curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
     "llm: generate_queries round 2 1 call",
     "search round 2: est $0.13 (2 queries)",
     "enrich: est $0.70 (20 profiles)",
-    "llm: judge 1 call (15 creators)"
+    "llm: judge 1 call (20 creators)"
   ],
   "results": [
     {
@@ -445,10 +446,16 @@ graph records that on `errors`, sets `stage` to `failed`, and stops, the same
 way other node failures do.
 
 The model returns three things for each creator: `judge` (0–1), `audience`
-(0–1), and `audience_confidence` (0–1), plus `risky` and a short reason. The
+(0–1), and `audience_confidence` (0–1), plus `risky`, `account_type`
+(`kol`, `seller`, or `media`), and a short reason. Seller and media accounts
+are removed and counted in `rejected`. The
 judge rubric covers category match, tone match, and no risky content. Audience
 is inferred from text, captions, and bio only, never from faces. Only the top
-15 candidates by first-pass score are sent, in one request. The returned
+20 candidates by first-pass score, or `top_k` when that is larger, are sent, in
+one request, and only creators sent to the judge can be recommended. Up to two
+more calls judge the next candidates in place of removed accounts. Each seller or
+media account removed by a rule or the judge is listed in `removed` with its
+reason and, for the judge, its sentence. The returned
 values replace the `judge = sim` placeholder and the neutral `A_eff = 0.5`,
 and the final ranking is recomputed. Query generation returns only the new
 queries for that round, so the discovery loop and `last_queries` keep working.

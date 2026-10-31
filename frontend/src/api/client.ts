@@ -16,6 +16,15 @@ export class ApiError extends Error {
   }
 }
 
+/** What to tell a Marketer about a failed request. The raw detail stays on the error and in the API. */
+export function friendlyError(error: Error): string {
+  if (error instanceof ApiError) {
+    if (error.status === 429) return 'ระบบกำลังทำงานเต็มคิว กรุณารอสักครู่แล้วลองใหม่'
+    if (error.status === 404) return 'ไม่พบการค้นหานี้'
+  }
+  return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
+}
+
 function isErrorBody(body: unknown): body is ErrorBody {
   return typeof body === 'object' && body !== null && 'detail' in body
 }

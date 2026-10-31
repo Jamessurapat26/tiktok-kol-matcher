@@ -1,13 +1,11 @@
 import { Loader2 } from 'lucide-react'
-import { cloneElement, type ComponentProps, type FormEvent, type ReactElement, useId, useState } from 'react'
-import { ApiError } from '@/api/client'
-import { useCreateJob, useHealth } from '@/api/queries'
-import type { LiveFlag, LiveFlags } from '@/api/types'
+import { cloneElement, type ComponentProps, type FormEvent, type ReactElement, useState } from 'react'
+import { ApiError, friendlyError } from '@/api/client'
+import { useCreateJob } from '@/api/queries'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { type FieldErrors, validateBrandInput } from '@/lib/validation'
 
 export interface BrandDraft {
@@ -16,13 +14,8 @@ export interface BrandDraft {
   topK: string
 }
 
-const FLAG_LABELS: Record<LiveFlag, string> = {
-  live_web: 'Website reader',
-  live_fb: 'Facebook page',
-  live_kols: 'TikTok search',
-  live_llm: 'LLM',
-  live_embed: 'Embeddings',
-}
+// The API's field messages are English, so a rejected field gets this instead.
+const API_FIELD_ERROR = 'กรุณาตรวจสอบข้อมูลในช่องนี้'
 
 interface Props {
   draft: BrandDraft
@@ -31,20 +24,19 @@ interface Props {
 }
 
 export function BrandForm({ draft, onDraftChange, onCreated }: Props) {
-  const health = useHealth()
   const createJob = useCreateJob()
   // Validate live once the user has tried to submit, so errors clear as they are fixed.
   const [submitted, setSubmitted] = useState(false)
   const clientErrors = submitted ? validateBrandInput(draft) : {}
-  // In live mode a flag defaults on exactly when it can run, so defaults double as availability.
-  const available = health.data?.mode === 'live' ? health.data.defaults : null
-  const [flags, setFlags] = useState<Partial<LiveFlags>>({})
 
   const apiFields: FieldErrors = createJob.error instanceof ApiError ? createJob.error.fields : {}
-  const errors: FieldErrors = { ...apiFields, ...clientErrors }
+  const errors: FieldErrors = {
+    ...Object.fromEntries(Object.keys(apiFields).map((field) => [field, API_FIELD_ERROR])),
+    ...clientErrors,
+  }
   // A 422 on a field this form shows goes inline; anything else (400, 429, network) goes above the button.
   const inline = Boolean(apiFields.website_url || apiFields.facebook_url || apiFields.top_k)
-  const formError = createJob.error && !inline ? createJob.error.message : null
+  const formError = createJob.error && !inline ? friendlyError(createJob.error) : null
 
   const set = (field: keyof BrandDraft, value: string) => {
     onDraftChange({ ...draft, [field]: value })
@@ -60,7 +52,6 @@ export function BrandForm({ draft, onDraftChange, onCreated }: Props) {
         website_url: draft.website.trim(),
         facebook_url: draft.facebook.trim(),
         top_k: Number(draft.topK),
-        ...(available ? flags : {}),
       },
       { onSuccess: ({ job_id }) => onCreated(job_id) },
     )
@@ -69,12 +60,12 @@ export function BrandForm({ draft, onDraftChange, onCreated }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Brand</CardTitle>
-        <CardDescription>Where the brand lives online.</CardDescription>
+        <CardTitle>ข้อมูลแบรนด์</CardTitle>
+        <CardDescription>ใส่ลิงก์เว็บไซต์และเพจของแบรนด์</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="flex flex-col gap-5" onSubmit={submit} noValidate>
-          <Field id="website_url" label="Website URL" error={errors.website_url}>
+          <Field id="website_url" label="เว็บไซต์ของแบรนด์" error={errors.website_url}>
             <Input
               type="url"
               inputMode="url"
@@ -83,7 +74,7 @@ export function BrandForm({ draft, onDraftChange, onCreated }: Props) {
               onChange={(e) => set('website', e.target.value)}
             />
           </Field>
-          <Field id="facebook_url" label="Facebook URL" error={errors.facebook_url}>
+          <Field id="facebook_url" label="เพจ Facebook ของแบรนด์" error={errors.facebook_url}>
             <Input
               type="url"
               inputMode="url"
@@ -92,7 +83,7 @@ export function BrandForm({ draft, onDraftChange, onCreated }: Props) {
               onChange={(e) => set('facebook', e.target.value)}
             />
           </Field>
-          <Field id="top_k" label="Top K" error={errors.top_k}>
+          <Field id="top_k" label="จำนวน KOL ที่ต้องการ" error={errors.top_k}>
             <Input
               type="number"
               min={1}
@@ -102,21 +93,6 @@ export function BrandForm({ draft, onDraftChange, onCreated }: Props) {
               onChange={(e) => set('topK', e.target.value)}
             />
           </Field>
-
-          {available && (
-            <fieldset className="flex flex-col gap-3">
-              <legend className="mb-2 text-body-sm font-bold text-ink">Run live</legend>
-              {(Object.keys(FLAG_LABELS) as LiveFlag[]).map((flag) => (
-                <FlagToggle
-                  key={flag}
-                  flag={flag}
-                  disabled={!available[flag]}
-                  checked={flags[flag] ?? available[flag]}
-                  onChange={(on) => setFlags((f) => ({ ...f, [flag]: on }))}
-                />
-              ))}
-            </fieldset>
-          )}
 
           {formError && (
             <p role="alert" className="rounded-lg bg-error-soft px-3 py-2 text-body-sm text-error">
@@ -130,7 +106,7 @@ export function BrandForm({ draft, onDraftChange, onCreated }: Props) {
             disabled={createJob.isPending}
           >
             {createJob.isPending && <Loader2 className="animate-spin" aria-hidden />}
-            Find KOLs
+            ค้นหา KOL
           </Button>
         </form>
       </CardContent>
@@ -166,29 +142,6 @@ function Field({
           {error}
         </p>
       )}
-    </div>
-  )
-}
-
-function FlagToggle({
-  flag,
-  checked,
-  disabled,
-  onChange,
-}: {
-  flag: LiveFlag
-  checked: boolean
-  disabled: boolean
-  onChange: (on: boolean) => void
-}) {
-  const id = useId()
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <Label htmlFor={id} className="text-body-sm text-ink">
-        {FLAG_LABELS[flag]}
-        {disabled && <span className="text-muted-foreground"> (unavailable)</span>}
-      </Label>
-      <Switch id={id} checked={checked && !disabled} disabled={disabled} onCheckedChange={onChange} />
     </div>
   )
 }

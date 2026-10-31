@@ -1,6 +1,13 @@
 import type { JobEvent, NodeStatus } from '@/api/types'
 import demoEvents from '@/test/demo-events.json'
-import { applyEvent, initialProgress, type Progress, STAGE_LABELS, STAGE_ORDER, stepDuration } from './steps'
+import {
+  applyEvent,
+  failureMessage,
+  initialProgress,
+  type Progress,
+  STAGE_ORDER,
+  visibleSteps,
+} from './steps'
 
 const events = demoEvents as JobEvent[]
 const fold = (list: JobEvent[], from: Progress = initialProgress()) => list.reduce(applyEvent, from)
@@ -47,19 +54,11 @@ describe('applyEvent', () => {
     expect(progress.steps.every((s) => s.status === 'pending')).toBe(true)
   })
 
-  it('gives every stage a readable label', () => {
-    for (const stage of STAGE_ORDER) {
-      expect(STAGE_LABELS[stage]).toBeTruthy()
-      expect(STAGE_LABELS[stage]).not.toBe(stage)
-    }
-  })
-
-  it('turns a full demo stream into finished stages with summaries and durations', () => {
+  it('turns a full demo stream into finished stages with summaries', () => {
     const progress = fold(events)
     expect(progress.steps.every((s) => s.status === 'finished')).toBe(true)
     expect(step(progress, 'filtering').summary).toBe('candidates=25')
     expect(step(progress, 'scraping').summary).toBe('website=1330 chars · facebook=ExampleBrand')
-    expect(stepDuration(step(progress, 'analyzing_brand'))).toBeGreaterThanOrEqual(0)
     expect(progress.outcome).toEqual({ type: 'done', summary: 'ranked 3 KOLs' })
     expect(progress.lastSeq).toBe(25)
   })
@@ -98,7 +97,6 @@ describe('applyEvent', () => {
     const progress = fold(events.slice(0, 9))
     expect(step(progress, 'discovering_kols').status).toBe('running')
     expect(step(progress, 'filtering').status).toBe('pending')
-    expect(stepDuration(step(progress, 'discovering_kols'))).toBeNull()
   })
 
   it('counts the discovery loop as a second round and keeps the latest summary', () => {
@@ -179,5 +177,80 @@ describe('applyEvent', () => {
     const before = fold(events.slice(0, 3))
     const bogus = nodeEvent(4, 'scrape_facebook', 'paused' as NodeStatus)
     expect(applyEvent(before, bogus)).toBe(before)
+  })
+})
+
+const failedJob = (seq: number, summary: string): JobEvent => ({
+  ...nodeEvent(seq, '', 'failed'),
+  type: 'failed',
+  node: null,
+  status: null,
+  summary,
+})
+
+describe('visibleSteps', () => {
+  it('folds the stages into five steps', () => {
+    expect(visibleSteps(initialProgress()).map((s) => [s.label, s.status])).toEqual([
+      ['อ่านข้อมูลแบรนด์', 'pending'],
+      ['วิเคราะห์แบรนด์', 'pending'],
+      ['ค้นหา KOL บน TikTok', 'pending'],
+      ['คัดกรองและประเมิน KOL', 'pending'],
+      ['จัดอันดับ', 'pending'],
+    ])
+  })
+
+  it('finishes every step when the demo stream ends', () => {
+    expect(visibleSteps(fold(events)).every((s) => s.status === 'finished' && !s.partial)).toBe(true)
+  })
+
+  it('keeps a step running between two of its stages', () => {
+    const progress = fold([
+      nodeEvent(1, 'generate_queries', 'started'),
+      nodeEvent(2, 'generate_queries', 'finished'),
+    ])
+    expect(visibleSteps(progress)[2].status).toBe('running')
+  })
+
+  it('keeps the search step running through a second discovery round', () => {
+    const during = fold(events.slice(0, 13))
+    expect(visibleSteps(during)[2].status).toBe('running')
+  })
+
+  it('marks a step partial when the Search went on after part of it failed', () => {
+    const progress = fold([
+      nodeEvent(1, 'scrape_facebook', 'started'),
+      nodeEvent(2, 'scrape_facebook', 'failed', 'scrape_facebook: blocked'),
+      nodeEvent(3, 'analyze_brand', 'started'),
+    ])
+    expect(visibleSteps(progress)[0]).toMatchObject({ status: 'finished', partial: true })
+  })
+})
+
+describe('failureMessage', () => {
+  it('tells the Marketer to check the links when the brand step fails', () => {
+    const progress = fold([
+      nodeEvent(1, 'analyze_brand', 'started'),
+      nodeEvent(2, 'analyze_brand', 'failed', 'analyze_brand: model unavailable'),
+      failedJob(3, 'analyze_brand: model unavailable'),
+    ])
+    expect(failureMessage(progress)).toBe('อ่านข้อมูลแบรนด์ไม่สำเร็จ กรุณาตรวจลิงก์แล้วลองใหม่')
+  })
+
+  it('tells the Marketer to retry when the KOL steps fail', () => {
+    const progress = fold([
+      nodeEvent(1, 'judge_and_rank', 'started'),
+      nodeEvent(2, 'judge_and_rank', 'failed', 'judge_and_rank: boom'),
+      failedJob(3, 'judge_and_rank: boom'),
+    ])
+    expect(failureMessage(progress)).toBe('ค้นหา KOL ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+  })
+
+  it('names an interrupted Search', () => {
+    const progress = fold([nodeEvent(1, 'scrape_website', 'started'), failedJob(2, 'interrupted by restart')])
+    expect(failureMessage(progress)).toBe('การค้นหาถูกหยุดกลางคัน กรุณาเริ่มใหม่')
+  })
+
+  it('falls back to a general message when no step failed', () => {
+    expect(failureMessage(fold([failedJob(1, 'pipeline: boom')]))).toBe('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง')
   })
 })

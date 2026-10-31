@@ -61,6 +61,12 @@ The object must contain exactly these keys:
   the size of the brand's own page. Do not return a follower count.
 - tier_confidence: a number from 0 to 1 for how sure you are of the tier.
 - tier_reason: one short sentence explaining the tier choice.
+- category_th: the category in Thai, for display to a Thai marketer.
+- key_products_th: key_products in Thai, in the same order. Keep proper names
+  as written.
+- tone_th: tone in Thai.
+- interests_th: target_audience.interests in Thai, in the same order.
+- tier_reason_th: tier_reason in Thai.
 
 Tier guidance (creator tier to hire):
 - Very small or brand-new shop -> nano.
@@ -120,7 +126,7 @@ Rubric:
   audience estimate.
 - risky is true when the creator's content shows gambling, casino, or similar
   unsafe content.
-- reason is one short sentence. Only say a creator posts about the brand when a
+- reason is one short sentence in Thai, for a Thai marketer. Only say a creator posts about the brand when a
   brand name appears in their text; never claim that without that evidence. This
   rule only governs the reason wording, not the judge score. Copy every handle
   from the input unchanged. Include each creator you judge exactly once.

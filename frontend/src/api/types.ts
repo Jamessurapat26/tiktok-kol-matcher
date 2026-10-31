@@ -71,6 +71,12 @@ export interface BrandProfile {
   tier_label: Tier
   tier_confidence: number
   tier_reason: string
+  /** Thai display text. Absent on briefs stored before the fields existed. */
+  category_th?: string
+  key_products_th?: string[]
+  tone_th?: string
+  interests_th?: string[]
+  tier_reason_th?: string
 }
 
 /** models.py `VideoStats` */

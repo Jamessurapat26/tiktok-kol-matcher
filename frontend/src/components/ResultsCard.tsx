@@ -5,54 +5,55 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { downloadCsv, toCsv } from '@/lib/csv'
-import { formatCompact, formatScore, initials } from '@/lib/format'
+import { csvFilename, downloadCsv, toCsv } from '@/lib/csv'
+import { formatCompact, initials, scoreOutOf100 } from '@/lib/format'
+import { flagLabel, isWarningFlag, scoreRows } from '@/lib/kol'
 import { ScoreBar } from './ScoreBar'
 
 interface Props {
-  jobId: string
+  websiteUrl: string | null
   results: RankedKol[]
   /** Still running: show placeholders instead of an empty list. */
   pending: boolean
   failed: boolean
 }
 
-export function ResultsCard({ jobId, results, pending, failed }: Props) {
+export function ResultsCard({ websiteUrl, results, pending, failed }: Props) {
   const sorted = [...results].sort((a, b) => b.final - a.final)
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ranked KOLs</CardTitle>
+        <CardTitle>KOL ที่แนะนำ</CardTitle>
         <CardDescription aria-live="polite">
           {pending
-            ? 'Ranking creators…'
+            ? 'กำลังจัดอันดับ KOL…'
             : failed
-              ? 'Run failed'
-              : `${sorted.length} creators, best match first`}
+              ? 'การค้นหาไม่สำเร็จ'
+              : `${sorted.length} คน เรียงจากเหมาะสมที่สุด`}
         </CardDescription>
         <CardAction>
           <Button
             variant="outline"
             size="lg"
             disabled={sorted.length === 0}
-            onClick={() => downloadCsv(`kols-${jobId}.csv`, toCsv(sorted))}
+            onClick={() => downloadCsv(csvFilename(websiteUrl), toCsv(sorted))}
           >
             <Download aria-hidden />
-            Export CSV
+            ดาวน์โหลดรายชื่อ (CSV)
           </Button>
         </CardAction>
       </CardHeader>
       <CardContent>
         {pending ? (
           <div className="flex flex-col gap-3">
-            <span className="sr-only">Loading results</span>
+            <span className="sr-only">กำลังโหลดผลลัพธ์</span>
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-20" />
             ))}
           </div>
         ) : sorted.length === 0 ? (
           <p className="text-body-sm text-muted-foreground">
-            {failed ? 'No results: the run failed.' : 'No creators matched.'}
+            {failed ? 'ไม่มีผลลัพธ์ เพราะการค้นหาไม่สำเร็จ' : 'ไม่พบ KOL ที่เหมาะสม'}
           </p>
         ) : (
           <ol className="flex flex-col divide-y divide-border">
@@ -93,19 +94,13 @@ function KolAvatar({ kol }: { kol: KolProfile }) {
 }
 
 function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
-  const { kol, scores } = row
-  const scoreRows = [
-    { key: 'F', label: 'Fit (F)', value: scores.F, confidence: scores.F_conf },
-    { key: 'E', label: 'Engagement (E)', value: scores.E, confidence: scores.E_conf },
-    { key: 'T', label: 'Tier fit (T)', value: scores.T, confidence: scores.T_conf },
-    { key: 'A', label: 'Audience (A_eff)', value: scores.A_eff, confidence: scores.A_conf },
-  ] as const
+  const { kol } = row
 
   return (
     <li className="py-4 first:pt-0 last:pb-0">
       <div className="flex gap-4">
         <span className="w-6 shrink-0 pt-2 text-right text-heading-sm text-muted-foreground">
-          <span className="sr-only">Rank </span>
+          <span className="sr-only">อันดับ </span>
           {rank}
         </span>
         <KolAvatar kol={kol} />
@@ -119,50 +114,43 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
             >
               @{kol.handle}
               <ExternalLink aria-hidden className="size-3.5 text-muted-foreground" />
-              <span className="sr-only">(opens TikTok in a new tab)</span>
+              <span className="sr-only">(เปิด TikTok ในแท็บใหม่)</span>
             </a>
             {kol.nickname && (
               <span className="truncate text-body-sm text-muted-foreground">{kol.nickname}</span>
             )}
           </div>
 
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-body-xs text-muted-foreground">
-            <span>
-              <strong className="font-bold text-ink">{formatCompact(kol.followers)}</strong> followers
-            </span>
-            <span>
-              Final <strong className="font-bold text-ink">{formatScore(row.final)}</strong>
-            </span>
-            <span>
-              Quality <strong className="font-bold text-ink">{formatScore(row.quality)}</strong>
-            </span>
-          </div>
+          <p className="mt-1 text-body-xs text-muted-foreground">
+            ผู้ติดตาม <strong className="font-bold text-ink">{formatCompact(kol.followers)}</strong>
+          </p>
 
-          <div className="mt-3 flex items-center gap-3">
-            <ScoreBar value={row.final} label="Final score" className="flex-1" />
-            <span className="w-10 text-right text-body-sm font-bold text-ink">{formatScore(row.final)}</span>
+          <div className="mt-3 flex items-baseline justify-between gap-3 text-body-sm">
+            <span className="font-bold text-ink">ความเหมาะสมรวม</span>
+            <span className="font-bold text-ink">{scoreOutOf100(row.final)}/100</span>
           </div>
+          <ScoreBar value={row.final} label="ความเหมาะสมรวม" className="mt-1" />
 
           <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            {scoreRows.map((score) => (
-              <div key={score.key} className="grid grid-cols-[7.5rem_1fr_3.5rem] items-center gap-2">
-                <dt className="text-body-xs text-muted-foreground">{score.label}</dt>
-                <dd>
-                  <ScoreBar value={score.value} label={score.label} className="h-1.5" />
-                </dd>
-                <dd className="text-right text-body-xs text-muted-foreground">
-                  <span className="font-bold text-ink">{formatScore(score.value)}</span>
-                  <span className="block">conf {formatScore(score.confidence)}</span>
-                </dd>
+            {scoreRows(row).map((score) => (
+              <div key={score.key}>
+                <div className="flex items-baseline justify-between gap-2 text-body-xs text-muted-foreground">
+                  <dt>{score.label}</dt>
+                  <dd className="flex shrink-0 items-baseline gap-2">
+                    {score.limitedData && <span className="text-warning">ข้อมูลน้อย</span>}
+                    <span className="font-bold text-ink">{scoreOutOf100(score.value)}</span>
+                  </dd>
+                </div>
+                <ScoreBar value={score.value} label={score.label} className="mt-1 h-1.5" />
               </div>
             ))}
           </dl>
 
           {row.flags.length > 0 && (
-            <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Flags">
+            <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="ป้ายเตือน">
               {row.flags.map((flag) => (
                 <li key={flag}>
-                  <Badge variant="outline">{flag}</Badge>
+                  <Badge variant={isWarningFlag(flag) ? 'warning' : 'outline'}>{flagLabel(flag)}</Badge>
                 </li>
               ))}
             </ul>
@@ -171,7 +159,7 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
           <p className="mt-2 text-body-sm text-ink">{row.reason}</p>
 
           {row.evidence_urls.length > 0 && (
-            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1" aria-label="Evidence videos">
+            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1" aria-label="วิดีโอตัวอย่าง">
               {row.evidence_urls.slice(0, 3).map((url, index) => (
                 <li key={url}>
                   <a
@@ -180,7 +168,7 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 rounded-sm text-body-xs font-bold text-muted-foreground underline-offset-4 outline-none hover:text-ink hover:underline focus-visible:ring-3 focus-visible:ring-ring"
                   >
-                    Evidence {index + 1}
+                    วิดีโอตัวอย่าง {index + 1}
                     <ExternalLink aria-hidden className="size-3" />
                   </a>
                 </li>

@@ -68,6 +68,16 @@ def tidy_brand_profile(profile: BrandProfile) -> BrandProfile:
                 transform=None,
             ),
             "target_audience": tidy_audience,
+            "key_products_th": _plain_items(
+                profile.key_products_th,
+                limit=MAX_KEY_PRODUCTS,
+                max_chars=MAX_PRODUCT_CHARS,
+            ),
+            "interests_th": _plain_items(
+                profile.interests_th,
+                limit=MAX_INTERESTS,
+                max_chars=MAX_PRODUCT_CHARS,
+            ),
             "topic_keywords_th": _tidy_list(
                 profile.topic_keywords_th,
                 limit=MAX_KEYWORDS,

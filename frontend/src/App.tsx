@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { friendlyError } from '@/api/client'
 import { useJob } from '@/api/queries'
 import type { MatchRequest } from '@/api/types'
 import { type BrandDraft, BrandForm } from '@/components/BrandForm'
@@ -48,14 +49,16 @@ export default function App() {
       <main className="grid items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           <BrandForm draft={draft} onDraftChange={setDraft} onCreated={setJobId} />
-          {jobId && !job.isError && <ProgressCard progress={progress} connected={connected} />}
+          {jobId && !job.isError && (
+            <ProgressCard progress={progress} connected={connected} resultCount={job.data?.results?.length} />
+          )}
         </div>
         <div className="flex flex-col gap-6">
           {!jobId ? (
             <EmptyState onTryDemo={() => setDraft(DEMO_DRAFT)} />
           ) : job.isError ? (
             <p role="alert" className="rounded-xl bg-error-soft p-4 text-body-sm text-error">
-              Could not load job {jobId}: {job.error.message}
+              {friendlyError(job.error)}
             </p>
           ) : (
             <>
@@ -65,7 +68,7 @@ export default function App() {
                 unavailable={terminal && !job.data?.brand_profile}
               />
               <ResultsCard
-                jobId={jobId}
+                websiteUrl={job.data?.request.website_url ?? null}
                 results={job.data?.results ?? []}
                 pending={!terminal}
                 failed={status === 'failed'}

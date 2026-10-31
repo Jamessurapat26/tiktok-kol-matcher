@@ -4,7 +4,8 @@ import type { JobEvent, Stage } from '@/api/types'
  * backend/app/state.py `MatchState.stage`, in pipeline order.
  *
  * Node events still name graph nodes; `NODE_STAGE` folds them into these
- * user-facing stages (the two scrapers share "scraping").
+ * stages (the two scrapers share "scraping"), and `visibleSteps` folds the
+ * stages into the few steps a Marketer sees.
  */
 export const STAGE_ORDER = [
   'received',
@@ -21,20 +22,6 @@ export const STAGE_ORDER = [
 ] as const
 
 export type StageName = (typeof STAGE_ORDER)[number]
-
-export const STAGE_LABELS: Record<StageName, string> = {
-  received: 'Request received',
-  scraping: 'Read brand sources',
-  analyzing_brand: 'Analyze brand',
-  generating_queries: 'Generate search queries',
-  discovering_kols: 'Discover KOLs',
-  filtering: 'Filter creators',
-  first_pass: 'First-pass ranking',
-  enriching_kols: 'Enrich profiles',
-  judging: 'Judge and rank',
-  outputting: 'Rank and output',
-  done: 'Done',
-}
 
 /** backend/app/graph.py `_NODE_ORDER` mapped onto the stage list above. */
 const NODE_STAGE: Record<string, StageName> = {
@@ -198,10 +185,76 @@ function joinSummary(current: string, addition: string): string {
   return `${current} · ${addition}`
 }
 
-/** Milliseconds of the latest run, or null until it ends. */
-export function stepDuration(step: Step): number | null {
-  if (!step.startedAt || !step.finishedAt) return null
-  return Math.max(0, Date.parse(step.finishedAt) - Date.parse(step.startedAt))
+const VISIBLE_STEPS: { label: string; stages: StageName[]; failure: string }[] = [
+  {
+    label: 'อ่านข้อมูลแบรนด์',
+    stages: ['received', 'scraping'],
+    failure: 'อ่านข้อมูลแบรนด์ไม่สำเร็จ กรุณาตรวจลิงก์แล้วลองใหม่',
+  },
+  {
+    label: 'วิเคราะห์แบรนด์',
+    stages: ['analyzing_brand'],
+    failure: 'อ่านข้อมูลแบรนด์ไม่สำเร็จ กรุณาตรวจลิงก์แล้วลองใหม่',
+  },
+  {
+    label: 'ค้นหา KOL บน TikTok',
+    stages: ['generating_queries', 'discovering_kols'],
+    failure: 'ค้นหา KOL ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+  },
+  {
+    label: 'คัดกรองและประเมิน KOL',
+    stages: ['filtering', 'first_pass', 'enriching_kols', 'judging'],
+    failure: 'ค้นหา KOL ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+  },
+  {
+    label: 'จัดอันดับ',
+    stages: ['outputting', 'done'],
+    failure: 'ค้นหา KOL ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+  },
+]
+
+export interface VisibleStep {
+  label: string
+  status: StepStatus
+  /** The Search went on after part of this step failed, as when one brand source cannot be read. */
+  partial: boolean
+}
+
+function foldStatus(statuses: StepStatus[], ended: boolean): StepStatus {
+  if (statuses.includes('failed')) return 'failed'
+  if (statuses.includes('running')) return 'running'
+  if (statuses.every((status) => status === 'finished')) return 'finished'
+  if (statuses.every((status) => status === 'pending')) return 'pending'
+  // Between two stages of a step the step is still under way, unless the Search has ended.
+  return ended ? 'finished' : 'running'
+}
+
+/** The steps a Marketer sees, each folding one or more stages. */
+export function visibleSteps(progress: Progress): VisibleStep[] {
+  const statusOf = new Map(progress.steps.map((step) => [step.stage, step.status]))
+  const folded = VISIBLE_STEPS.map(({ label, stages }) => ({
+    label,
+    status: foldStatus(
+      stages.map((stage) => statusOf.get(stage) ?? 'pending'),
+      progress.outcome !== null,
+    ),
+  }))
+  return folded.map((step, i) => {
+    const wentOn = folded.slice(i + 1).some((later) => later.status !== 'pending')
+    if (progress.outcome?.type === 'done' || (step.status === 'failed' && wentOn)) {
+      return { ...step, status: 'finished', partial: step.status === 'failed' }
+    }
+    return { ...step, partial: false }
+  })
+}
+
+/** What to tell a Marketer about a failed Search. The raw reason stays in the API and logs. */
+export function failureMessage(progress: Progress): string {
+  if (progress.outcome?.summary === 'interrupted by restart') {
+    return 'การค้นหาถูกหยุดกลางคัน กรุณาเริ่มใหม่'
+  }
+  const index = visibleSteps(progress).findIndex((step) => step.status === 'failed')
+  return VISIBLE_STEPS[index]?.failure ?? 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
 }
 
 /** A stage from the wire enum, narrowed to one of the visible steps. */

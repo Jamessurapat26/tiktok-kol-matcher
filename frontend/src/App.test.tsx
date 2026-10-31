@@ -10,22 +10,25 @@ vi.mock('@/hooks/useJobProgress', async () => {
   return { useJobProgress: () => ({ progress: initialProgress(), connected: false }) }
 })
 
-vi.mock('@/api/queries', () => ({
-  useJob: () => ({
-    isError: true,
-    error: { message: 'Job not found' },
-    data: undefined,
-  }),
-  useHealth: () => ({ data: undefined, isError: false }),
-  useJobs: () => ({ isPending: false, isError: false, data: [] }),
-  useCreateJob: () => ({ mutate: vi.fn(), isPending: false, error: null, reset: vi.fn() }),
-}))
+vi.mock('@/api/queries', async () => {
+  const { ApiError } = await import('@/api/client')
+  return {
+    useJob: () => ({
+      isError: true,
+      error: new ApiError(404, { detail: 'job missing not found' }),
+      data: undefined,
+    }),
+    useHealth: () => ({ data: undefined, isError: false }),
+    useJobs: () => ({ isPending: false, isError: false, data: [] }),
+    useCreateJob: () => ({ mutate: vi.fn(), isPending: false, error: null, reset: vi.fn() }),
+  }
+})
 
 describe('App', () => {
   it('hides the progress card when the job query fails', () => {
     render(<App />)
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Could not load job missing: Job not found')
-    expect(screen.queryByText('Progress')).not.toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('ไม่พบการค้นหานี้')
+    expect(screen.queryByText('ความคืบหน้า')).not.toBeInTheDocument()
   })
 })

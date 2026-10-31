@@ -76,13 +76,13 @@ def _matches(text: str, terms: list[str]) -> list[str]:
 def _judgement_reason(matched: list[str], audience_hits: list[str]) -> str:
     if matched:
         topics = ", ".join(matched[:3])
-        reason = f"Matched brief topics: {topics}."
+        reason = f"เนื้อหาตรงกับหัวข้อของแบรนด์: {topics}"
         if audience_hits:
-            reason += f" Audience cues: {', '.join(audience_hits[:2])}."
+            reason += f" และกลุ่มผู้ชมสนใจ: {', '.join(audience_hits[:2])}"
         return reason
     if audience_hits:
-        return f"Audience cues: {', '.join(audience_hits[:2])}."
-    return "No brief topic terms found in the creator's text."
+        return f"กลุ่มผู้ชมสนใจ: {', '.join(audience_hits[:2])}"
+    return "ไม่พบหัวข้อของแบรนด์ในเนื้อหาของ KOL"
 
 
 class MockBrandAnalyzer:
@@ -104,8 +104,13 @@ class MockBrandAnalyzer:
                 f"Mock analysis derived from the {' and '.join(sources)}: "
                 "a small Bangkok online shop, so a micro creator around 30k."
             )
+            tier_reason_th = (
+                "ร้านออนไลน์ขนาดเล็กในกรุงเทพฯ จึงเหมาะกับ KOL ระดับ Micro "
+                "ที่มีผู้ติดตามราว 30K"
+            )
         else:
             tier_reason = "No source content was available; mock brand defaults used."
+            tier_reason_th = "ไม่มีข้อมูลแบรนด์ จึงใช้ค่าตัวอย่าง"
 
         return BrandProfile(
             category="gaming eyewear / blue-light glasses",
@@ -143,6 +148,11 @@ class MockBrandAnalyzer:
             tier_label="micro",
             tier_confidence=0.7,
             tier_reason=tier_reason,
+            category_th="แว่นเกมมิ่ง / แว่นกรองแสงสีฟ้า",
+            key_products_th=["แว่นกรองแสงสีฟ้า", "แว่นเกมมิ่ง", "คลิปออนกรองแสงสีฟ้า"],
+            tone_th="สนุก เป็นกันเอง สไตล์เกมเมอร์",
+            interests_th=["เกม", "อีสปอร์ต", "เทคโนโลยี", "ไลฟ์สไตล์", "แว่นตา"],
+            tier_reason_th=tier_reason_th,
         )
 
     def generate_queries(

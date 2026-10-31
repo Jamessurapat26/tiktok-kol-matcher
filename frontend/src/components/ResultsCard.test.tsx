@@ -46,7 +46,7 @@ function ranked(handle: string, avatarUrl?: string | null): RankedKol {
 }
 
 function renderCard(row: RankedKol) {
-  render(<ResultsCard jobId="job" results={[row]} pending={false} failed={false} />)
+  render(<ResultsCard websiteUrl={null} results={[row]} pending={false} failed={false} />)
 }
 
 describe('ResultsCard avatar', () => {

@@ -1,22 +1,31 @@
 import type { RankedKol } from '@/api/types'
+import { hostOf, scoreOutOf100 } from './format'
+import { flagLabel, type ScoreRow, scoreRows } from './kol'
+
+const score = (key: ScoreRow['key']) => (row: RankedKol) =>
+  scoreOutOf100(scoreRows(row).find((r) => r.key === key)?.value ?? 0)
 
 const COLUMNS: [string, (row: RankedKol) => string | number | null][] = [
-  ['handle', (r) => r.kol.handle],
-  ['nickname', (r) => r.kol.nickname],
-  ['profile_url', (r) => r.profile_url],
-  ['followers', (r) => r.kol.followers],
-  ['final', (r) => r.final],
-  ['F', (r) => r.scores.F],
-  ['E', (r) => r.scores.E],
-  ['T', (r) => r.scores.T],
-  ['A_eff', (r) => r.scores.A_eff],
-  ['F_conf', (r) => r.scores.F_conf],
-  ['E_conf', (r) => r.scores.E_conf],
-  ['T_conf', (r) => r.scores.T_conf],
-  ['A_conf', (r) => r.scores.A_conf],
-  ['flags', (r) => r.flags.join('; ')],
-  ['reason', (r) => r.reason],
-  ['evidence_urls', (r) => r.evidence_urls.join(' | ')],
+  ['ชื่อบัญชี', (r) => r.kol.handle],
+  ['ชื่อที่แสดง', (r) => r.kol.nickname],
+  ['ลิงก์โปรไฟล์', (r) => r.profile_url],
+  ['ผู้ติดตาม', (r) => r.kol.followers],
+  ['ความเหมาะสมรวม', (r) => scoreOutOf100(r.final)],
+  ['ตรงกับแบรนด์', score('F')],
+  ['การมีส่วนร่วม', score('E')],
+  ['ขนาดผู้ติดตามเหมาะสม', score('T')],
+  ['กลุ่มผู้ชม (ประมาณการ)', score('A')],
+  [
+    'คะแนนที่ข้อมูลน้อย',
+    (r) =>
+      scoreRows(r)
+        .filter((row) => row.limitedData)
+        .map((row) => row.label)
+        .join('; '),
+  ],
+  ['ป้ายเตือน', (r) => r.flags.map(flagLabel).join('; ')],
+  ['เหตุผล', (r) => r.reason],
+  ['วิดีโอตัวอย่าง', (r) => r.evidence_urls.join(' | ')],
 ]
 
 function cell(value: string | number | null): string {
@@ -29,9 +38,19 @@ function cell(value: string | number | null): string {
 
 /** Ranked KOLs as CSV, in the given order, with a 1-based rank column. */
 export function toCsv(rows: RankedKol[]): string {
-  const header = ['rank', ...COLUMNS.map(([name]) => name)].join(',')
+  const header = ['อันดับ', ...COLUMNS.map(([name]) => name)].join(',')
   const lines = rows.map((row, i) => [i + 1, ...COLUMNS.map(([, get]) => cell(get(row)))].join(','))
   return [header, ...lines].join('\r\n') + '\r\n'
+}
+
+/** "KOL-example-brand.co.th-2026-10-31.csv", dated in the viewer's time zone. */
+export function csvFilename(websiteUrl: string | null, now = new Date()): string {
+  const date = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-')
+  return ['KOL', ...(websiteUrl ? [hostOf(websiteUrl)] : []), `${date}.csv`].join('-')
 }
 
 export function downloadCsv(filename: string, csv: string): void {

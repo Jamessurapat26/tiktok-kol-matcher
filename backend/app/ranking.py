@@ -88,9 +88,10 @@ def _unjudged_reason(
     cfg: MatchingConfig,
 ) -> str:
     return (
-        f"On-topic in {scores.on_topic:.0%} of recent videos; "
-        f"engagement percentile {scores.E:.2f} in "
-        f"{tier_of(kol.followers, cfg)} tier; not judged."
+        f"{scores.on_topic:.0%} ของวิดีโอล่าสุดตรงกับหัวข้อของแบรนด์ "
+        f"การมีส่วนร่วม {scores.E * 100:.0f}/100 "
+        f"เมื่อเทียบกับ KOL ขนาด {tier_of(kol.followers, cfg).capitalize()} "
+        "(ยังไม่ได้ผ่านการประเมินโดย AI)"
     )
 
 

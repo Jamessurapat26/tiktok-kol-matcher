@@ -1,5 +1,5 @@
 import type { RankedKol } from '@/api/types'
-import { toCsv } from './csv'
+import { csvFilename, toCsv } from './csv'
 
 function ranked(
   handle: string,
@@ -56,10 +56,10 @@ describe('toCsv', () => {
   it('writes a header and one ranked row per KOL in order', () => {
     const rows = parseRows(toCsv([ranked('alpha', 0.9), ranked('beta', 0.7)]))
     expect(rows[0]).toBe(
-      'rank,handle,nickname,profile_url,followers,final,F,E,T,A_eff,F_conf,E_conf,T_conf,A_conf,flags,reason,evidence_urls',
+      'อันดับ,ชื่อบัญชี,ชื่อที่แสดง,ลิงก์โปรไฟล์,ผู้ติดตาม,ความเหมาะสมรวม,ตรงกับแบรนด์,การมีส่วนร่วม,ขนาดผู้ติดตามเหมาะสม,กลุ่มผู้ชม (ประมาณการ),คะแนนที่ข้อมูลน้อย,ป้ายเตือน,เหตุผล,วิดีโอตัวอย่าง',
     )
     expect(rows[1]).toBe(
-      '1,alpha,,https://www.tiktok.com/@alpha,1000,0.9,0.5,0.25,1,0.75,0.9,0.8,0.7,0.6,mentions_brand,Good fit.,https://www.tiktok.com/@alpha/video/1',
+      '1,alpha,,https://www.tiktok.com/@alpha,1000,90,50,25,100,75,,เคยพูดถึงแบรนด์นี้,Good fit.,https://www.tiktok.com/@alpha/video/1',
     )
     expect(rows[2].startsWith('2,beta,')).toBe(true)
     expect(rows).toHaveLength(3)
@@ -73,7 +73,7 @@ describe('toCsv', () => {
     }
     const rows = parseRows(toCsv([row]))
     expect(rows[1]).toContain(
-      ',mentions_brand; low_reach,Good fit.,https://www.tiktok.com/@alpha/video/1 | https://www.tiktok.com/@alpha/video/2',
+      ',เคยพูดถึงแบรนด์นี้; ยอดวิวต่ำเมื่อเทียบกับผู้ติดตาม,Good fit.,https://www.tiktok.com/@alpha/video/1 | https://www.tiktok.com/@alpha/video/2',
     )
   })
 
@@ -94,6 +94,25 @@ describe('toCsv', () => {
   it('leaves empty cells for no flags and no evidence', () => {
     const row = { ...ranked('alpha', 0.9), flags: [], evidence_urls: [] }
     const rows = parseRows(toCsv([row]))
-    expect(rows[1].endsWith(',0.6,,Good fit.,')).toBe(true)
+    expect(rows[1].endsWith(',75,,,Good fit.,')).toBe(true)
+  })
+
+  it('names the scores with too little evidence', () => {
+    const rows = parseRows(toCsv([ranked('alpha', 0.9, {}, 'Good fit.', { F_conf: 0.2, A_conf: 0.4 })]))
+    expect(rows[1]).toContain(',ตรงกับแบรนด์; กลุ่มผู้ชม (ประมาณการ),')
+  })
+})
+
+describe('csvFilename', () => {
+  const now = new Date(2026, 9, 31)
+
+  it('names the file after the brand and the date', () => {
+    expect(csvFilename('https://www.example-brand.co.th/shop', now)).toBe(
+      'KOL-example-brand.co.th-2026-10-31.csv',
+    )
+  })
+
+  it('leaves the brand out when it is unknown', () => {
+    expect(csvFilename(null, now)).toBe('KOL-2026-10-31.csv')
   })
 })

@@ -244,8 +244,8 @@ def test_health_reports_integration_default_models(make_client, monkeypatch):
         models = client.get("/api/health").json()["models"]
 
     assert models == {
-        "llm_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
-        "llm_host": "integrate.api.nvidia.com",
+        "llm_model": "deepseek/deepseek-v4.1-flash-1017",
+        "llm_host": "openrouter.ai",
         "embed_model": "google/embeddinggemma-2",
     }
 

@@ -175,13 +175,10 @@ Each job stores the flags it actually ran with.
 
 ### LLM model
 
-Unless `.env` says otherwise, the code uses NVIDIA Nemotron on NVIDIA's API. The
-live setup for this project overrides that with DeepSeek on OpenRouter, and this
-is the configuration to use when reproducing it:
+Unless `.env` says otherwise, the code uses DeepSeek on OpenRouter. Only the key
+is required:
 
 ```bash
-LLM_BASE_URL=https://openrouter.ai/api/v1
-LLM_MODEL=deepseek/deepseek-v4.1-flash-1017
 LLM_API_KEY=your-openrouter-key
 ```
 
@@ -209,12 +206,12 @@ messages, and `/api/health` reports each one only as set or missing.
 | `DISCOVERY_MAX_ROUNDS` | Most query and search rounds, 1-5 | `3` |
 | `JINA_API_KEY` | Jina key: optional for the web reader (higher rate limit), required for web research on the brand | unset |
 | `WEB_FETCH_ALLOW_PROXY_RANGE` | Allow the direct web fetch guard to reach exactly 198.18.0.0/15 (fake-IP proxy range for some sandboxes; weakens the private-address guard) | off |
-| `LLM_BASE_URL` | OpenAI-compatible API root | `https://integrate.api.nvidia.com/v1` |
-| `LLM_MODEL` | Chat model id | `nvidia/nemotron-3.5-lightning-30b-a3b` |
+| `LLM_BASE_URL` | OpenAI-compatible API root | `https://openrouter.ai/api/v1` |
+| `LLM_MODEL` | Chat model id | `deepseek/deepseek-v4.1-flash-1017` |
 | `LLM_API_KEY`, `NVIDIA_API_KEY`, `OPENAI_API_KEY` | LLM bearer token, first non-empty wins | unset |
 | `LLM_TIMEOUT`, `LLM_MAX_TOKENS`, `LLM_TEMPERATURE` | Request limits (timeout is per attempt) | `60`, `16000`, `0.2` |
 | `LLM_MAX_RETRIES`, `LLM_RETRY_BACKOFF` | Retries for timeouts, connection errors, 408, 429, and 5xx, with doubling backoff | `2`, `2` |
-| `LLM_DISABLE_REASONING`, `LLM_NO_THINK_MESSAGE` | How to turn model thinking off | `extra_body` for the default model only |
+| `LLM_DISABLE_REASONING`, `LLM_NO_THINK_MESSAGE` | How to turn model thinking off | `extra_body` for Nemotron on NVIDIA only, otherwise `off` |
 | `EMBED_MODEL` | Local sentence-transformers model | `google/embeddinggemma-2` |
 | `EMBED_DEVICE`, `EMBED_DIM`, `EMBED_DTYPE`, `EMBED_BATCH_SIZE` | Embedder settings | `cpu`, `768`, `float32`, `32` |
 | `HF_TOKEN` | Hugging Face token, only for a gated model | unset |
@@ -574,14 +571,14 @@ briefs:
 ## Design decisions and trade-offs
 
 **An OpenAI-compatible LLM, chosen by configuration.** The live client speaks
-the chat completions API, so moving between the default NVIDIA-hosted Nemotron
-model, [DeepSeek on OpenRouter](#llm-model), OpenAI, or a local server means
-changing `LLM_BASE_URL`, `LLM_MODEL`, and the key. Every call asks for one JSON
-object, validates it with Pydantic, and retries once with the validation error
-in the prompt. Nemotron is a reasoning model, so for that default the client
-turns thinking off through `chat_template_kwargs`, which cut a brand-analysis
-call from 30-45 seconds to about 3. Other models get a plain request unless
-`LLM_DISABLE_REASONING` is set.
+the chat completions API, so moving between the default
+[DeepSeek on OpenRouter](#llm-model), NVIDIA-hosted Nemotron, OpenAI, or a local
+server means changing `LLM_BASE_URL`, `LLM_MODEL`, and the key. Every call asks
+for one JSON object, validates it with Pydantic, and retries once with the
+validation error in the prompt. Nemotron is a reasoning model, so on NVIDIA's
+endpoint the client turns thinking off through `chat_template_kwargs`, which cut
+a brand-analysis call from 30-45 seconds to about 3. Other models, including the
+default, get a plain request unless `LLM_DISABLE_REASONING` is set.
 
 **Local embeddings as a free similarity term.** embeddinggemma runs on CPU
 through sentence-transformers, with no per-call cost and no data leaving the

@@ -232,8 +232,8 @@ curl localhost:8000/api/health
     "JINA_API_KEY": false
   },
   "models": {
-    "llm_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
-    "llm_host": "integrate.api.nvidia.com",
+    "llm_model": "deepseek/deepseek-v4.1-flash-1017",
+    "llm_host": "openrouter.ai",
     "embed_model": "google/embeddinggemma-2"
   }
 }
@@ -407,36 +407,36 @@ only: set `LLM_BASE_URL`, `LLM_MODEL`, and a key.
 
 | Variable | Default | Role |
 | --- | --- | --- |
-| `LLM_BASE_URL` | `https://integrate.api.nvidia.com/v1` | API root, including the `/v1` prefix |
-| `LLM_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Chat model id |
+| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | API root, including the `/v1` prefix |
+| `LLM_MODEL` | `deepseek/deepseek-v4.1-flash-1017` | Chat model id |
 | `LLM_API_KEY` | unset | Bearer token. If empty, `NVIDIA_API_KEY` is used, then `OPENAI_API_KEY` |
 | `LLM_TIMEOUT` | `60` | Request timeout in seconds |
 | `LLM_MAX_TOKENS` | `16000` | Completion token budget, shared with any reasoning trace |
 | `LLM_TEMPERATURE` | `0.2` | Sampling temperature |
-| `LLM_DISABLE_REASONING` | `extra_body` for the default endpoint and model, otherwise `off` | Provider-specific reasoning control, below |
+| `LLM_DISABLE_REASONING` | `extra_body` for Nemotron on NVIDIA's endpoint, otherwise `off` | Provider-specific reasoning control, below |
 | `LLM_NO_THINK_MESSAGE` | `/no_think` | System message used when reasoning control is `system` or `both` |
 
-The default model is a reasoning model. A short prompt can take tens of seconds
+On a reasoning model such as Nemotron, a short prompt can take tens of seconds
 and spend most of its completion tokens on `reasoning_content`. With a small
 `max_tokens`, `content` comes back null. The client defaults are sized for
 that: 16000 completion tokens and a 60 second timeout. Empty or missing
 `content` is retried once.
 
-`LLM_DISABLE_REASONING` picks how thinking is turned off. When it is unset, the
-default NVIDIA endpoint and model use `extra_body` and every other provider
-gets a plain request. The values are provider-specific:
+`LLM_DISABLE_REASONING` picks how thinking is turned off. When it is unset,
+Nemotron on NVIDIA's endpoint uses `extra_body` and everything else, including
+the default model, gets a plain request. The values are provider-specific:
 
 - `off` sends a normal chat request.
-- `system` prepends `LLM_NO_THINK_MESSAGE` (default `/no_think`). The default
-  model ignores it, so it still thinks.
-- `extra_body` sends `chat_template_kwargs.enable_thinking` set to false. On the
-  default model this turns thinking off: a brand-analysis call dropped from
+- `system` prepends `LLM_NO_THINK_MESSAGE` (default `/no_think`). Nemotron
+  ignores it, so it still thinks.
+- `extra_body` sends `chat_template_kwargs.enable_thinking` set to false. On
+  Nemotron this turns thinking off: a brand-analysis call dropped from
   about 30-45 seconds and 2,000-3,700 completion tokens to about 3 seconds and
   250 tokens.
 - `both`, and also `true`, `1`, or `on`, does both.
 
 A provider that rejects unknown JSON fields works with the default (`off` for
-anything but the NVIDIA default). Point `LLM_BASE_URL` at
+anything but Nemotron on NVIDIA). Point `LLM_BASE_URL` at
 `https://api.openai.com/v1` and set `LLM_MODEL` plus `OPENAI_API_KEY` to use
 OpenAI with no code change.
 

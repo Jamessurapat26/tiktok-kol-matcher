@@ -2,19 +2,19 @@
 
 The provider is selected with settings, not code. ``LLM_BASE_URL``,
 ``LLM_MODEL``, and the API key are enough to point the same client at the
-default NVIDIA endpoint or at any other ``/v1`` chat API.
+default DeepSeek model on OpenRouter or at any other ``/v1`` chat API.
 
-The default model is a reasoning model. It can return ``reasoning_content``
-and a null ``content`` when the completion budget is used up by the trace, so
-``max_tokens`` defaults to 16000 and empty content is retried once. Each request
+A reasoning model can return ``reasoning_content`` and a null ``content`` when
+the completion budget is used up by the trace, so ``max_tokens`` defaults to
+16000 and empty content is retried once. Each request
 attempt times out after 60 seconds. Transport failures (timeouts, connection
 errors, 408, 429, and 5xx) are retried twice with doubling backoff, so the
 worst case for one call with the defaults is 3 x 60 s + 2 s + 4 s = 186 s.
 ``LLM_DISABLE_REASONING`` controls thinking: ``extra_body`` sends
 ``chat_template_kwargs.enable_thinking=false``, ``system`` prepends a
 ``/no_think`` message, ``both`` does both, and ``off`` sends a plain request.
-When unset it is ``extra_body`` for the default NVIDIA endpoint and model
-(measured about 10x faster) and ``off`` for any other provider.
+When unset it is ``extra_body`` for Nemotron on NVIDIA's endpoint (measured
+about 10x faster) and ``off`` for everything else, including the default.
 
 The API key is never logged. It is removed from every error string.
 """
@@ -58,8 +58,10 @@ from ..prompts import (
 )
 from .llm import ChatClient
 
-DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
-DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
+DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash-1017"
+_NEMOTRON_BASE_URL = "https://integrate.api.nvidia.com/v1"
+_NEMOTRON_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
 DEFAULT_TIMEOUT = 60.0
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_RETRY_BACKOFF = 2.0
@@ -127,10 +129,10 @@ class LlmSettings:
         temperature = _env_float("LLM_TEMPERATURE", DEFAULT_TEMPERATURE, minimum=0.0)
         reasoning = _reasoning_mode(os.environ.get("LLM_DISABLE_REASONING"))
         if reasoning is None:
-            # Unset: turn thinking off only for the default endpoint and model,
+            # Unset: turn thinking off only for Nemotron on NVIDIA's endpoint,
             # where it is known to work. Other providers get a plain request.
-            is_default = base_url == DEFAULT_BASE_URL and model == DEFAULT_MODEL
-            reasoning = "extra_body" if is_default else "off"
+            is_nemotron = base_url == _NEMOTRON_BASE_URL and model == _NEMOTRON_MODEL
+            reasoning = "extra_body" if is_nemotron else "off"
         no_think = os.environ.get("LLM_NO_THINK_MESSAGE", "").strip() or DEFAULT_NO_THINK_MESSAGE
         return cls(
             base_url=base_url,
@@ -572,7 +574,7 @@ def _with_reasoning_message(
 
 
 def _reasoning_extra_body(settings: LlmSettings) -> dict[str, Any] | None:
-    """Provider-specific body. The default NVIDIA model reads ``enable_thinking``."""
+    """Provider-specific body. Nemotron on NVIDIA reads ``enable_thinking``."""
     if settings.reasoning not in {"extra_body", "both"}:
         return None
     return {"chat_template_kwargs": {"enable_thinking": False}}

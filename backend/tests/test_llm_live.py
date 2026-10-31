@@ -278,7 +278,7 @@ def test_default_settings_and_key_fallback(monkeypatch):
     assert settings.retry_backoff == DEFAULT_RETRY_BACKOFF == 2.0
     assert settings.max_tokens == DEFAULT_MAX_TOKENS == 16000
     assert settings.temperature == DEFAULT_TEMPERATURE
-    assert settings.reasoning == "extra_body"
+    assert settings.reasoning == "off"
     assert settings.api_key == ""
 
     monkeypatch.setenv("OPENAI_API_KEY", "oa-key")
@@ -313,9 +313,9 @@ def test_settings_overrides_and_invalid_values(monkeypatch):
 
     monkeypatch.delenv("LLM_DISABLE_REASONING")
     assert LlmSettings.from_env().reasoning == "off"
-    monkeypatch.setenv("LLM_BASE_URL", DEFAULT_BASE_URL)
+    monkeypatch.setenv("LLM_BASE_URL", "https://integrate.api.nvidia.com/v1")
     assert LlmSettings.from_env().reasoning == "off"  # custom model
-    monkeypatch.setenv("LLM_MODEL", DEFAULT_MODEL)
+    monkeypatch.setenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
     assert LlmSettings.from_env().reasoning == "extra_body"
     monkeypatch.setenv("LLM_DISABLE_REASONING", "off")
     assert LlmSettings.from_env().reasoning == "off"

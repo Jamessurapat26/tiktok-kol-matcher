@@ -651,7 +651,7 @@ def test_judge_is_one_batched_call_on_at_most_judge_top_n():
     final = build_graph(
         replace(mock_integrations(), llm=analyzer),
         cfg=cfg,
-    ).invoke(initial_state(make_request()))
+    ).invoke(initial_state(make_request(top_k=3)))
 
     assert final["stage"] == "done"
     assert len(analyzer.calls) == 1

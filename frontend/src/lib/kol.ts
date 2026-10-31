@@ -55,6 +55,7 @@ const FLAG_LABELS: Record<string, string> = {
   activity_unknown: 'ไม่ทราบวันที่โพสต์ล่าสุด',
   search_stats_only: 'ข้อมูลสถิติจำกัด',
   risky_content: 'เนื้อหาเสี่ยง เช่น การพนัน',
+  unreviewed: 'AI ยังไม่ได้ตรวจบัญชีนี้',
 }
 
 export function flagLabel(flag: string): string {

@@ -10,6 +10,7 @@ from .models import (
     KolProfile,
     MatchRequest,
     RankedKol,
+    RemovedAccount,
     VideoStats,
     normalize_handle,
     outranks,
@@ -138,6 +139,8 @@ class MatchState(BaseModel):
     # hard_filter rejection counts by stable reason. Plain overwrite; expected
     # rejections are not errors.
     rejected: dict[str, int] = Field(default_factory=dict)
+    # Seller and media accounts screened out, so a wrong removal can be checked.
+    removed: list[RemovedAccount] = Field(default_factory=list)
 
     # Every candidate after judge_and_rank, sorted by final score descending.
     ranked: list[RankedKol] = Field(default_factory=list)

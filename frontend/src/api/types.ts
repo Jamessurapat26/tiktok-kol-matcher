@@ -200,6 +200,8 @@ export interface Job {
   /** Facebook page picture. Absent on jobs stored before the field existed. */
   brand_logo_url?: string | null
   rejected: Record<string, number>
+  /** Absent on jobs stored before the field existed. */
+  removed?: { handle: string; reason: string; note: string }[]
   cost_log: string[]
   results: RankedKol[]
   created_at: string

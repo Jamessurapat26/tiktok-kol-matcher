@@ -15,8 +15,9 @@ from app.filters import (
     FOLLOWERS_OUT_OF_RANGE,
     INACTIVE,
     NOT_THAI,
+    MEDIA_ACCOUNT,
     OWN_BRAND_ACCOUNT,
-    SHOP_MEDIA_ACCOUNT,
+    SELLER_ACCOUNT,
     hard_filter,
 )
 from app.matching_config import DEFAULT_CONFIG
@@ -140,14 +141,14 @@ def test_official_competitor_account_is_rejected():
 def test_shop_and_news_accounts_are_rejected():
     brief = _brief()
 
-    assert _filter(_kol("gadgetshop_bkk"), brief) == SHOP_MEDIA_ACCOUNT
-    assert _filter(_kol("gamernews.th"), brief) == SHOP_MEDIA_ACCOUNT
+    assert _filter(_kol("gadgetshop_bkk"), brief) == SELLER_ACCOUNT
+    assert _filter(_kol("gamernews.th"), brief) == MEDIA_ACCOUNT
     assert (
         _filter(
             _kol("dailyclip", nickname="ข่าวเกมเมอร์", bio="สำนักข่าวเกม"),
             brief,
         )
-        == SHOP_MEDIA_ACCOUNT
+        == MEDIA_ACCOUNT
     )
 
 
@@ -215,9 +216,9 @@ def test_short_shop_media_tokens_do_not_match_inside_ordinary_words():
     assert _filter(_kol("itvlogs"), brief) is None
     assert _filter(_kol("dailyclip", nickname="Small Things"), brief) is None
     assert _filter(_kol("small_things"), brief) is None
-    assert _filter(_kol("gamer.tv"), brief) == SHOP_MEDIA_ACCOUNT
-    assert _filter(_kol("channeltv"), brief) == SHOP_MEDIA_ACCOUNT
-    assert _filter(_kol("dailyclip", nickname="Gamer News"), brief) == SHOP_MEDIA_ACCOUNT
+    assert _filter(_kol("gamer.tv"), brief) == MEDIA_ACCOUNT
+    assert _filter(_kol("channeltv"), brief) == MEDIA_ACCOUNT
+    assert _filter(_kol("dailyclip", nickname="Gamer News"), brief) == MEDIA_ACCOUNT
 
 
 def test_activity_can_be_left_for_after_enrichment():
@@ -253,7 +254,52 @@ def test_lao_creator_is_rejected_as_not_thai():
     assert _filter(kol, brief) == NOT_THAI
 
 
-def test_retailer_account_is_not_a_competitor():
+def test_retailer_account_is_a_seller_not_a_competitor():
     brief = _brief(retailers=["ExampleMart"])
 
-    assert _filter(_kol("examplemart"), brief) is None
+    assert _filter(_kol("examplemart"), brief) == SELLER_ACCOUNT
+
+
+def test_dealers_and_sales_staff_are_sellers_by_their_bio():
+    brief = _brief()
+
+    for kol in (
+        _kol("sahayont", bio="ตัวแทนจำหน่ายแว่น ขอนแก่น สายด่วน 088"),
+        _kol("kitiya.jang", nickname="เซลล์แจง โคราช"),
+        _kol("salestoon", bio="ขายแว่น พร้อมให้บริการ เซลล์ตูน"),
+    ):
+        assert _filter(kol, brief) == SELLER_ACCOUNT
+
+
+def test_a_business_name_in_the_identity_marks_a_seller():
+    brief = _brief(competitors=["Krungsri", "SCB"], brand_names=["Kubota", "คูโบต้า"])
+    aliases = brand_aliases(brief, "", "")
+
+    for kol in (
+        _kol("krungsricard"),
+        _kol("puii.scb"),
+        _kol("kubotaphetchabun"),
+        _kol("plammizuze", nickname="ปาล์มมี่ คูโบต้าเจริญชัย"),
+    ):
+        assert _filter(kol, brief, aliases) == SELLER_ACCOUNT
+
+
+def test_a_short_business_name_inside_an_ordinary_word_is_not_a_seller():
+    brief = _brief(brand_names=["Dime"], competitors=["SCB"])
+    aliases = brand_aliases(brief, "", "")
+
+    assert _filter(_kol("dimension.review"), brief, aliases) is None
+    assert _filter(_kol("scbarista"), brief, aliases) is None
+
+
+def test_creators_who_also_sell_or_use_trade_words_stay_kols():
+    brief = _brief()
+
+    for kol in (
+        _kol("amroastrun", bio="ทุกร้านที่เราโพส คืออร่อยสำหรับเราจริงๆ"),
+        _kol("sinefinechannel", bio="คนธรรมดาก็รวยได้ด้วยความรู้ คอร์สครูทรายคลิก"),
+        _kol("tonpakshee", bio="หุ้น/นักลงทุน รับรีวิวสินค้า ติดต่องาน DM"),
+        _kol("skincarejoy", bio="รีวิวสเต็มเซลล์และการดูแลเซลล์ผิว"),
+        _kol("solarmate", bio="รีวิวโซลาร์เซลล์สำหรับบ้าน"),
+    ):
+        assert _filter(kol, brief) is None

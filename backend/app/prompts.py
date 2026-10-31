@@ -87,8 +87,9 @@ The object must contain exactly these keys:
 Tier guidance (creator tier to hire):
 - Very small or brand-new shop -> nano.
 - SME or small online shop -> micro.
-- Nationwide Thai brand -> mid.
-- Multinational or very large brand -> macro.
+- Nationwide Thai brand, however large, including a Thai market leader or a
+  brand in a large Thai group -> mid.
+- Multinational brand -> macro.
 Use the price tier, the sales channels (online-only, small stores, or
 nationwide convenience stores), and whether the brand is local or
 multinational. The brand page follower count only hints at how big the brand
@@ -150,8 +151,8 @@ in markdown.
 
 Shape: {{"creators": [{{"handle": "...", "judge": 0.0, "audience": 0.0,
 "audience_confidence": 0.0, "reason": "...", "risky": false,
-"content_formats": ["..."], "content_style": "...", "style_fit": 0.0,
-"style_reason": "...", "style_evidence": [1]}}]}}
+"account_type": "kol", "content_formats": ["..."], "content_style": "...",
+"style_fit": 0.0, "style_reason": "...", "style_evidence": [1]}}]}}
 
 Rubric:
 - judge is 0 to 1: score content fit to the brand using category match, tone
@@ -168,6 +169,19 @@ Rubric:
   audience estimate.
 - risky is true when the creator's content shows gambling, casino, or similar
   unsafe content.
+- account_type is one of "kol", "seller", or "media":
+  - "seller": the account's main purpose is to sell or promote one business's
+    goods or services, its own or another's. This includes dealers, sales staff,
+    bank or finance staff offering products, shops, cafes, farms or contractors
+    advertising their own produce or service, founders promoting their own
+    company, and the official account of any business. Treat an account as
+    "seller" when its videos show its own work or stock and its bio offers a way
+    for customers to buy or hire, even if it feels personal. A contact "for
+    work" that invites brand deals does not count as selling.
+  - "media": a news outlet or media company publishing as an organization.
+  - "kol": everyone else. Someone who makes content people follow for its own
+    sake stays "kol" even if they also sell courses, use affiliate links, take
+    paid reviews, or host a show under their own name.
 - reason is one short sentence in Thai, for a Thai marketer. Only say a creator posts about the brand when a
   brand name appears in their text; never claim that without that evidence. This
   rule only governs the reason wording, not the judge score. Copy every handle

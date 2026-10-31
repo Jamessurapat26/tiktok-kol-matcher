@@ -73,6 +73,8 @@ export default function App() {
                 results={job.data?.results ?? []}
                 pending={!terminal}
                 failed={status === 'failed'}
+                sellersRemoved={job.data?.rejected.seller_account}
+                requested={job.data?.request.top_k}
               />
             </>
           )}

@@ -118,3 +118,31 @@ describe('content style', () => {
     expect(screen.queryByRole('region', { name: 'สไตล์คอนเทนต์' })).toBeNull()
   })
 })
+
+describe('ResultsCard seller accounts', () => {
+  const props = { websiteUrl: null, pending: false, failed: false }
+
+  it('says how many seller accounts were removed', () => {
+    render(<ResultsCard {...props} results={[ranked('a')]} sellersRemoved={14} requested={1} />)
+
+    expect(screen.getByText('ตัดบัญชีผู้ขายออก 14 บัญชี')).toBeInTheDocument()
+  })
+
+  it('explains a list shorter than the Marketer asked for', () => {
+    render(<ResultsCard {...props} results={[ranked('a')]} sellersRemoved={14} requested={10} />)
+
+    expect(screen.getByText('ตัดบัญชีผู้ขายออก 14 บัญชี จึงแสดงเท่าที่เหลือ 1 คน')).toBeInTheDocument()
+  })
+
+  it('explains an empty list when only sellers were found', () => {
+    render(<ResultsCard {...props} results={[]} sellersRemoved={3} requested={10} />)
+
+    expect(screen.getByText('ไม่เหลือ KOL ที่แนะนำหลังตัดบัญชีผู้ขายออก 3 บัญชี')).toBeInTheDocument()
+  })
+
+  it('stays quiet when no seller was removed', () => {
+    render(<ResultsCard {...props} results={[ranked('a')]} requested={10} />)
+
+    expect(screen.queryByText(/ตัดบัญชีผู้ขาย/)).not.toBeInTheDocument()
+  })
+})

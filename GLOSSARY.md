@@ -14,6 +14,10 @@ _Avoid_: User, operator
 A Thai TikTok account that the app considers or recommends for a brand. The Thai interface also writes this as "KOL".
 _Avoid_: Creator, influencer, ครีเอเตอร์, อินฟลูเอนเซอร์
 
+**Seller account** (บัญชีผู้ขาย):
+A TikTok account whose main purpose is to sell or promote one business's goods or services, whether that business is its own or another's. This covers dealers, sales staff, shops, and any business's official account. It is never a KOL, but someone who makes content people follow for its own sake and also earns from selling remains a KOL.
+_Avoid_: Shop account, ร้านค้า, ตัวแทน
+
 ### Finding KOLs
 
 **Search** (การค้นหา):

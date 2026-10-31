@@ -242,6 +242,7 @@ class JudgementItem(DomainModel):
     audience_confidence: float
     reason: str = ""
     risky: bool = False
+    account_type: Literal["kol", "seller", "media"] = "kol"
     # Display only, so a malformed value must not fail the whole batch of scores.
     content_formats: Any = None
     content_style: Any = None
@@ -488,6 +489,7 @@ class LiveBrandAnalyzer:
                     audience_confidence=_unit(item.audience_confidence),
                     reason=item.reason.strip(),
                     risky=item.risky,
+                    account_type=item.account_type,
                     content=_content_analysis(item, kol),
                 )
             )

@@ -365,6 +365,9 @@ def _json_payload(final_state: dict[str, Any]) -> dict[str, Any]:
         },
         "brief": brief,
         "rejected": final_state.get("rejected") or {},
+        "removed": [
+            item.model_dump(mode="json") for item in final_state.get("removed") or []
+        ],
         "results": [
             _result_payload(result)
             for result in final_state.get("results") or []

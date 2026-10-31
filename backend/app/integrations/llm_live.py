@@ -239,6 +239,7 @@ class JudgementItem(DomainModel):
     audience_confidence: float
     reason: str = ""
     risky: bool = False
+    account_type: Literal["kol", "seller", "media"] = "kol"
 
 
 class JudgementBatch(DomainModel):
@@ -478,6 +479,7 @@ class LiveBrandAnalyzer:
                     audience_confidence=_unit(item.audience_confidence),
                     reason=item.reason.strip(),
                     risky=item.risky,
+                    account_type=item.account_type,
                 )
             )
         return judgements

@@ -13,6 +13,7 @@ from .brand_match import (
     normalize_for_match,
     normalized_aliases,
 )
+from .filters import SELLER_ACCOUNT, is_seller_account
 from .filters import hard_filter as apply_hard_filter
 from .integrations import Integrations
 from .integrations.apify import (
@@ -23,7 +24,7 @@ from .integrations.apify import (
 from .integrations.web_reader import truncate
 from .matching_config import DEFAULT_CONFIG, MatchingConfig
 from .models import BrandProfile, KolProfile, normalize_handle
-from .ranking import diversify, rank_candidates, similarities
+from .ranking import UNREVIEWED_FLAG, diversify, rank_candidates, similarities
 from .scoring import score_pool
 from .state import MatchState
 from .thai import is_thai_creator
@@ -90,13 +91,6 @@ def _kol_from_fixture(raw: dict) -> KolProfile:
     )
 
 
-def _thai_creator_count(kols: list[KolProfile]) -> int:
-    """Count unique discovered creators that pass the Thai filter."""
-    return len(
-        {normalize_handle(kol.handle) for kol in kols if is_thai_creator(kol)}
-    )
-
-
 def _with_url_aliases(
     profile: BrandProfile,
     website_url: str,
@@ -133,6 +127,28 @@ def make_nodes(
         )
         competitors = normalized_aliases(state.brand_profile.competitors)
         return brand, competitors
+
+    def _search_target_count(state: MatchState) -> int:
+        """Count unique discovered Thai creators, leaving out plain sellers."""
+        brand_alias_list, competitor_alias_list = (
+            _alias_sets(state) if state.brand_profile is not None else ([], [])
+        )
+        return len(
+            {
+                normalize_handle(kol.handle)
+                for kol in state.discovered
+                if is_thai_creator(kol)
+                and (
+                    state.brand_profile is None
+                    or not is_seller_account(
+                        kol,
+                        state.brand_profile,
+                        brand_alias_list,
+                        competitor_alias_list,
+                    )
+                )
+            }
+        )
 
     def _scrape_reason(errors: list[str], node: str) -> str:
         prefix = f"{node}: "
@@ -297,7 +313,8 @@ def make_nodes(
         """Loop for more queries until enough Thai KOLs or the round cap is hit.
 
         The target counts unique discovered creators that already pass the Thai
-        filter, so a round full of non-Thai accounts does not stop discovery.
+        filter and are not plain sellers, so a round full of non-Thai accounts
+        or dealers does not stop discovery.
         ``stage == "failed"`` (search raised or nothing valid was found, and
         no KOLs were discovered yet) stops the graph instead of retrying.
         """
@@ -306,7 +323,7 @@ def make_nodes(
         if len(state.search_queries) >= cfg.max_search_queries:
             return "hard_filter"
         if (
-            _thai_creator_count(state.discovered) < min_candidates
+            _search_target_count(state) < min_candidates
             and state.search_rounds < max_search_rounds
         ):
             return "generate_queries"
@@ -355,7 +372,8 @@ def make_nodes(
                 kept.append(kol)
             else:
                 counts[reason] = counts.get(reason, 0) + 1
-        if not kept:
+        # Finding only sellers is a real answer, not a failed Search.
+        if not kept and not counts.get(SELLER_ACCOUNT):
             raise ValueError("no candidates passed the hard filters")
         return kept, counts
 
@@ -480,9 +498,14 @@ def make_nodes(
             competitor_aliases=competitor_alias_list,
             cfg=cfg,
             now=datetime.now(UTC),
+            top_k=state.request.top_k,
         )
+        rejected = dict(state.rejected)
+        for reason, count in outcome.rejected.items():
+            rejected[reason] = rejected.get(reason, 0) + count
         update: dict[str, Any] = {
             "ranked": outcome.ranked,
+            "rejected": rejected,
             "stage": "judging",
         }
         if outcome.judged_count:
@@ -495,8 +518,14 @@ def make_nodes(
 
     @_guarded("rank_and_output")
     def rank_and_output(state: MatchState) -> dict[str, Any]:
+        # Only creators the judge reviewed, or was asked about and failed to
+        # answer for, can be recommended. The rest never had a seller check.
         results = diversify(
-            state.ranked,
+            [
+                item
+                for item in state.ranked
+                if item.scores.judged or UNREVIEWED_FLAG in item.flags
+            ],
             integrations.embedder,
             state.request.top_k,
             cfg,

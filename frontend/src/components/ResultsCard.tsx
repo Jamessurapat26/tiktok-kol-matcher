@@ -16,10 +16,15 @@ interface Props {
   /** Still running: show placeholders instead of an empty list. */
   pending: boolean
   failed: boolean
+  /** Seller accounts the Search removed. Absent on jobs stored before the count existed. */
+  sellersRemoved?: number
+  /** How many KOLs the Marketer asked for. */
+  requested?: number
 }
 
-export function ResultsCard({ websiteUrl, results, pending, failed }: Props) {
+export function ResultsCard({ websiteUrl, results, pending, failed, sellersRemoved = 0, requested }: Props) {
   const sorted = [...results].sort((a, b) => b.final - a.final)
+  const fewerThanAsked = requested !== undefined && sorted.length < requested
   return (
     <Card>
       <CardHeader>
@@ -53,14 +58,26 @@ export function ResultsCard({ websiteUrl, results, pending, failed }: Props) {
           </div>
         ) : sorted.length === 0 ? (
           <p className="text-body-sm text-muted-foreground">
-            {failed ? 'ไม่มีผลลัพธ์ เพราะการค้นหาไม่สำเร็จ' : 'ไม่พบ KOL ที่เหมาะสม'}
+            {failed
+              ? 'ไม่มีผลลัพธ์ เพราะการค้นหาไม่สำเร็จ'
+              : sellersRemoved > 0
+                ? `ไม่เหลือ KOL ที่แนะนำหลังตัดบัญชีผู้ขายออก ${sellersRemoved} บัญชี`
+                : 'ไม่พบ KOL ที่เหมาะสม'}
           </p>
         ) : (
-          <ol className="flex flex-col divide-y divide-border">
-            {sorted.map((row, i) => (
-              <KolRow key={row.kol.handle} row={row} rank={i + 1} />
-            ))}
-          </ol>
+          <>
+            {sellersRemoved > 0 && (
+              <p className="mb-4 text-body-sm text-muted-foreground">
+                ตัดบัญชีผู้ขายออก {sellersRemoved} บัญชี
+                {fewerThanAsked && ` จึงแสดงเท่าที่เหลือ ${sorted.length} คน`}
+              </p>
+            )}
+            <ol className="flex flex-col divide-y divide-border">
+              {sorted.map((row, i) => (
+                <KolRow key={row.kol.handle} row={row} rank={i + 1} />
+              ))}
+            </ol>
+          </>
         )}
       </CardContent>
     </Card>

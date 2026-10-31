@@ -45,6 +45,7 @@ class Judgement(DomainModel):
     audience_confidence: float = Field(ge=0, le=1)
     reason: str
     risky: bool = False
+    account_type: Literal["kol", "seller", "media"] = "kol"
 
 
 class MatchRequest(DomainModel):

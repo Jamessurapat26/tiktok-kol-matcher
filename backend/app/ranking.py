@@ -18,6 +18,7 @@ from .integrations.embeddings import (
     kol_document_text,
     kol_title,
 )
+from .filters import MEDIA_ACCOUNT, SELLER_ACCOUNT
 from .matching_config import MatchingConfig
 from .models import (
     BrandProfile,
@@ -36,6 +37,9 @@ from .scoring import (
 )
 
 _MAX_EVIDENCE_URLS = 3
+_REJECTED_ACCOUNT_TYPES = {"seller": SELLER_ACCOUNT, "media": MEDIA_ACCOUNT}
+# The judge was asked about this creator but gave no answer.
+UNREVIEWED_FLAG = "unreviewed"
 
 JudgeFn = Callable[[BrandProfile, list[KolProfile]], list[Judgement]]
 
@@ -47,6 +51,7 @@ class RankOutcome:
     ranked: list[RankedKol]
     judged_count: int
     errors: list[str]
+    rejected: dict[str, int]
 
 
 def similarities(
@@ -110,12 +115,17 @@ def rank_candidates(
     competitor_aliases: Iterable[str],
     cfg: MatchingConfig,
     now: datetime,
+    top_k: int = 0,
 ) -> RankOutcome:
     """Score, judge the first-pass leaders once, and rank every candidate.
 
-    A judge exception is recorded in ``errors`` and leaves every creator
+    The judge sees at least ``top_k`` creators, because only reviewed creators
+    can be recommended. A judge exception is recorded in ``errors`` and leaves every creator
     unjudged instead of aborting the run. ``judged_count`` is the number of
     creators sent to the judge, which is also what the cost log reports.
+    Creators the judge calls a seller or media account leave the ranking and
+    are counted in ``rejected``. Creators it was sent but did not answer for
+    carry ``UNREVIEWED_FLAG``.
     """
     brand_alias_list = list(brand_aliases)
     competitor_alias_list = list(competitor_aliases)
@@ -134,7 +144,7 @@ def rank_candidates(
     first_pass.sort(
         key=lambda item: (-item.final, normalize_handle(item.kol.handle))
     )
-    to_judge = [item.kol for item in first_pass[: cfg.judge_top_n]]
+    to_judge = [item.kol for item in first_pass[: max(cfg.judge_top_n, top_k)]]
 
     errors: list[str] = []
     judgements: dict[str, Judgement] = {}
@@ -156,10 +166,27 @@ def rank_candidates(
                     f"creators ({', '.join(missing)}); ranked them unjudged"
                 )
 
+    rejected: dict[str, int] = {}
+    kept: list[KolProfile] = []
+    kept_sims: list[float] = []
+    for kol, sim in zip(candidates, sims):
+        judgement = judgements.get(normalize_handle(kol.handle))
+        reason = (
+            _REJECTED_ACCOUNT_TYPES.get(judgement.account_type)
+            if judgement is not None
+            else None
+        )
+        if reason is None:
+            kept.append(kol)
+            kept_sims.append(sim)
+        else:
+            rejected[reason] = rejected.get(reason, 0) + 1
+
+    sent_to_judge = {normalize_handle(kol.handle) for kol in to_judge}
     scored = score_pool(
-        candidates,
+        kept,
         brief,
-        sims,
+        kept_sims,
         judgements,
         brand_alias_list,
         competitor_alias_list,
@@ -168,7 +195,9 @@ def rank_candidates(
     )
     ranked: list[RankedKol] = []
     for item in scored:
-        judgement = judgements.get(normalize_handle(item.kol.handle))
+        handle = normalize_handle(item.kol.handle)
+        judgement = judgements.get(handle)
+        unreviewed = judgement is None and handle in sent_to_judge
         reason = (
             judgement.reason
             if judgement is not None
@@ -180,7 +209,7 @@ def rank_candidates(
                 scores=item.scores,
                 quality=item.quality,
                 final=item.final,
-                flags=item.flags,
+                flags=[*item.flags, UNREVIEWED_FLAG] if unreviewed else item.flags,
                 reason=reason,
                 evidence_urls=_evidence_urls(item.kol, brief, cfg),
                 profile_url=(
@@ -194,6 +223,7 @@ def rank_candidates(
         ranked=ranked,
         judged_count=len(to_judge),
         errors=errors,
+        rejected=rejected,
     )
 
 

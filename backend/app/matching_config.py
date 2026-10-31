@@ -61,7 +61,7 @@ class MatchingConfig:
     recent_videos: int = 10
     max_search_queries: int = 10
     enrich_top_n: int = 20
-    judge_top_n: int = 15
+    judge_top_n: int = 20
     mmr_lambda: float = 0.7
 
     # Confidence before and after the LLM judge.

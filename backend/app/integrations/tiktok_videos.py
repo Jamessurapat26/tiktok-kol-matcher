@@ -61,6 +61,23 @@ def caption_from_item(item: dict[str, Any]) -> str:
     return re.sub(r"\s+", " ", raw).strip()[:CAPTION_CHARS].rstrip()
 
 
+def hashtags_from_item(item: dict[str, Any]) -> list[str]:
+    """Hashtag names on one video, without the leading ``#``, once each."""
+    raw = item.get("hashtags")
+    tags: list[str] = []
+    seen: set[str] = set()
+    for tag in raw if isinstance(raw, list) else []:
+        name = tag.get("name") if isinstance(tag, dict) else tag
+        if not isinstance(name, str):
+            continue
+        cleaned = name.strip().lstrip("#")
+        key = cleaned.casefold()
+        if cleaned and key not in seen:
+            seen.add(key)
+            tags.append(cleaned)
+    return tags
+
+
 def video_from_item(item: dict[str, Any], handle: str | None) -> dict[str, Any]:
     """Build a ``VideoStats``-compatible row from one live dataset item."""
     return {
@@ -71,6 +88,8 @@ def video_from_item(item: dict[str, Any], handle: str | None) -> dict[str, Any]:
         "shares": as_count(item.get("shareCount")) or 0,
         "posted_at": posted_at_from_item(item),
         "caption": caption_from_item(item),
+        "hashtags": hashtags_from_item(item),
+        "is_ad": item.get("isAd") is True,
     }
 
 
@@ -95,6 +114,8 @@ def video_from_days_ago(video: dict[str, Any], now: datetime) -> dict[str, Any]:
         "shares": _count(video.get("shares")),
         "posted_at": posted,
         "caption": caption_from_item({"text": video.get("caption", "")}),
+        "hashtags": hashtags_from_item(video),
+        "is_ad": video.get("is_ad") is True,
     }
     return row
 

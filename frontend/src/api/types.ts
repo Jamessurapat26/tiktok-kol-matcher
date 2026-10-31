@@ -12,6 +12,7 @@ export interface LiveFlags {
   live_kols: boolean
   live_llm: boolean
   live_embed: boolean
+  live_search: boolean
 }
 
 export type LiveFlag = keyof LiveFlags
@@ -53,6 +54,28 @@ export interface TargetAudience {
 
 export type Tier = 'nano' | 'micro' | 'mid' | 'macro'
 
+/** models.py `ContentFormat` */
+export type ContentFormat =
+  | 'review'
+  | 'tutorial'
+  | 'unboxing'
+  | 'comparison'
+  | 'vlog'
+  | 'comedy'
+  | 'storytelling'
+  | 'challenge'
+  | 'lifestyle'
+  | 'news'
+
+/** models.py `ContentAnalysis`. For the Marketer only: it moves no score. */
+export interface ContentAnalysis {
+  formats: ContentFormat[]
+  style: string
+  style_fit: number | null
+  style_reason: string
+  evidence_urls: string[]
+}
+
 /** models.py `BrandProfile`: the structured brief. */
 export interface BrandProfile {
   category: string
@@ -60,6 +83,9 @@ export interface BrandProfile {
   price_tier: 'budget' | 'mid' | 'premium' | 'luxury'
   target_audience: TargetAudience
   tone: string
+  /** Absent on briefs stored before the fields existed. */
+  content_formats?: ContentFormat[]
+  content_style?: string
   topic_keywords_th: string[]
   topic_keywords_en: string[]
   competitors: string[]
@@ -75,6 +101,7 @@ export interface BrandProfile {
   category_th?: string
   key_products_th?: string[]
   tone_th?: string
+  content_style_th?: string
   interests_th?: string[]
   tier_reason_th?: string
 }
@@ -88,6 +115,9 @@ export interface VideoStats {
   shares: number
   posted_at: string | null
   caption: string
+  /** Absent on rows stored before the fields existed. */
+  hashtags?: string[]
+  is_ad?: boolean
 }
 
 /** models.py `KolProfile`. The API has no avatar field. */
@@ -136,6 +166,8 @@ export interface RankedKol {
   reason: string
   evidence_urls: string[]
   profile_url: string
+  /** Only for judged KOLs. Absent on rows stored before the field existed. */
+  content?: ContentAnalysis | null
 }
 
 /** state.py `MatchState.stage`, in pipeline order. */

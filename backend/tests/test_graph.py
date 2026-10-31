@@ -1,8 +1,14 @@
 import json
+import operator
 from dataclasses import replace
 from pathlib import Path
+from typing import Annotated
 
 import pytest
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
+from pydantic import BaseModel, Field
 
 from app.brand_match import normalize_for_match
 from app.graph import build_graph, initial_state
@@ -11,7 +17,7 @@ from app.integrations.kol_enricher import MockKolEnricher
 from app.integrations.llm import MockBrandAnalyzer
 from app.matching_config import DEFAULT_CONFIG
 from app.models import KolProfile, MatchRequest
-from app.nodes import make_nodes
+from app.nodes import _guarded, make_nodes
 from app.state import MatchState
 
 _KOL_FIXTURE = Path(__file__).resolve().parents[1] / "app" / "fixtures" / "kols.json"
@@ -211,8 +217,9 @@ def test_parallel_scrapers_both_populate_state():
     assert final["facebook_page"] is not None
 
     edges = {(edge.source, edge.target) for edge in graph.get_graph().edges}
-    assert ("scrape_website", "analyze_brand") in edges
-    assert ("scrape_facebook", "analyze_brand") in edges
+    assert ("scrape_website", "research_brand") in edges
+    assert ("scrape_facebook", "research_brand") in edges
+    assert ("research_brand", "analyze_brand") in edges
 
 
 def test_hard_filter_shrinks_discovered():
@@ -606,7 +613,7 @@ def test_default_enrichment_is_capped_by_the_config():
 
 def test_analyze_brand_merges_url_aliases_after_model_names():
     class _NamedAnalyzer(MockBrandAnalyzer):
-        def analyze_brand(self, website_content, facebook_page):
+        def analyze_brand(self, website_content, facebook_page, research=None):
             profile = super().analyze_brand(website_content, facebook_page)
             return profile.model_copy(
                 update={"brand_names": ["ExampleBrand", "EB-24"]}
@@ -747,3 +754,49 @@ def test_demo_graph_hard_filters_and_recall_guard():
 
     for query in final["search_queries"]:
         assert "examplebrand" not in normalize_for_match(query)
+
+
+class _GuardState(BaseModel):
+    stage: str = "received"
+    answer: str | None = None
+    errors: Annotated[list[str], operator.add] = Field(default_factory=list)
+
+
+def _single_node_graph(node, **compile_kwargs):
+    builder = StateGraph(_GuardState)
+    builder.add_node("node", node)
+    builder.add_edge(START, "node")
+    builder.add_edge("node", END)
+    return builder.compile(**compile_kwargs)
+
+
+def test_guarded_node_lets_interrupt_pause_and_resume():
+    @_guarded("ask")
+    def ask(state: _GuardState) -> dict:
+        return {"answer": interrupt("approve?")}
+
+    graph = _single_node_graph(ask, checkpointer=InMemorySaver())
+    config = {"configurable": {"thread_id": "guarded-interrupt"}}
+
+    paused = graph.invoke(_GuardState(), config)
+
+    assert [item.value for item in paused["__interrupt__"]] == ["approve?"]
+    assert paused["stage"] == "received"
+    assert paused["errors"] == []
+
+    resumed = graph.invoke(Command(resume="yes"), config)
+
+    assert resumed["answer"] == "yes"
+    assert resumed["stage"] == "received"
+    assert resumed["errors"] == []
+
+
+def test_guarded_node_still_records_ordinary_exceptions():
+    @_guarded("boom")
+    def boom(state: _GuardState) -> dict:
+        raise ValueError("broken")
+
+    final = _single_node_graph(boom).invoke(_GuardState())
+
+    assert final["stage"] == "failed"
+    assert final["errors"] == ["boom: broken"]

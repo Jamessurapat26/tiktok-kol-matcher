@@ -17,6 +17,7 @@ from .graph import (
 )
 from .integrations import build_integrations
 from .integrations.apify import ApifyConfigError, DiscoveryLimits
+from .integrations.brand_research import WebSearchConfigError
 from .integrations.embeddings import EmbedConfigError
 from .integrations.llm_live import LlmConfigError, llm_api_key_from_env
 from .matching_config import DEFAULT_CONFIG
@@ -139,6 +140,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "The default stays on the offline mock"
         ),
     )
+    match.add_argument(
+        "--live-search",
+        action="store_true",
+        help=(
+            "let the LLM search the web for facts about the brand through Jina "
+            "(requires JINA_API_KEY and an LLM key; default skips web research)"
+        ),
+    )
     return parser
 
 
@@ -182,6 +191,8 @@ def summarize_update(
         page = update["facebook_page"]
         name = getattr(page, "page_name", None)
         parts.append(f"facebook={name}" if name else "facebook=ok")
+    if "brand_research" in update:
+        parts.append(f"research={len(update['brand_research'] or '')} chars")
     if "brand_profile" in update:
         parts.append("brand=profile")
     if "brand_sources" in update:
@@ -232,7 +243,8 @@ def _run_pipeline(
             step += 1
             if show_progress:
                 summary = summarize_update(
-                    update,
+                    # LangGraph reports a node's empty update as None.
+                    update or {},
                     node=node,
                     discovered_total=discovered_now,
                     discovered_before=discovered_before,
@@ -430,6 +442,15 @@ def _cmd_match(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.live_search and not (
+        os.environ.get("JINA_API_KEY", "").strip() and llm_api_key_from_env()
+    ):
+        print(
+            "error: --live-search requires JINA_API_KEY and one of LLM_API_KEY, "
+            "NVIDIA_API_KEY, or OPENAI_API_KEY in the environment",
+            file=sys.stderr,
+        )
+        return 2
     # find_spec only, so the model is neither imported nor loaded here.
     if args.live_embed and importlib.util.find_spec("sentence_transformers") is None:
         print(
@@ -460,7 +481,14 @@ def _cmd_match(args: argparse.Namespace) -> int:
         )
     # Default stays on build_graph's mocked bundle so the CLI never opens a
     # socket or loads a model unless a live flag is set.
-    if args.live_web or args.live_kols or args.live_llm or args.live_embed or args.live_fb:
+    if (
+        args.live_web
+        or args.live_kols
+        or args.live_llm
+        or args.live_embed
+        or args.live_fb
+        or args.live_search
+    ):
         try:
             graph_kwargs["integrations"] = build_integrations(
                 live_web=args.live_web,
@@ -468,9 +496,15 @@ def _cmd_match(args: argparse.Namespace) -> int:
                 live_llm=args.live_llm,
                 live_embed=args.live_embed,
                 live_fb=args.live_fb,
+                live_search=args.live_search,
                 max_results_per_query=args.max_results_per_query,
             )
-        except (ApifyConfigError, LlmConfigError, EmbedConfigError) as exc:
+        except (
+            ApifyConfigError,
+            LlmConfigError,
+            EmbedConfigError,
+            WebSearchConfigError,
+        ) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
     graph = build_graph(**graph_kwargs)

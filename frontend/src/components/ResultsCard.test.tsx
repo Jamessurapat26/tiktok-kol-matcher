@@ -76,3 +76,45 @@ describe('ResultsCard avatar', () => {
     expect(screen.getByTestId('kol-initials')).toHaveTextContent(initials('plainkol'))
   })
 })
+
+describe('content style', () => {
+  function renderRow(row: RankedKol) {
+    render(<ResultsCard websiteUrl={null} results={[row]} pending={false} failed={false} />)
+  }
+
+  it('shows formats, style fit, and its evidence, and says it is not in the score', () => {
+    renderRow({
+      ...ranked('styled'),
+      content: {
+        formats: ['review', 'tutorial'],
+        style: 'รีวิวจากการใช้งานจริง',
+        style_fit: 0.8,
+        style_reason: 'รูปแบบตรงกับแบรนด์',
+        evidence_urls: ['https://www.tiktok.com/@styled/video/1'],
+      },
+    })
+
+    expect(screen.getByText('รีวิว')).toBeTruthy()
+    expect(screen.getByText('สอน/แนะนำวิธี')).toBeTruthy()
+    expect(screen.getByText('รีวิวจากการใช้งานจริง')).toBeTruthy()
+    expect(screen.getByText('สไตล์เข้ากับแบรนด์ 80/100')).toBeTruthy()
+    expect(screen.getByText(/ยังไม่นับรวมในความเหมาะสมรวม/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: /คลิปอ้างอิงสไตล์ 1/ }).getAttribute('href')).toBe(
+      'https://www.tiktok.com/@styled/video/1',
+    )
+  })
+
+  it('counts TikTok ad labels on the checked videos', () => {
+    const row = ranked('ads')
+    const video = { url: null, views: 1, likes: 0, comments: 0, shares: 0, posted_at: null, caption: 'x' }
+    renderRow({ ...row, kol: { ...row.kol, videos: [{ ...video, is_ad: true }, video] } })
+
+    expect(screen.getByText('ติดป้ายโฆษณา 1 จาก 2 คลิปที่ตรวจ')).toBeTruthy()
+  })
+
+  it('hides the section when there is nothing to show, as on older stored rows', () => {
+    renderRow(ranked('plain'))
+
+    expect(screen.queryByRole('region', { name: 'สไตล์คอนเทนต์' })).toBeNull()
+  })
+})

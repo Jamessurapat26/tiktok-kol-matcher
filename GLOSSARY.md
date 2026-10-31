@@ -28,6 +28,10 @@ _Avoid_: Search
 The follower-size group of KOLs a brand should work with: Nano, Micro, Mid, or Macro.
 _Avoid_: Brand tier
 
+**Brand research** (ค้นข้อมูลแบรนด์):
+Web searches the LLM runs to learn what the brand's own pages leave out. Its notes feed the brand analysis.
+_Avoid_: Search, web search (for the step as a whole)
+
 ### Judging a KOL
 
 **Match score** (ความเหมาะสมรวม):
@@ -49,6 +53,10 @@ _Avoid_: Tier fit, T
 **Audience fit** (กลุ่มผู้ชม):
 An estimate of how well a KOL's viewers match the brand's target audience, read from text rather than real viewer data.
 _Avoid_: A_eff, demographics
+
+**Style fit** (สไตล์เข้ากับแบรนด์):
+How well the way a KOL makes content suits the brand, read from captions and hashtags. Shown to the Marketer only; it is not part of the Match score.
+_Avoid_: Brand fit, tone score
 
 **Limited data** (ข้อมูลน้อย):
 A mark on a score the system has too little evidence to trust fully.

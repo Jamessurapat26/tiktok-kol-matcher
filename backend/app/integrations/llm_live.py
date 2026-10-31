@@ -40,10 +40,12 @@ from ..brand_match import MIN_ALIAS_CHARS, normalize_for_match
 from ..brand_tidy import tidy_brand_profile
 from ..models import (
     BrandProfile,
+    ContentAnalysis,
     DomainModel,
     FacebookPage,
     Judgement,
     KolProfile,
+    known_content_formats,
     normalize_handle,
 )
 from ..prompts import (
@@ -51,6 +53,7 @@ from ..prompts import (
     MAX_QUERIES,
     brand_messages,
     judge_messages,
+    judge_videos,
     query_messages,
 )
 from .llm import ChatClient
@@ -239,6 +242,12 @@ class JudgementItem(DomainModel):
     audience_confidence: float
     reason: str = ""
     risky: bool = False
+    # Display only, so a malformed value must not fail the whole batch of scores.
+    content_formats: Any = None
+    content_style: Any = None
+    style_fit: Any = None
+    style_reason: Any = None
+    style_evidence: Any = None
 
 
 class JudgementBatch(DomainModel):
@@ -404,9 +413,10 @@ class LiveBrandAnalyzer:
         self,
         website_content: str | None,
         facebook_page: FacebookPage | None,
+        research: str | None = None,
     ) -> BrandProfile:
         profile = self._structured(
-            brand_messages(website_content, facebook_page),
+            brand_messages(website_content, facebook_page, research),
             BrandProfile,
             coerce=_coerce_brand_lists,
         )
@@ -478,6 +488,7 @@ class LiveBrandAnalyzer:
                     audience_confidence=_unit(item.audience_confidence),
                     reason=item.reason.strip(),
                     risky=item.risky,
+                    content=_content_analysis(item, kol),
                 )
             )
         return judgements
@@ -601,6 +612,38 @@ def _has_reasoning(message: Any) -> bool:
     return bool(reasoning and str(reasoning).strip())
 
 
+def _content_analysis(item: JudgementItem, kol: KolProfile) -> ContentAnalysis | None:
+    """Build the display fields. A style score must cite a video the card showed."""
+    videos = judge_videos(kol)
+    if not videos:
+        return None
+    evidence: list[str] = []
+    numbers = item.style_evidence if isinstance(item.style_evidence, list) else []
+    for number in numbers:
+        if isinstance(number, int) and 1 <= number <= len(videos):
+            url = videos[number - 1].url
+            if url and url not in evidence:
+                evidence.append(url)
+    style_fit: float | None = None
+    if evidence and isinstance(item.style_fit, (int, float)):
+        style_fit = _unit(item.style_fit)
+    formats = known_content_formats(item.content_formats)
+    style = _text(item.content_style)
+    if style_fit is None and not formats and not style:
+        return None
+    return ContentAnalysis(
+        formats=formats,
+        style=style,
+        style_fit=style_fit,
+        style_reason=_text(item.style_reason) if style_fit is not None else "",
+        evidence_urls=evidence[:3],
+    )
+
+
+def _text(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
 _BRAND_LIST_FIELDS = (
     "brand_names",
     "key_products",
@@ -635,6 +678,10 @@ def _coerce_brand_lists(data: dict[str, Any]) -> dict[str, Any]:
     for name in _BRAND_LIST_FIELDS:
         if name in out:
             out[name] = _as_list(out[name])
+    if "content_formats" in out:
+        out["content_formats"] = known_content_formats(
+            _as_list(out["content_formats"])
+        )
     audience = out.get("target_audience")
     if isinstance(audience, dict) and "interests" in audience:
         out["target_audience"] = {

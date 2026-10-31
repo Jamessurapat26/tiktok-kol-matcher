@@ -40,6 +40,7 @@ class JobCreate(BaseModel):
     live_kols: bool | None = None
     live_llm: bool | None = None
     live_embed: bool | None = None
+    live_search: bool | None = None
 
     @field_validator("website_url")
     @classmethod

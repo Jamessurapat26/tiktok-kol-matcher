@@ -113,9 +113,12 @@ class MatchState(BaseModel):
 
     website_content: str | None = None
     facebook_page: FacebookPage | None = None
+    # Notes from research_brand's web searches, for analyze_brand only.
+    brand_research: str | None = None
     brand_profile: BrandProfile | None = None
     # Which scraped sources analyze_brand used, e.g. ["website: used",
-    # "facebook: skipped"]. Set by analyze_brand.
+    # "facebook: skipped"], plus "web research: used" when it had notes.
+    # Set by analyze_brand.
     brand_sources: list[str] = Field(default_factory=list)
 
     # Accumulates across rounds. generate_queries returns only the new queries for

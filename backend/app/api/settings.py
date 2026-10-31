@@ -22,6 +22,7 @@ class LiveFlags(BaseModel):
     live_kols: bool = False
     live_llm: bool = False
     live_embed: bool = False
+    live_search: bool = False
 
 
 class FlagUnavailable(ValueError):
@@ -104,11 +105,15 @@ class Settings(BaseSettings):
     def unavailable(self) -> dict[str, str | None]:
         """Why each live flag cannot run, or None when it can."""
         no_apify = None if _is_set(self.apify_token) else "APIFY_TOKEN is not set"
+        no_llm = None if self.llm_key() else f"{_LLM_KEY_VARS} is not set"
         return {
             "live_web": None,
             "live_fb": no_apify,
             "live_kols": no_apify,
-            "live_llm": None if self.llm_key() else f"{_LLM_KEY_VARS} is not set",
+            "live_llm": no_llm,
+            "live_search": (
+                no_llm or (None if _is_set(self.jina_api_key) else "JINA_API_KEY is not set")
+            ),
             # find_spec only, so the model is neither imported nor loaded here.
             "live_embed": (
                 None

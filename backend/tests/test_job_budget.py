@@ -1,4 +1,4 @@
-"""The default live job plan must fit the $1.50 budget with 20+ enrichments."""
+"""The default live job plan must fit the $1.55 budget with 20+ enrichments."""
 
 import os
 
@@ -6,13 +6,11 @@ import pytest
 
 from app.integrations.apify import (
     ApifyLimits,
+    TIKTOK_ACTOR,
     estimate_default_job_usd,
     estimate_run_cost,
 )
 from app.matching_config import DEFAULT_CONFIG
-
-_SEARCH_ACTOR = "clockworks/tiktok-scraper"
-_PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
 
 
 def _clear_apify_env(monkeypatch) -> None:
@@ -21,8 +19,8 @@ def _clear_apify_env(monkeypatch) -> None:
             monkeypatch.delenv(name, raising=False)
 
 
-def _uncapped_run_cost(actor: str, items: int) -> float:
-    return estimate_run_cost(actor, items, float("inf"))
+def _uncapped_run_cost(actor: str, items: int, *, proxied: bool = False) -> float:
+    return estimate_run_cost(actor, items, float("inf"), proxied=proxied)
 
 
 def test_default_job_plan_enriches_at_least_twenty_profiles(monkeypatch):
@@ -31,7 +29,7 @@ def test_default_job_plan_enriches_at_least_twenty_profiles(monkeypatch):
 
     estimate = estimate_default_job_usd(limits)
 
-    assert limits.job_budget_usd == pytest.approx(1.50)
+    assert limits.job_budget_usd == pytest.approx(1.55)
     assert estimate.profile_runs >= 20
     # Every first-pass leader the config asks for fits in the budget.
     assert estimate.profile_runs >= DEFAULT_CONFIG.enrich_top_n
@@ -50,11 +48,12 @@ def test_worst_case_searches_still_leave_room_for_the_planned_profiles(
     estimate = estimate_default_job_usd(limits)
 
     search_run = _uncapped_run_cost(
-        _SEARCH_ACTOR,
+        TIKTOK_ACTOR,
         limits.tiktok_results_per_query,
+        proxied=True,
     )
     profile_run = _uncapped_run_cost(
-        _PROFILE_ACTOR,
+        TIKTOK_ACTOR,
         limits.tiktok_profile_videos,
     )
     worst_case = (

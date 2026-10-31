@@ -1,5 +1,6 @@
 """Offline tests for the job-level Apify budget and its degradation paths."""
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
@@ -26,7 +27,7 @@ from app.nodes import make_nodes
 from app.state import MatchState
 
 _TOKEN = "super-secret-token"
-_SEARCH_ACTOR = "clockworks/tiktok-scraper"
+_SEARCH_ACTOR = "clockworks/free-tiktok-scraper"
 _LIMIT_ENV = (
     "APIFY_JOB_BUDGET_USD",
     "APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD",
@@ -129,7 +130,10 @@ def test_budget_rejects_a_negative_upcoming_estimate():
 
 
 def test_estimate_run_cost_uses_the_actor_rate_and_the_run_cap():
-    assert estimate_run_cost(_SEARCH_ACTOR, 2, 0.50) == pytest.approx(0.013)
+    assert estimate_run_cost(_SEARCH_ACTOR, 2, 0.50) == pytest.approx(0.011)
+    assert estimate_run_cost(
+        _SEARCH_ACTOR, 2, 0.50, proxied=True
+    ) == pytest.approx(0.0136)
     assert estimate_run_cost("unknown/actor", 0, 0.50) == pytest.approx(0.015)
     assert estimate_run_cost(_SEARCH_ACTOR, 1_000, 0.50) == 0.50
 
@@ -138,8 +142,8 @@ def test_estimate_run_cost_scales_with_the_item_count():
     fifteen = estimate_run_cost(_SEARCH_ACTOR, 15, 0.50)
     twenty = estimate_run_cost(_SEARCH_ACTOR, 20, 0.50)
 
-    assert twenty - fifteen == pytest.approx(5 * 0.004)
-    assert twenty == pytest.approx(0.085)
+    assert twenty - fifteen == pytest.approx(5 * 0.003)
+    assert twenty == pytest.approx(0.065)
 
 
 def test_budget_records_are_thread_safe():
@@ -171,8 +175,8 @@ def test_client_records_an_estimate_then_refuses_without_http():
     items = client.run_sync_get_items(_SEARCH_ACTOR, {}, max_items=2)
 
     assert len(items) == 2
-    assert budget.spent == pytest.approx(0.013)
-    assert budget.remaining == pytest.approx(0.007)
+    assert budget.spent == pytest.approx(0.011)
+    assert budget.remaining == pytest.approx(0.009)
     with pytest.raises(ApifyBudgetExceeded):
         client.run_sync_get_items(_SEARCH_ACTOR, {}, max_items=2)
 
@@ -272,14 +276,14 @@ def test_limits_from_env_defaults(monkeypatch):
 
     limits = ApifyLimits.from_env()
 
-    assert limits.job_budget_usd == pytest.approx(1.50)
+    assert limits.job_budget_usd == pytest.approx(1.55)
     assert limits.tiktok_search_max_charge_usd == pytest.approx(0.50)
     assert limits.tiktok_profile_max_charge_usd == pytest.approx(0.50)
     assert limits.facebook_max_charge_usd == pytest.approx(0.50)
     assert limits.tiktok_results_per_query == 15
     assert limits.tiktok_profile_videos == 10
     assert limits.enrich_reserve_usd == pytest.approx(0.70)
-    assert limits.budget().remaining == pytest.approx(1.50)
+    assert limits.budget().remaining == pytest.approx(1.55)
 
 
 def test_discovery_limits_from_env_defaults(monkeypatch):
@@ -393,14 +397,18 @@ def test_limits_from_env_rejects_a_reserve_that_is_not_below_the_budget(
         "APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD",
     ],
 )
-def test_limits_from_env_rejects_a_tiktok_cap_below_the_actor_minimum(
+def test_limits_from_env_accepts_a_tiktok_cap_below_fifty_cents(
     monkeypatch, name
 ):
     _clear_limit_env(monkeypatch)
-    monkeypatch.setenv(name, "0.49")
+    monkeypatch.setenv(name, "0.20")
 
-    with pytest.raises(ApifyConfigError, match="must be at least 0.50"):
-        ApifyLimits.from_env()
+    limits = ApifyLimits.from_env()
+
+    assert pytest.approx(0.20) in (
+        limits.tiktok_search_max_charge_usd,
+        limits.tiktok_profile_max_charge_usd,
+    )
 
 
 def test_estimate_default_job_plans_search_then_enrichment_within_budget(
@@ -414,9 +422,10 @@ def test_estimate_default_job_plans_search_then_enrichment_within_budget(
         _SEARCH_ACTOR,
         limits.tiktok_results_per_query,
         limits.tiktok_search_max_charge_usd,
+        proxied=True,
     )
     profile_run = estimate_run_cost(
-        "clockworks/tiktok-profile-scraper",
+        _SEARCH_ACTOR,
         limits.tiktok_profile_videos,
         limits.tiktok_profile_max_charge_usd,
     )
@@ -442,7 +451,7 @@ def test_default_reserve_covers_twenty_profile_runs(monkeypatch):
     limits = ApifyLimits.from_env()
 
     profile_run = estimate_run_cost(
-        "clockworks/tiktok-profile-scraper",
+        _SEARCH_ACTOR,
         limits.tiktok_profile_videos,
         limits.tiktok_profile_max_charge_usd,
     )
@@ -467,7 +476,7 @@ def test_search_stops_after_the_budget_and_keeps_found_creators():
         max_charge_usd=0.50,
         max_retries=0,
         backoff=0,
-        budget=ApifyBudget(0.025),
+        budget=ApifyBudget(0.03),
     )
 
     rows = search.search(["one", "two", "three"], round=1)
@@ -486,7 +495,7 @@ def test_search_reserve_leaves_room_for_enrichment(tmp_path):
     calls = {"search": 0, "profile": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if "profile-scraper" in request.url.path:
+        if "profiles" in json.loads(request.content):
             calls["profile"] += 1
             return httpx.Response(
                 201,
@@ -506,7 +515,7 @@ def test_search_reserve_leaves_room_for_enrichment(tmp_path):
             json=[{"authorMeta": {"name": "found_creator", "fans": 1200}}],
         )
 
-    budget = ApifyBudget(0.309)
+    budget = ApifyBudget(0.31)
     search = ApifyKolSearch(
         token=_TOKEN,
         client=_client(handler),
@@ -542,7 +551,7 @@ def test_search_reserve_leaves_room_for_enrichment(tmp_path):
     assert update["stats_source"] == "profile"
     assert update["videos"]
     assert "median_engagement_rate" not in update
-    assert budget.spent == pytest.approx(0.009 + 0.008)
+    assert budget.spent == pytest.approx(0.0093 + 0.008)
 
 
 class _BudgetEnricher:

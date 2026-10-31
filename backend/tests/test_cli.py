@@ -365,7 +365,7 @@ def test_live_kols_without_token_exits_2(monkeypatch, capsys):
 @pytest.mark.parametrize(
     ("name", "value", "message"),
     [
-        ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0.30", "must be at least 0.50"),
+        ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0", "must be a positive number"),
         ("APIFY_JOB_BUDGET_USD", "not-a-number", "must be a positive number"),
     ],
 )

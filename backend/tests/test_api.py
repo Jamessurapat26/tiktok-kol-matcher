@@ -85,7 +85,7 @@ def read_events(client, job_id, **kwargs):
 
 
 class FailingAnalyzer:
-    def analyze_brand(self, website_content, facebook_page):
+    def analyze_brand(self, website_content, facebook_page, research=None):
         raise RuntimeError("model unavailable")
 
 
@@ -316,7 +316,7 @@ def _live_app_without_factory(tmp_path, submitted):
 @pytest.mark.parametrize(
     ("name", "value"),
     [
-        ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0.30"),
+        ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", "0"),
         ("APIFY_JOB_BUDGET_USD", "not-a-number"),
     ],
 )

@@ -183,6 +183,7 @@ def rank_candidates(
                 flags=item.flags,
                 reason=reason,
                 evidence_urls=_evidence_urls(item.kol, brief, cfg),
+                content=judgement.content if judgement is not None else None,
                 profile_url=(
                     str(item.kol.url)
                     or f"https://www.tiktok.com/@{normalize_handle(item.kol.handle)}"

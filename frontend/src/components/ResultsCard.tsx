@@ -7,7 +7,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Skeleton } from '@/components/ui/skeleton'
 import { csvFilename, downloadCsv, toCsv } from '@/lib/csv'
 import { formatCompact, initials, scoreOutOf100 } from '@/lib/format'
-import { flagLabel, isWarningFlag, scoreRows } from '@/lib/kol'
+import { adVideoCount, flagLabel, formatLabel, isWarningFlag, scoreRows } from '@/lib/kol'
 import { ScoreBar } from './ScoreBar'
 
 interface Props {
@@ -93,6 +93,59 @@ function KolAvatar({ kol }: { kol: KolProfile }) {
   )
 }
 
+function ContentStyle({ row }: { row: RankedKol }) {
+  const { content, kol } = row
+  const ads = adVideoCount(kol)
+  if (!content && ads === 0) return null
+
+  return (
+    <section aria-label="สไตล์คอนเทนต์" className="mt-3 border-t border-border pt-3">
+      <h4 className="text-body-xs font-bold text-ink">สไตล์คอนเทนต์</h4>
+      {content && content.formats.length > 0 && (
+        <ul className="mt-1.5 flex flex-wrap gap-1.5" aria-label="รูปแบบคอนเทนต์">
+          {content.formats.map((format) => (
+            <li key={format}>
+              <Badge variant="outline">{formatLabel(format)}</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+      {content?.style && <p className="mt-1.5 text-body-sm text-ink">{content.style}</p>}
+      {content?.style_fit != null && (
+        <p className="mt-1.5 text-body-xs text-muted-foreground">
+          <strong className="font-bold text-ink">
+            สไตล์เข้ากับแบรนด์ {scoreOutOf100(content.style_fit)}/100
+          </strong>
+          {' · ยังไม่นับรวมในความเหมาะสมรวม'}
+          {content.style_reason && <span className="block">{content.style_reason}</span>}
+        </p>
+      )}
+      {content && content.evidence_urls.length > 0 && (
+        <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1" aria-label="คลิปอ้างอิงสไตล์">
+          {content.evidence_urls.map((url, index) => (
+            <li key={url}>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-sm text-body-xs font-bold text-muted-foreground underline-offset-4 outline-none hover:text-ink hover:underline focus-visible:ring-3 focus-visible:ring-ring"
+              >
+                คลิปอ้างอิงสไตล์ {index + 1}
+                <ExternalLink aria-hidden className="size-3" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+      {ads > 0 && (
+        <p className="mt-1.5 text-body-xs text-muted-foreground">
+          ติดป้ายโฆษณา {ads} จาก {kol.videos.length} คลิปที่ตรวจ
+        </p>
+      )}
+    </section>
+  )
+}
+
 function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
   const { kol } = row
 
@@ -157,6 +210,8 @@ function KolRow({ row, rank }: { row: RankedKol; rank: number }) {
           )}
 
           <p className="mt-2 text-body-sm text-ink">{row.reason}</p>
+
+          <ContentStyle row={row} />
 
           {row.evidence_urls.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1" aria-label="วิดีโอตัวอย่าง">

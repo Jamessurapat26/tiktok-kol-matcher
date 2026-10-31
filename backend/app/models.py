@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import (
     BaseModel,
@@ -15,6 +15,34 @@ from .matching_config import DEFAULT_CONFIG
 
 class DomainModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+# Shared by the brief and the judge, so a brand and a KOL can be compared.
+ContentFormat = Literal[
+    "review",
+    "tutorial",
+    "unboxing",
+    "comparison",
+    "vlog",
+    "comedy",
+    "storytelling",
+    "challenge",
+    "lifestyle",
+    "news",
+]
+CONTENT_FORMATS: tuple[str, ...] = get_args(ContentFormat)
+
+
+def known_content_formats(values: Any) -> list[str]:
+    """Keep known format names once each. Models sometimes invent their own."""
+    if not isinstance(values, list):
+        return []
+    known: list[str] = []
+    for value in values:
+        name = str(value).strip().casefold()
+        if name in CONTENT_FORMATS and name not in known:
+            known.append(name)
+    return known
 
 
 class Scores(DomainModel):
@@ -36,6 +64,19 @@ class Scores(DomainModel):
     judged: bool = False
 
 
+class ContentAnalysis(DomainModel):
+    """What a KOL's content is like. For the Marketer only: it moves no score.
+
+    ``style_fit`` is None unless the judge cited a real video as evidence.
+    """
+
+    formats: list[ContentFormat] = Field(default_factory=list)
+    style: str = ""
+    style_fit: float | None = Field(default=None, ge=0, le=1)
+    style_reason: str = ""
+    evidence_urls: list[str] = Field(default_factory=list)
+
+
 class Judgement(DomainModel):
     """One creator's result from the batched LLM judge call."""
 
@@ -45,6 +86,7 @@ class Judgement(DomainModel):
     audience_confidence: float = Field(ge=0, le=1)
     reason: str
     risky: bool = False
+    content: ContentAnalysis | None = None
 
 
 class MatchRequest(DomainModel):
@@ -111,6 +153,8 @@ class BrandProfile(DomainModel):
     price_tier: Literal["budget", "mid", "premium", "luxury"]
     target_audience: TargetAudience
     tone: str
+    content_formats: list[ContentFormat] = Field(default_factory=list)
+    content_style: str = Field(default_factory=str)
     topic_keywords_th: list[str]
     topic_keywords_en: list[str]
     competitors: list[str]
@@ -124,6 +168,7 @@ class BrandProfile(DomainModel):
     category_th: str = Field(default_factory=str)
     key_products_th: list[str] = Field(default_factory=list)
     tone_th: str = Field(default_factory=str)
+    content_style_th: str = Field(default_factory=str)
     interests_th: list[str] = Field(default_factory=list)
     tier_reason_th: str = Field(default_factory=str)
 
@@ -180,6 +225,9 @@ class VideoStats(DomainModel):
     shares: int = Field(default=0, ge=0)
     posted_at: datetime | None = None
     caption: str = ""
+    hashtags: list[str] = Field(default_factory=list)
+    # TikTok's own ad label. An unlabelled video can still be sponsored.
+    is_ad: bool = False
 
     @field_validator("posted_at")
     @classmethod
@@ -225,3 +273,4 @@ class RankedKol(DomainModel):
     reason: str
     evidence_urls: list[str] = Field(default_factory=list)
     profile_url: str
+    content: ContentAnalysis | None = None

@@ -29,15 +29,22 @@ _RUN_SYNC_ITEMS = (
 # sync HTTP call gave up, but the paid run may still be executing.
 _RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
-# Measured live costs plus a modest margin (search 20 items: est 0.085 vs
-# measured 0.075; profile 10 videos: est 0.035 vs measured 0.03), and they
+# TikTok Data Extractor handles both search and profile enrichment.
+TIKTOK_ACTOR = "clockworks/free-tiktok-scraper"
+# Thai proxy for TikTok search only. Profile runs name the account already, and
+# the proxy made them about nine times slower in a live check.
+TIKTOK_PROXY_COUNTRY = "TH"
+
+# Measured live costs plus a modest margin (search 15 items: est 0.0695 vs
+# measured 0.0645; profile 10 videos: est 0.035 vs price 0.03), and they
 # scale with the configured item counts. The sync endpoint returns dataset
 # items only, not the run usage or cost, so these numbers cannot be exact.
 _FIXED_RUN_USD = 0.005
 _DEFAULT_ITEM_USD = 0.01
+# Apify bills the proxy as an add-on per result, on the Free plan.
+_PROXY_USD_PER_ITEM = 0.0013
 ESTIMATED_USD_PER_ITEM: dict[str, float] = {
-    "clockworks/tiktok-scraper": 0.004,
-    "clockworks/tiktok-profile-scraper": 0.003,
+    TIKTOK_ACTOR: 0.003,
     "apify/facebook-pages-scraper": 0.015,
     "apify/facebook-posts-scraper": 0.005,
 }
@@ -144,6 +151,8 @@ def estimate_run_cost(
     actor: str,
     items_returned: int,
     max_charge_usd: float,
+    *,
+    proxied: bool = False,
 ) -> float:
     """Estimate one run's cost from its item count and per-run cap.
 
@@ -152,6 +161,8 @@ def estimate_run_cost(
     the default per-item rate. The result never exceeds the run's own cap.
     """
     per_item = ESTIMATED_USD_PER_ITEM.get(actor, _DEFAULT_ITEM_USD)
+    if proxied:
+        per_item += _PROXY_USD_PER_ITEM
     estimate = _FIXED_RUN_USD + per_item * max(items_returned, 1)
     return min(max_charge_usd, estimate)
 
@@ -219,7 +230,7 @@ class ApifyLimits:
 
     @classmethod
     def from_env(cls) -> ApifyLimits:
-        job_budget = _positive_env("APIFY_JOB_BUDGET_USD", 1.50)
+        job_budget = _positive_env("APIFY_JOB_BUDGET_USD", 1.55)
         tiktok_search = _positive_env("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", 0.50)
         tiktok_profile = _positive_env("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", 0.50)
         facebook = _positive_env("APIFY_FACEBOOK_MAX_CHARGE_USD", 0.50)
@@ -236,15 +247,6 @@ class ApifyLimits:
             maximum=30,
         )
         enrich_reserve = _non_negative_env("APIFY_ENRICH_RESERVE_USD", 0.70)
-        for name, value in (
-            ("APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD", tiktok_search),
-            ("APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD", tiktok_profile),
-        ):
-            if value < 0.50:
-                raise ApifyConfigError(
-                    f"{name} must be at least 0.50, the minimum the TikTok "
-                    "actors accept"
-                )
         if enrich_reserve >= job_budget:
             raise ApifyConfigError(
                 "APIFY_ENRICH_RESERVE_USD must be below APIFY_JOB_BUDGET_USD"
@@ -335,9 +337,10 @@ def estimate_default_job_usd(
     spent = facebook_usd
 
     search_run = estimate_run_cost(
-        "clockworks/tiktok-scraper",
+        TIKTOK_ACTOR,
         limits.tiktok_results_per_query,
         limits.tiktok_search_max_charge_usd,
+        proxied=True,
     )
     search_runs = 0
     while search_runs < queries:
@@ -351,7 +354,7 @@ def estimate_default_job_usd(
     search_usd = search_runs * search_run
 
     enrichment_run = estimate_run_cost(
-        "clockworks/tiktok-profile-scraper",
+        TIKTOK_ACTOR,
         limits.tiktok_profile_videos,
         limits.tiktok_profile_max_charge_usd,
     )
@@ -489,12 +492,13 @@ class ApifyClient:
         """Run ``actor`` and return the dataset items (a JSON list)."""
         if max_items < 1:
             raise ValueError("max_items must be at least 1")
+        proxied = run_input.get("proxyCountryCode", "None") != "None"
         if self._budget is not None:
             self._budget.check(
                 actor,
                 reserve_usd=self._reserve_usd,
                 upcoming_usd=estimate_run_cost(
-                    actor, max_items, self._max_charge_usd
+                    actor, max_items, self._max_charge_usd, proxied=proxied
                 ),
             )
 
@@ -552,7 +556,7 @@ class ApifyClient:
                     # The run happened; keep the estimate conservative.
                     self._record_cap(actor)
                     raise
-                self._record_estimate(actor, len(items))
+                self._record_estimate(actor, len(items), proxied=proxied)
                 return items
 
             if response.status_code in _RETRY_STATUS and attempt < attempts - 1:
@@ -567,12 +571,16 @@ class ApifyClient:
 
         self._fail(f"Apify request failed calling {actor}: {last_transport}")
 
-    def _record_estimate(self, actor: str, items_returned: int) -> None:
+    def _record_estimate(
+        self, actor: str, items_returned: int, *, proxied: bool
+    ) -> None:
         if self._budget is None:
             return
         self._budget.record(
             actor,
-            estimate_run_cost(actor, items_returned, self._max_charge_usd),
+            estimate_run_cost(
+                actor, items_returned, self._max_charge_usd, proxied=proxied
+            ),
         )
 
     def _record_cap(self, actor: str) -> None:

@@ -31,18 +31,34 @@ low-confidence scores as limited data, and names flags in plain words (see
 [GLOSSARY.md](GLOSSARY.md)). The whole pipeline also runs offline in demo mode,
 with no keys.
 
+## How this meets the brief
+
+This prototype answers the Convert Cake AI Engineer case study.
+
+| Brief | What the tool does | Limit |
+| --- | --- | --- |
+| Analyze a client's Facebook page and website | Reads both and has the LLM build a brief: category, products, audience, tone, keywords, competitors, and creator tier | Content style is the brand's `tone` only, with no breakdown of content formats |
+| Identify and evaluate Thai TikTok KOLs | Searches TikTok, removes accounts that cannot fit, fetches recent videos, and has the LLM judge the leaders | Some dealers and shops still get through; see [Known limitations](#known-limitations) |
+| Rank by relevance, engagement, and audience demographics | Scores F, E, T, and A_eff, then selects with MMR | Audience is estimated from text. TikTok does not expose demographics to scrapers |
+| Present a curated list with profile information | Returns profile links, followers, scores, a reason, flags, and evidence videos in the Thai web app, API, CLI, and CSV | |
+
 ## Contents
 
+- [How this meets the brief](#how-this-meets-the-brief)
 - [Screenshots](#screenshots)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
 - [Architecture](#architecture)
 - [Scoring](#scoring)
+- [Live results](#live-results)
+- [Business value](#business-value)
 - [Design decisions and trade-offs](#design-decisions-and-trade-offs)
+- [Ethics and privacy](#ethics-and-privacy)
 - [Known limitations](#known-limitations)
 - [Testing](#testing)
 - [Next steps](#next-steps)
 - [Repo layout](#repo-layout)
+- [References](#references)
 - [Reference: HTTP API and live integrations](docs/reference.md)
 
 ## Screenshots
@@ -80,7 +96,8 @@ docker compose up --build
 
 Open http://localhost:5173. With no `.env`, or no `APIFY_TOKEN` in it, the
 service starts in demo mode. Press **ลองดูตัวอย่าง** to fill the form with the
-example brand.
+example brand. That brand exists only in the fixtures, so in live mode enter a
+real website and Facebook page instead.
 
 Both services bind to `127.0.0.1` only (frontend on 5173, API on 8000), because
 the API has no authentication. nginx serves the built app, proxies `/api` to
@@ -88,12 +105,11 @@ the backend, and turns off buffering on the event stream. Jobs and caches live
 in the `backend-data` volume. The backend runs as a non-root user with a health
 check on `/api/health`.
 
-The image skips the local embedding model by default. To include it (this pulls
-the CPU build of torch):
-
-```bash
-docker build --build-arg INSTALL_EMBED=true -t tkm-backend backend
-```
+Compose installs the local embedding packages, including the CPU build of
+torch, so the backend image is about 2.15 GB. The model itself downloads into
+the `backend-data` volume the first time a live job embeds. Demo mode does not
+use it. A plain `docker build` of `backend/` leaves the packages out unless you
+pass `--build-arg INSTALL_EMBED=true`.
 
 ### Local development
 
@@ -407,7 +423,7 @@ through the code.
 **The eval harness.** [`eval/README.md`](eval/README.md) documents an offline
 NDCG@10 harness over cached candidate pools, with `--ablate F|E|T|A`. It needs
 no network. The labels in `eval/golden/` are drafts, not human-checked. On the
-example pool, ablating A raises mean NDCG@10 from 0.9113 to 0.9558, so the
+example pool, ablating A raises mean NDCG@10 from 0.9134 to 0.9576, so the
 current A term is not yet justified by that set. The harness is the tool for
 tuning once real labels exist.
 
@@ -435,8 +451,9 @@ eleventh search run is not allowed. Raising `--max-enrich` above 20 would
 need `$1.475 + $0.035 = $1.51` for a 21st profile, over the `$1.50` budget, so
 the budget guard would skip it. `estimate_default_job_usd` reproduces this table.
 
-These are estimates from the code's own per-item rates; the `$1.50` default has
-not been verified with a live v2 run.
+These are estimates from the code's own per-item rates. The
+[live runs](#live-results) stayed inside this plan, but the code does not read
+Apify's billing, so their real spend is unmeasured.
 
 The reserve matters for enrichment. The `$0.70` reserve guarantees room for 20
 profile runs, which equals `MatchingConfig.enrich_top_n` (default 20), so every
@@ -444,8 +461,9 @@ first-pass leader the config asks for gets profile stats. Leaders outside the
 top 20 keep stats from their search videos, score E with lower confidence, and
 carry `search_stats_only`. They are not dropped.
 
-LLM calls per job are one brand brief, one per query round (usually two or
-three), and one judge call: four or five calls in total. The CLI prints a cost
+LLM calls per job are one brand brief, one per query round (one in each recent
+live run, three at most), and one judge call: three to five calls in total,
+plus any retries. The CLI prints a cost
 log with one line per stage, for example:
 
 ```text
@@ -458,6 +476,59 @@ cost log:
   enrich: est $0.70 (20 profiles)
   llm: judge 1 call (15 creators)
 ```
+
+## Live results
+
+These are the five most recent successful live jobs, with every service live.
+Each one ran one discovery round and logged 20 profile runs. Apify cost is the logged estimate for search and enrichment, so it leaves
+out Facebook (about $0.125).
+
+| Brand | Top k | Run time | Accounts filtered out | Estimated Apify cost |
+| --- | --- | --- | --- | --- |
+| Akha Ama Coffee | 7 | 9 min 5 s | 106 | $1.35 |
+| Siam Kubota | 10 | 11 min 0 s | 65 | $1.22 |
+| InnovestX | 10 | 10 min 3 s | 82 | $1.35 |
+| InnovestX | 5 | 11 min 3 s | 58 | $1.35 |
+| Dime | 10 | 11 min 4 s | 82 | $1.28 |
+
+Only the Akha Ama job ran on the current commit. The others ran on earlier
+commits that used matching v2. The results are uneven, and the
+[known limitations](#known-limitations) describe what went wrong:
+
+- **InnovestX and Dime** returned mostly finance and investing creators. A
+  competitor-sponsored post appeared in one reason without raising a flag.
+- **Akha Ama** returned coffee creators, but also a coffee shop promoting
+  itself, a general lifestyle account, and creators far below the mid-tier
+  target.
+- **Siam Kubota** returned mostly the brand's own sales channel: the judge
+  described all of the top five as Kubota dealers or salespeople.
+
+## Business value
+
+The tool is for an agency's influencer team. It turns a client's two URLs into a
+first shortlist they can review, so their time goes to judging and contacting
+creators rather than searching for them.
+
+- **Speed.** A live job takes about 9-11 minutes without anyone watching it.
+- **Known cost per brief.** Apify is budgeted at up to $1.50 per job, with a hard
+  check before each run. LLM cost is separate and not tracked.
+- **Reasoning the team can check.** Each creator comes with component scores, a
+  reason, flags, and evidence videos, so a shortlist can be challenged and
+  explained to a client. It can be exported to CSV.
+- **Consistent criteria.** Every client goes through the same filters and scoring,
+  which also gives the team one place to tune them.
+- **Fewer poor fits reaching a person.** Own-brand, competitor, inactive, non-Thai,
+  and out-of-range accounts are removed before review, 58-106 per live job.
+
+The time saved has not been measured: there is no manual baseline, and the tool
+has not been used on a real campaign. A pilot should compare these on the same
+briefs:
+
+1. Hours from brief to approved shortlist, against the current manual process.
+2. The share of suggested creators the team accepts.
+3. Creator response and booking rates.
+4. Campaign results per creator, which can also become ranking labels for
+   [the eval harness](#scoring).
 
 ## Design decisions and trade-offs
 
@@ -517,16 +588,81 @@ media accounts, and a second discovery round.
 facebook.com or fb.com, rejects website URLs on local or private addresses,
 and the web reader checks resolved addresses before a direct fetch.
 
+## Ethics and privacy
+
+This section records how the prototype behaves and what must change before real
+use. It is not legal advice, and production use needs legal review.
+
+**What the tool does to reduce harm**
+
+- **No inference from faces.** Audience is estimated from text only. The judge
+  prompt forbids inferring age or gender from faces, appearance, or photos, and
+  its creator cards contain no images.
+- **Audience is labeled as an estimate.** Low-confidence estimates shrink toward
+  neutral, and the web app marks low-confidence scores as limited data.
+- **A person makes the decision.** The output is a shortlist with evidence for a
+  marketer to review. A `risky` flag is an LLM's reading of text, not a finding
+  about the creator.
+- **Secrets stay out of output.** Keys are not logged or put in error messages,
+  and `/api/health` reports them only as set or missing.
+- **Local by default.** Compose binds to localhost, and demo mode uses only
+  fixtures.
+
+**Data handling in live mode**
+
+- **Personal data.** Public handles, nicknames, bios, captions, and avatar links
+  can identify a person. This tool treats them as personal data under Thailand's
+  [PDPA](#references), even though they are public.
+- **Third parties.** Apify receives the Facebook URL, search queries, and creator
+  handles. Jina receives the website URL. Creator handles, nicknames, bios, and
+  captions go to the configured LLM host. Embeddings stay on the machine.
+- **Retention.** Jobs and creator data stay in SQLite, and the API has no delete
+  endpoint. Web, Facebook, and profile caches stop being used after 7 days, but
+  the files stay on disk, and embedding vectors do not expire.
+- **Creator rights.** There is no process to notify creators, handle their
+  requests, or remove them from results.
+
+**Platform terms**
+
+Live mode collects data through third-party scrapers, the route the brief
+suggests for a prototype. The platforms restrict this:
+[TikTok's terms](#references) prohibit automated scripts that collect information
+from the service, and [Meta's terms](#references) require express written
+permission for automated data collection.
+
+**Before production**
+
+1. Get legal review of the PDPA lawful basis, privacy notice, and platform terms,
+   and move to permitted data access wherever it is available.
+2. Add a retention period, deletion, and a way to handle creator requests.
+3. Add authentication and role-based access to jobs and creator data.
+4. Sign data processing terms with vendors, or use a self-hosted LLM.
+5. Ask shortlisted creators for their own TikTok analytics, with their agreement,
+   for real audience demographics.
+
 ## Known limitations
 
 - **The tuning values are not fitted.** The score weighting, the shrinkage constant,
   and the MMR lambda are reasoned starting points. The eval labels are drafts,
   and on the example pool ablating A does not lower NDCG@10, so that term is
   not yet supported by evidence.
-- **Shop and media detection can misfire.** It matches tokens such as `shop`,
-  `store`, `official`, `news`, `media`, and `tv` inside handle segments and the
-  nickname, so a legitimate creator with `official` or `tv` in the name can be
-  dropped.
+- **Shop and media detection misses and misfires.** It matches tokens such as
+  `shop`, `store`, `official`, `news`, `media`, and `tv` inside handle segments
+  and the nickname. A legitimate creator with `official` or `tv` in the name can
+  be dropped. Dealers, salespeople, and shops without those tokens get through:
+  in the Siam Kubota run, the judge described the top five as dealers or
+  salespeople, and nothing removes a creator because of what the judge wrote.
+- **The tier guess is unstable.** Two InnovestX runs less than an hour apart
+  guessed macro (800k) and mid (150k), which changed T and the shortlist. Only
+  three creators appeared in both top fives.
+- **Competitor sponsorship can be missed.** It depends on the competitors the LLM
+  lists. One InnovestX run gave a reason mentioning a Dime-sponsored post, but
+  raised no `competitor_sponsored` flag and did not list Dime as a competitor.
+- **LLM replies can come back empty.** Two Akha Ama jobs failed at brand analysis
+  this way before `LLM_MAX_TOKENS` was raised to 16000. The fix has one successful
+  run behind it.
+- **Content style is thin.** The brief captures the brand's tone in words, not its
+  formats or how its content is made.
 - **`on_topic` is keyword-based.** Terms are expanded from a small built-in
   category lexicon with a bio fallback, but a relevant video described in
   unseen words can still be missed, and a passing mention still counts as a
@@ -536,8 +672,7 @@ and the web reader checks resolved addresses before a direct fetch.
   prices rise, real spend can pass the budget until the rates are updated.
 - **The live budget caps enrichment.** The 20-profile default fits only at the
   estimated rates. If real prices are higher, the guard skips the last
-  profiles, and they keep `search_stats_only` stats. This has not been verified
-  on a live v2 run.
+  profiles, and they keep `search_stats_only` stats.
 - **TikTok search is not cached.** Web pages, Facebook pages, profile
   enrichment, and embeddings are cached, but every search query is a paid run.
   Repeating a job without changing the brand still pays for search.
@@ -547,17 +682,9 @@ and the web reader checks resolved addresses before a direct fetch.
 - **The Facebook web fallback can accept a login wall.** When it reads the page
   through Jina, it does not detect Facebook's login page, so the brand profile
   may get login text instead of the page's "about".
-- **The candidate pool is measured on one brand.** Three live runs on the same
-  retail brand, all before matching v2. The run in the screenshots used the
-  first settings (10 videos per query, a language-and-region filter, a loop
-  that counted every creator); it found 48 creators and kept 12. A run with 20
-  videos per query and the Thai-script filter found 210 and kept 60 after two
-  rounds, and spent $0.93 of real Apify credit. A run with 15 videos per query,
-  recalibrated estimates, and LLM retries found 138 creators in two rounds and
-  kept 33. It took 10 min 14 s and spent $0.78 of real Apify credit: 10 search
-  runs and 7 profile runs. One profile run timed out and the budget skipped 2
-  more, so at most 6 creators got profile stats. No live run has used matching
-  v2, so the current recall, runtime, and spend are unmeasured.
+- **Quality is measured on a few brands, without labels.** The
+  [live runs](#live-results) cover four brands and no marketer has rated them, so
+  recall and real shortlist quality are unmeasured.
 - **The brand mention check is literal.** A creator who refers to the brand
   only in speech, an image, or an unlisted nickname does not get the bonus, and
   an alias the LLM misses is not matched.
@@ -572,9 +699,9 @@ and the web reader checks resolved addresses before a direct fetch.
 ## Testing
 
 ```bash
-cd backend && uv run pytest          # 384 tests
+cd backend && uv run pytest          # 451 tests
 cd backend && uv run python ../eval/run_eval.py   # NDCG@10, no network
-cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 41 Vitest tests
+cd frontend && pnpm lint && pnpm test   # ESLint, Prettier, 77 Vitest tests
 ```
 
 The tests make no network calls. The backend suite covers the graph routing and
@@ -590,22 +717,32 @@ embedder. They need real keys, and the Apify one spends credit.
 
 ## Next steps
 
-1. **Human labels and tuning.** Replace the draft eval labels with a marketer's
+1. **Remove sellers from the shortlist.** Have the judge return an account type
+   and filter dealers, salespeople, and shops, including the brand's own sales
+   channel.
+2. **A stable tier guess.** Keep the same brand from swinging between tiers, for
+   example by caching the brief or letting a marketer confirm the tier.
+3. **Human labels and tuning.** Replace the draft eval labels with a marketer's
    labels for a few brands, then use [`eval/README.md`](eval/README.md) to
    tune the scoring values and confirm that each term earns its place.
-2. **A live run with matching v2.** Measure recall, runtime, enriched profiles,
-   and spend on the current pipeline; the current figures predate it.
-3. **More enrichment within budget.** Raise the profile cap only when the
+4. **A pilot.** Run the [business value](#business-value) comparison on real
+   briefs.
+5. **Real audience data.** Use creator-shared analytics or permitted data access,
+   then replace A with measured demographics.
+6. **Privacy and access work.** Complete the
+   [before-production list](#ethics-and-privacy).
+7. **More enrichment within budget.** Raise the profile cap only when the
    estimated spend allows it, and measure whether profile stats change the top
    10 enough to justify the cost.
-4. **Better signals.** Add comment language as a weak audience signal, detect
-   the Facebook login wall, and warn when the budget skips a Facebook run.
-5. **Real spend tracking.** Read `usageTotalUsd` from Apify's run API after each
+8. **Better signals.** Describe the brand's content formats, add comment language
+   as a weak audience signal, detect the Facebook login wall, and warn when the
+   budget skips a Facebook run.
+9. **Real spend tracking.** Read `usageTotalUsd` from Apify's run API after each
    run instead of estimating.
-6. **CI.** Run the backend and frontend suites and the Docker build on every
-   pull request.
-7. **Production shape.** Authentication, a shared database, and a job queue if
-   it ever needs more than one node.
+10. **CI.** Run the backend and frontend suites and the Docker build on every
+    pull request.
+11. **Production shape.** A shared database and a job queue if it ever needs more
+    than one node.
 
 ## Repo layout
 
@@ -642,3 +779,29 @@ docs/
 docker-compose.yml
 .env.example
 ```
+
+## References
+
+Data collection:
+
+- [Apify TikTok Scraper](https://apify.com/clockworks/tiktok-scraper) and
+  [TikTok Profile Scraper](https://apify.com/clockworks/tiktok-profile-scraper)
+- [Apify Facebook Pages Scraper](https://apify.com/apify/facebook-pages-scraper)
+  and [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper)
+- [Jina Reader](https://jina.ai/reader/) and
+  [Trafilatura](https://trafilatura.readthedocs.io/)
+
+AI and application:
+
+- [NVIDIA Nemotron 3.5 Lightning](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b)
+- [Google EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2) and
+  [Sentence Transformers](https://sbert.net/)
+- [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview) and
+  [FastAPI](https://fastapi.tiangolo.com/)
+
+Law and platform terms:
+
+- [Personal Data Protection Act B.E. 2562 (2019), unofficial English translation, Ministry of Digital Economy and Society](https://www.mdes.go.th/law/detail/3577)
+- [Thailand's Personal Data Protection Committee](https://www.pdpc.or.th)
+- [TikTok Terms of Service](https://www.tiktok.com/legal/page/row/terms-of-service/en)
+- [Meta Automated Data Collection Terms](https://www.facebook.com/legal/automated_data_collection_terms)

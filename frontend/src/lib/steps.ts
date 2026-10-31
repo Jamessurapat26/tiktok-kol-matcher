@@ -27,6 +27,7 @@ export type StageName = (typeof STAGE_ORDER)[number]
 const NODE_STAGE: Record<string, StageName> = {
   scrape_website: 'scraping',
   scrape_facebook: 'scraping',
+  research_brand: 'analyzing_brand',
   analyze_brand: 'analyzing_brand',
   generate_queries: 'generating_queries',
   discover_kols: 'discovering_kols',

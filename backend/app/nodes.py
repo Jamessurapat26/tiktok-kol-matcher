@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
 
+from langgraph.errors import GraphBubbleUp
 from langgraph.graph import END
 from pydantic import ValidationError
 
@@ -19,6 +20,7 @@ from .integrations import Integrations
 from .integrations.apify import (
     ApifyBudgetExceeded,
     ApifyLimits,
+    TIKTOK_ACTOR,
     estimate_run_cost,
 )
 from .integrations.web_reader import truncate
@@ -31,9 +33,6 @@ from .thai import is_thai_creator
 
 Node = Callable[[MatchState], dict[str, Any]]
 
-_SEARCH_ACTOR = "clockworks/tiktok-scraper"
-_PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
-
 
 def _guarded(name: str, *, stage_on_error: bool = True) -> Callable[[Node], Node]:
     """Turn any node exception into an ``errors`` update instead of a crash.
@@ -42,6 +41,7 @@ def _guarded(name: str, *, stage_on_error: bool = True) -> Callable[[Node], Node
     becomes ``"failed"`` and fail-fast routers stop the graph immediately.
     Scrapers pass ``stage_on_error=False`` because they share a parallel
     superstep and must not write ``stage``; they only record errors.
+    ``GraphBubbleUp`` passes through so ``interrupt()`` can pause the graph.
     """
 
     def decorator(fn: Node) -> Node:
@@ -49,6 +49,9 @@ def _guarded(name: str, *, stage_on_error: bool = True) -> Callable[[Node], Node
         def wrapper(state: MatchState) -> dict[str, Any]:
             try:
                 return fn(state)
+            except GraphBubbleUp:
+                # Control flow, not failure: interrupt() pauses the graph this way.
+                raise
             except Exception as exc:  # noqa: BLE001 - node boundary must not crash
                 update: dict[str, Any] = {"errors": [f"{name}: {exc}"]}
                 if stage_on_error:
@@ -173,6 +176,32 @@ def make_nodes(
             update["errors"] = [f"scrape_facebook: warning: {page.source_warning}"]
         return update
 
+    @_guarded("research_brand", stage_on_error=False)
+    def research_brand(state: MatchState) -> dict[str, Any]:
+        """Add web facts to the scraped pages. The brief can go on without them."""
+        # With no brand source there is nothing to anchor a search to, and
+        # analyze_brand reports that as the fatal error.
+        if not state.website_content and state.facebook_page is None:
+            return {}
+        research = integrations.researcher.research(
+            str(state.request.website_url),
+            state.website_content,
+            state.facebook_page,
+        )
+        update: dict[str, Any] = {}
+        if research.notes:
+            update["brand_research"] = research.notes
+        elif research.llm_calls:
+            update["errors"] = ["research_brand: warning: no web evidence found"]
+        cost_log: list[str] = []
+        if research.llm_calls:
+            cost_log.append(f"llm: research_brand {research.llm_calls} calls")
+        if research.searches:
+            cost_log.append(f"web search: {research.searches} queries")
+        if cost_log:
+            update["cost_log"] = cost_log
+        return update
+
     @_guarded("analyze_brand")
     def analyze_brand(state: MatchState) -> dict[str, Any]:
         # Either source is enough. Only a run with neither is fatal.
@@ -186,6 +215,7 @@ def make_nodes(
         profile = integrations.llm.analyze_brand(
             state.website_content,
             state.facebook_page,
+            state.brand_research,
         )
         profile = _with_url_aliases(
             profile,
@@ -197,6 +227,7 @@ def make_nodes(
             "brand_sources": [
                 "website: used" if state.website_content else "website: skipped",
                 "facebook: used" if state.facebook_page is not None else "facebook: skipped",
+                *(["web research: used"] if state.brand_research else []),
             ],
             "stage": "analyzing_brand",
             "cost_log": ["llm: analyze_brand 1 call"],
@@ -263,9 +294,10 @@ def make_nodes(
         if queries:
             limits = ApifyLimits.from_env()
             per_run = estimate_run_cost(
-                _SEARCH_ACTOR,
+                TIKTOK_ACTOR,
                 limits.tiktok_results_per_query,
                 limits.tiktok_search_max_charge_usd,
+                proxied=True,
             )
             cost_log.append(
                 f"search round {next_round}: est "
@@ -480,7 +512,7 @@ def make_nodes(
         if attempted:
             limits = ApifyLimits.from_env()
             per_profile = estimate_run_cost(
-                _PROFILE_ACTOR,
+                TIKTOK_ACTOR,
                 limits.tiktok_profile_videos,
                 limits.tiktok_profile_max_charge_usd,
             )
@@ -550,6 +582,7 @@ def make_nodes(
     return {
         "scrape_website": scrape_website,
         "scrape_facebook": scrape_facebook,
+        "research_brand": research_brand,
         "analyze_brand": analyze_brand,
         "generate_queries": generate_queries,
         "discover_kols": discover_kols,

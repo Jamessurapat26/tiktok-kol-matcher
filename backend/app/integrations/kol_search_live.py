@@ -1,9 +1,9 @@
-"""Live TikTok KOL search via the Apify actor ``clockworks/tiktok-scraper``.
+"""Live TikTok KOL search via the Apify actor ``clockworks/free-tiktok-scraper``.
 
-Store page: https://apify.com/clockworks/tiktok-scraper
+Store page: https://apify.com/clockworks/free-tiktok-scraper
 
 Each query is one synchronous run of
-``POST /v2/actors/clockworks~tiktok-scraper/run-sync-get-dataset-items``.
+``POST /v2/actors/clockworks~free-tiktok-scraper/run-sync-get-dataset-items``.
 A query that is only hashtags (an optional trailing "tiktok" is ignored) is
 sent as ``hashtags``. Every other query is sent as ``searchQueries`` with
 ``searchSection`` ``/video``, so each dataset item is a video that carries
@@ -38,13 +38,13 @@ from .apify import (
     ApifyBudgetExceeded,
     ApifyClient,
     ApifyError,
+    TIKTOK_ACTOR,
+    TIKTOK_PROXY_COUNTRY,
     as_count,
     avatar_from_item,
     dig,
 )
 from .tiktok_videos import video_from_item
-
-SEARCH_ACTOR = "clockworks/tiktok-scraper"
 
 _HASHTAG_TOKEN = re.compile(r"#([\w\u0E00-\u0E7F]+)")
 _TIKTOK_WORD = re.compile(r"tiktok", re.IGNORECASE)
@@ -65,7 +65,7 @@ _QUIET_INPUT: dict[str, Any] = {
     "downloadSubtitlesOptions": "NEVER_DOWNLOAD_SUBTITLES",
     "scrapeRelatedVideos": False,
     "commentsPerPost": 0,
-    "proxyCountryCode": "None",
+    "proxyCountryCode": TIKTOK_PROXY_COUNTRY,
 }
 
 
@@ -273,7 +273,7 @@ def _region(item: dict[str, Any]) -> str | None:
 
 
 class ApifyKolSearch:
-    """Search TikTok for creators with ``clockworks/tiktok-scraper``."""
+    """Search TikTok for creators with ``clockworks/free-tiktok-scraper``."""
 
     def __init__(
         self,
@@ -319,7 +319,7 @@ class ApifyKolSearch:
                 continue
             try:
                 items = self._apify.run_sync_get_items(
-                    SEARCH_ACTOR,
+                    TIKTOK_ACTOR,
                     search_input(query, max_results=self.max_results),
                     max_items=self.max_results,
                 )

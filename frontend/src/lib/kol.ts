@@ -1,4 +1,4 @@
-import type { RankedKol } from '@/api/types'
+import type { ContentFormat, KolProfile, RankedKol } from '@/api/types'
 
 /** Below this confidence a score is marked as limited data. */
 const LOW_CONFIDENCE = 0.5
@@ -23,6 +23,28 @@ export function scoreRows({ scores }: RankedKol): ScoreRow[] {
     row('T', 'ขนาดผู้ติดตามเหมาะสม', scores.T, scores.T_conf),
     row('A', 'กลุ่มผู้ชม (ประมาณการ)', scores.A_eff, scores.A_conf),
   ]
+}
+
+const FORMAT_LABELS: Record<ContentFormat, string> = {
+  review: 'รีวิว',
+  tutorial: 'สอน/แนะนำวิธี',
+  unboxing: 'แกะกล่อง',
+  comparison: 'เปรียบเทียบ',
+  vlog: 'Vlog',
+  comedy: 'ตลก',
+  storytelling: 'เล่าเรื่อง',
+  challenge: 'ชาเลนจ์',
+  lifestyle: 'ไลฟ์สไตล์',
+  news: 'ข่าว/อัปเดต',
+}
+
+export function formatLabel(format: ContentFormat): string {
+  return FORMAT_LABELS[format]
+}
+
+/** Recent videos TikTok labels as ads. Unlabelled videos can still be sponsored. */
+export function adVideoCount(kol: KolProfile): number {
+  return kol.videos.filter((video) => video.is_ad).length
 }
 
 const FLAG_LABELS: Record<string, string> = {

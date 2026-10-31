@@ -13,6 +13,7 @@ MAX_SEARCH_ROUNDS = 3
 _NODE_ORDER = (
     "scrape_website",
     "scrape_facebook",
+    "research_brand",
     "analyze_brand",
     "generate_queries",
     "discover_kols",
@@ -62,11 +63,13 @@ def build_graph(
     for name in _NODE_ORDER:
         graph.add_node(name, nodes[name])
 
-    # Both scrapers start together; the list form makes analyze_brand wait for
-    # both of them to finish (fan-in).
+    # Both scrapers start together; the list form makes research_brand wait for
+    # both of them to finish (fan-in). Research failures are only warnings, so
+    # it always continues to analyze_brand.
     graph.add_edge(START, "scrape_website")
     graph.add_edge(START, "scrape_facebook")
-    graph.add_edge(["scrape_website", "scrape_facebook"], "analyze_brand")
+    graph.add_edge(["scrape_website", "scrape_facebook"], "research_brand")
+    graph.add_edge("research_brand", "analyze_brand")
 
     def _edge(source: str, target: str) -> None:
         graph.add_conditional_edges(

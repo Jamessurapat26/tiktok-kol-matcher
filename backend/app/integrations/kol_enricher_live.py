@@ -1,6 +1,6 @@
-"""Live TikTok profile enrichment via ``clockworks/tiktok-profile-scraper``.
+"""Live TikTok profile enrichment via ``clockworks/free-tiktok-scraper``.
 
-Store page: https://apify.com/clockworks/tiktok-profile-scraper
+Store page: https://apify.com/clockworks/free-tiktok-scraper
 
 Recent videos for one handle are fetched with downloads, subtitles, and comment
 scrapes turned off, and with pinned posts excluded so they are not billed.
@@ -38,10 +38,16 @@ import httpx
 from pydantic import ValidationError
 
 from ..models import KolProfile, VideoStats, normalize_handle
-from .apify import ApifyBudget, ApifyClient, ApifyError, avatar_from_item, dig
+from .apify import (
+    ApifyBudget,
+    ApifyClient,
+    ApifyError,
+    TIKTOK_ACTOR,
+    avatar_from_item,
+    dig,
+)
 from .tiktok_videos import video_from_item
 
-PROFILE_ACTOR = "clockworks/tiktok-profile-scraper"
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 SUMMARY_CHARS = 400
 _WEEK_SECONDS = 7 * 24 * 60 * 60
@@ -58,6 +64,7 @@ _QUIET_INPUT: dict[str, Any] = {
     "shouldDownloadAvatars": False,
     "downloadSubtitlesOptions": "NEVER_DOWNLOAD_SUBTITLES",
     "commentsPerPost": 0,
+    "proxyCountryCode": "None",
 }
 
 
@@ -307,7 +314,7 @@ class ApifyKolEnricher:
             return {}
 
         items = self._apify.run_sync_get_items(
-            PROFILE_ACTOR,
+            TIKTOK_ACTOR,
             profile_input(handle, max_videos=self.max_videos),
             max_items=self.max_videos,
         )

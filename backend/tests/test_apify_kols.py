@@ -268,7 +268,7 @@ def test_search_posts_one_run_per_query_without_putting_the_token_in_the_url():
     assert len(seen) == 2
     assert all(
         request.url.path
-        == "/v2/actors/clockworks~tiktok-scraper/run-sync-get-dataset-items"
+        == "/v2/actors/clockworks~free-tiktok-scraper/run-sync-get-dataset-items"
         for request in seen
     )
     for request in seen:
@@ -285,6 +285,7 @@ def test_search_posts_one_run_per_query_without_putting_the_token_in_the_url():
     hashtag = json.loads(seen[1].content)
     assert keyword["searchQueries"] == ["blue light glasses"]
     assert keyword["searchSection"] == "/video"
+    assert keyword["proxyCountryCode"] == "TH"
     assert keyword["resultsPerPage"] == 4
     assert keyword["shouldDownloadVideos"] is False
     assert keyword["shouldDownloadCovers"] is False
@@ -476,7 +477,7 @@ def test_enricher_request_and_cache(tmp_path):
         calls["n"] += 1
         assert (
             request.url.path
-            == "/v2/actors/clockworks~tiktok-profile-scraper/run-sync-get-dataset-items"
+            == "/v2/actors/clockworks~free-tiktok-scraper/run-sync-get-dataset-items"
         )
         assert request.headers["authorization"] == f"Bearer {_TOKEN}"
         assert _TOKEN not in str(request.url)
@@ -637,7 +638,7 @@ def test_live_sizes_come_from_env_in_the_actor_inputs(monkeypatch, tmp_path):
         seen.append(
             (request.url.path, request.url.params, json.loads(request.content))
         )
-        if "profile-scraper" in request.url.path:
+        if "profiles" in json.loads(request.content):
             return httpx.Response(201, json=_profile_sample())
         return httpx.Response(201, json=_search_sample())
 
@@ -652,10 +653,12 @@ def test_live_sizes_come_from_env_in_the_actor_inputs(monkeypatch, tmp_path):
 
     search_path, search_params, search_body = seen[0]
     profile_path, profile_params, profile_body = seen[1]
-    assert "clockworks~tiktok-scraper" in search_path
+    assert "clockworks~free-tiktok-scraper" in search_path
     assert search_body["resultsPerPage"] == 7
     assert search_params["maxItems"] == "7"
-    assert "clockworks~tiktok-profile-scraper" in profile_path
+    assert "clockworks~free-tiktok-scraper" in profile_path
+    assert search_body["proxyCountryCode"] == "TH"
+    assert profile_body["proxyCountryCode"] == "None"
     assert profile_body["resultsPerPage"] == 3
     assert profile_params["maxItems"] == "3"
     assert any(row.get("handle") == "gretalynnhihi" for row in rows)

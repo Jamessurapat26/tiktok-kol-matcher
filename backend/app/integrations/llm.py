@@ -1,11 +1,28 @@
 from typing import Protocol
 
 from ..brand_match import normalize_for_match
-from ..models import BrandProfile, FacebookPage, Judgement, KolProfile, TargetAudience
+from ..models import (
+    BrandProfile,
+    ContentAnalysis,
+    FacebookPage,
+    Judgement,
+    KolProfile,
+    TargetAudience,
+)
+from ..prompts import judge_videos
 
 _RISKY_WORDS = ("gambling", "พนัน", "casino", "บาคาร่า")
 _AUDIENCE_HITS_FOR_ONE = 2
 _TOPIC_HITS_FOR_ONE = 3
+_FORMAT_WORDS = {
+    "review": ("รีวิว", "review"),
+    "tutorial": ("สอน", "วิธี", "how to", "tutorial"),
+    "unboxing": ("แกะกล่อง", "unbox"),
+    "comparison": ("เทียบ", " vs "),
+    "vlog": ("vlog", "ชีวิตประจำวัน"),
+    "comedy": ("ตลก", "ฮา", "comedy"),
+}
+_FORMATS_FOR_FULL_FIT = 2
 
 
 class BrandAnalyzer(Protocol):
@@ -13,6 +30,7 @@ class BrandAnalyzer(Protocol):
         self,
         website_content: str | None,
         facebook_page: FacebookPage | None,
+        research: str | None = None,
     ) -> BrandProfile:
         """Build a structured brand profile from the scraped sources."""
         ...
@@ -85,6 +103,34 @@ def _judgement_reason(matched: list[str], audience_hits: list[str]) -> str:
     return "ไม่พบหัวข้อของแบรนด์ในเนื้อหาของ KOL"
 
 
+def _mock_content(brief: BrandProfile, kol: KolProfile) -> ContentAnalysis | None:
+    """Read formats from caption keywords, so demo mode can show this section."""
+    formats: list[str] = []
+    evidence: list[str] = []
+    for video in judge_videos(kol):
+        caption = video.caption.casefold()
+        for name, words in _FORMAT_WORDS.items():
+            if any(word in caption for word in words):
+                if name not in formats:
+                    formats.append(name)
+                if video.url and video.url not in evidence:
+                    evidence.append(video.url)
+    if not formats:
+        return None
+    shared = [name for name in formats if name in brief.content_formats]
+    return ContentAnalysis(
+        formats=formats[:3],
+        style=f"โพสต์แนว {', '.join(formats[:3])} ตามแคปชันล่าสุด",
+        style_fit=min(1.0, len(shared) / _FORMATS_FOR_FULL_FIT),
+        style_reason=(
+            f"รูปแบบตรงกับแบรนด์: {', '.join(shared)}"
+            if shared
+            else "รูปแบบคอนเทนต์ต่างจากที่แบรนด์ต้องการ"
+        ),
+        evidence_urls=evidence[:3],
+    )
+
+
 class MockBrandAnalyzer:
     """MOCK: replace with real implementation (LLM calls)."""
 
@@ -92,6 +138,7 @@ class MockBrandAnalyzer:
         self,
         website_content: str | None,
         facebook_page: FacebookPage | None,
+        research: str | None = None,
     ) -> BrandProfile:
         sources = []
         if website_content:
@@ -127,6 +174,8 @@ class MockBrandAnalyzer:
                 interests=["gaming", "esports", "tech", "lifestyle", "eyewear"],
             ),
             tone="energetic, friendly, gamer-coded",
+            content_formats=["review", "comparison", "tutorial"],
+            content_style="Hands-on gear reviews with real gaming setups.",
             topic_keywords_th=[
                 "แว่นกันแสงสีฟ้า",
                 "แว่นเกมมิ่ง",
@@ -151,6 +200,7 @@ class MockBrandAnalyzer:
             category_th="แว่นเกมมิ่ง / แว่นกรองแสงสีฟ้า",
             key_products_th=["แว่นกรองแสงสีฟ้า", "แว่นเกมมิ่ง", "คลิปออนกรองแสงสีฟ้า"],
             tone_th="สนุก เป็นกันเอง สไตล์เกมเมอร์",
+            content_style_th="รีวิวอุปกรณ์จากการใช้งานจริงในเซ็ตอัปเล่นเกม",
             interests_th=["เกม", "อีสปอร์ต", "เทคโนโลยี", "ไลฟ์สไตล์", "แว่นตา"],
             tier_reason_th=tier_reason_th,
         )
@@ -223,6 +273,7 @@ class MockBrandAnalyzer:
                     audience_confidence=min(0.9, len(profile_text) / 1500),
                     reason=_judgement_reason(matched, audience_hits),
                     risky=risky,
+                    content=_mock_content(brief, kol),
                 )
             )
         return judgements

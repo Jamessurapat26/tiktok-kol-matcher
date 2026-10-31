@@ -54,7 +54,7 @@ curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
     "facebook_url": "https://www.facebook.com/example-brand",
     "top_k": 3
   },
-  "flags": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false},
+  "flags": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false, "live_search": false},
   "errors": [],
   "brand_logo_url": null,
   "brand_profile": {
@@ -85,9 +85,9 @@ curl localhost:8000/api/jobs/14aa56a39f8845cab15a866b34308480
   "cost_log": [
     "llm: analyze_brand 1 call",
     "llm: generate_queries round 1 1 call",
-    "search round 1: est $0.52 (8 queries)",
+    "search round 1: est $0.56 (8 queries)",
     "llm: generate_queries round 2 1 call",
-    "search round 2: est $0.13 (2 queries)",
+    "search round 2: est $0.14 (2 queries)",
     "enrich: est $0.70 (20 profiles)",
     "llm: judge 1 call (20 creators)"
   ],
@@ -223,7 +223,7 @@ curl localhost:8000/api/health
 {
   "status": "ok",
   "mode": "demo",
-  "defaults": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false},
+  "defaults": {"live_web": false, "live_fb": false, "live_kols": false, "live_llm": false, "live_embed": false, "live_search": false},
   "credentials": {
     "APIFY_TOKEN": false,
     "LLM_API_KEY": false,
@@ -339,14 +339,14 @@ The default run uses the offline KOL fixtures and does not call Apify.
 header. It is not written to logs or error messages. If it is missing, the CLI
 exits with code 2 before the pipeline starts.
 
-- **Search** uses [clockworks/tiktok-scraper](https://apify.com/clockworks/tiktok-scraper).
+- **Search** uses [clockworks/free-tiktok-scraper](https://apify.com/clockworks/free-tiktok-scraper)
+  (TikTok Data Extractor) with `proxyCountryCode` set to `TH`.
   A query that is only a hashtag (a trailing "tiktok" is ignored, so
   `#examplebrand tiktok` counts) is sent as `hashtags`. Every other query is sent as
   `searchQueries` with `searchSection` set to `/video`, so each item is a video
   with `authorMeta`. Authors are deduped. Rows without a handle, and actor
   `errorCode` items, are skipped and recorded by `discover_kols`.
-- **Enrichment** uses [clockworks/tiktok-profile-scraper](https://apify.com/clockworks/tiktok-profile-scraper)
-  to fetch recent videos for one profile. Each video keeps its views, likes,
+- **Enrichment** uses the same actor, without the proxy, to fetch recent videos for one profile. Each video keeps its views, likes,
   comments, shares, date, caption, and URL, and the profile is marked
   `stats_source: "profile"`. The scorer computes
   `(likes + comments + shares) / views` per video and takes the median; the
@@ -362,7 +362,8 @@ exits with code 2 before the pipeline starts.
   `maxItems`, `limit`, and `maxTotalChargeUsd` (default $0.50) on the sync
   endpoint. Transport errors and HTTP 429/5xx are retried once. Timeouts and
   HTTP 408 are not retried, because the paid run may already be in progress.
-  The store lists these actors from about $1–$2 per 1,000 results.
+  On the Free plan this actor charges $0.003 per result, plus $0.0013 per result
+  for the Thai proxy on search.
 - **Cost control.** Each run has its own cap (`APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD`,
   `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD`, and `APIFY_FACEBOOK_MAX_CHARGE_USD`),
   and one `APIFY_JOB_BUDGET_USD` budget covers the whole job across Facebook,
@@ -448,7 +449,11 @@ way other node failures do.
 The model returns three things for each creator: `judge` (0–1), `audience`
 (0–1), and `audience_confidence` (0–1), plus `risky`, `account_type`
 (`kol`, `seller`, or `media`), and a short reason. Seller and media accounts
-are removed and counted in `rejected`. The
+are removed and counted in `rejected`. The judge reads up to 10 numbered captions
+per creator, with hashtags and TikTok's ad label. It also returns
+`content_formats`, `content_style`, `style_fit`, `style_reason`, and
+`style_evidence`. These fill `RankedKol.content`, which is for display and moves
+no score. `style_fit` is dropped unless it cites a video in the card. The
 judge rubric covers category match, tone match, and no risky content. Audience
 is inferred from text, captions, and bio only, never from faces. Only the top
 20 candidates by first-pass score, or `top_k` when that is larger, are sent, in

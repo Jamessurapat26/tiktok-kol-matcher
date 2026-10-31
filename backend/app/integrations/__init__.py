@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .apify import (
     ApifyBudget,
@@ -8,6 +8,7 @@ from .apify import (
     ApifyLimits,
     DiscoveryLimits,
 )
+from .brand_research import BrandResearcher, MockBrandResearcher
 from .embeddings import Embedder, MockEmbedder
 from .facebook import FacebookScraper, MockFacebookScraper
 from .kol_enricher import KolEnricher, MockKolEnricher
@@ -26,6 +27,7 @@ class Integrations:
     kol_search: KolSearch
     enricher: KolEnricher
     embedder: Embedder
+    researcher: BrandResearcher = field(default_factory=MockBrandResearcher)
 
 
 def build_integrations(
@@ -35,6 +37,7 @@ def build_integrations(
     live_llm: bool = False,
     live_embed: bool = False,
     live_fb: bool = False,
+    live_search: bool = False,
     kol_fixtures: list[dict] | None = None,
     max_results_per_query: int | None = None,
     apify_token: str | None = None,
@@ -53,8 +56,9 @@ def build_integrations(
     The Facebook page is read live through Apify only when ``live_fb`` is true
     (requires ``APIFY_TOKEN``). Its fallback is always the live web reader,
     even without ``live_web``, because the mock website fixture is not a
-    Facebook page. The default never touches the network and does not
-    download a model.
+    Facebook page. Web research on the brand is live only when ``live_search``
+    is true (requires ``JINA_API_KEY`` and an LLM key). The default never
+    touches the network and does not download a model.
 
     When any live Apify flag is on, one ``ApifyBudget`` is shared by Facebook,
     TikTok search, and enrichment. ``apify_limits`` defaults to
@@ -101,6 +105,7 @@ def build_integrations(
         kol_search=kol_search,
         enricher=enricher,
         embedder=_live_embedder() if live_embed else MockEmbedder(),
+        researcher=_live_researcher(llm_api_key) if live_search else MockBrandResearcher(),
     )
 
 
@@ -181,6 +186,12 @@ def _live_llm(api_key: str | None) -> BrandAnalyzer:
     return LiveBrandAnalyzer(api_key=api_key)
 
 
+def _live_researcher(api_key: str | None) -> BrandResearcher:
+    from .brand_research_live import LiveBrandResearcher
+
+    return LiveBrandResearcher(api_key=api_key)
+
+
 def _live_web_reader() -> WebReader:
     from .web_reader_live import (
         CachedWebReader,
@@ -208,6 +219,7 @@ __all__ = [
     "ApifyConfigError",
     "ApifyLimits",
     "BrandAnalyzer",
+    "BrandResearcher",
     "DiscoveryLimits",
     "Embedder",
     "FacebookScraper",

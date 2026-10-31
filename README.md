@@ -151,8 +151,8 @@ uv run python -m app.cli match \
 Progress goes to stderr and the ranked table to stdout. The table shows F, E,
 T, A_eff, their confidences, flags, and the profile URL. It also prints the
 rejected counts and the per-stage cost log. `--json` prints one JSON object
-instead. Add `--live-web`, `--live-fb`, `--live-kols`, `--live-llm`, or
-`--live-embed` to run that service for real. Cost flags:
+instead. Add `--live-web`, `--live-fb`, `--live-kols`, `--live-llm`, `--live-embed`, or
+`--live-search` to run that service for real. Cost flags:
 `--max-results-per-query`, `--max-enrich` (overrides the config's
 `enrich_top_n`, default 20), `--min-candidates`, and `--max-rounds`.
 
@@ -182,16 +182,16 @@ messages, and `/api/health` reports each one only as set or missing.
 | --- | --- | --- |
 | `DEMO_MODE` | `1` forces demo, `0` forces live | unset: live only when `APIFY_TOKEN` is set |
 | `APIFY_TOKEN` | Apify, for Facebook, TikTok search, and enrichment | unset |
-| `APIFY_JOB_BUDGET_USD` | Estimated Apify budget for one job or CLI run | `1.50` |
-| `APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD` | Per-run cap for each TikTok search, at least 0.50 | `0.50` |
-| `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD` | Per-run cap for each profile enrichment, at least 0.50 | `0.50` |
+| `APIFY_JOB_BUDGET_USD` | Estimated Apify budget for one job or CLI run | `1.55` |
+| `APIFY_TIKTOK_SEARCH_MAX_CHARGE_USD` | Per-run cap for each TikTok search | `0.50` |
+| `APIFY_TIKTOK_PROFILE_MAX_CHARGE_USD` | Per-run cap for each profile enrichment | `0.50` |
 | `APIFY_FACEBOOK_MAX_CHARGE_USD` | Per-run cap for each Facebook page or posts run | `0.50` |
 | `APIFY_ENRICH_RESERVE_USD` | Budget TikTok search must leave for enrichment, below the job budget | `0.70` |
 | `TIKTOK_RESULTS_PER_QUERY` | Videos per TikTok search query, 1-50 | `15` |
 | `TIKTOK_PROFILE_VIDEOS` | Recent videos fetched per enriched profile, 1-30 | `10` |
 | `DISCOVERY_MIN_THAI_CANDIDATES` | Thai creators discovery aims for before it stops | `30` |
 | `DISCOVERY_MAX_ROUNDS` | Most query and search rounds, 1-5 | `3` |
-| `JINA_API_KEY` | Optional Jina Reader key for a higher rate limit | unset |
+| `JINA_API_KEY` | Jina key: optional for the web reader (higher rate limit), required for web research on the brand | unset |
 | `WEB_FETCH_ALLOW_PROXY_RANGE` | Allow the direct web fetch guard to reach exactly 198.18.0.0/15 (fake-IP proxy range for some sandboxes; weakens the private-address guard) | off |
 | `LLM_BASE_URL` | OpenAI-compatible API root | `https://integrate.api.nvidia.com/v1` |
 | `LLM_MODEL` | Chat model id | `nvidia/nemotron-3.5-lightning-30b-a3b` |
@@ -209,7 +209,7 @@ messages, and `/api/health` reports each one only as set or missing.
 | `MAX_QUEUED_JOBS` | Queued or running jobs before `POST /api/jobs` returns 429 | `20` |
 
 The last five must be unset, not blank, to take their defaults. An invalid
-Apify or discovery value, such as a TikTok cap below 0.50 or a non-numeric
+Apify or discovery value, such as a TikTok cap of 0 or a non-numeric
 budget, makes `POST /api/jobs` return 400 naming the variable, and makes the
 CLI exit with code 2, before any Apify run starts. `--max-results-per-query`,
 `--min-candidates`, and `--max-rounds` override the matching variables for one
@@ -233,8 +233,9 @@ flowchart TD
         F["scrape_facebook<br/>Apify page + posts actors"]
     end
 
-    W --> A["analyze_brand<br/>one LLM call, structured brief"]
-    F --> A
+    W --> R["research_brand<br/>LLM with a Jina web search tool, at most 3 searches"]
+    F --> R
+    R --> A["analyze_brand<br/>one LLM call, structured brief"]
     A --> Q["generate_queries<br/>topic keywords plus competitors"]
     Q --> D["discover_kols<br/>Apify TikTok search, per-video stats"]
     D -->|"under target Thai creators and rounds left"| Q
@@ -249,6 +250,11 @@ flowchart TD
    superstep. Either source is enough: brand analysis runs when at least one of
    the website text or the Facebook page is available, and fails only when both
    are missing. A missing source is a warning that names the failed scrape.
+   An LLM agent then searches the web for what those pages leave out, such as
+   competitors, stores, price position, and brand size. `bind_tools` and
+   `ToolNode` run the loop, code caps it at 3 searches, and a separate step writes
+   notes with source URLs. Each search costs about 10,000 Jina tokens. Notes exist
+   only when a search returned results, and a research failure is only a warning.
 2. **Structured brief.** One LLM call returns category, key products, price
    tier, target audience, tone, Thai and English topic keywords, competitors,
    `brand_handles`, and a tier guess: `target_followers`, `tier_label`,
@@ -293,7 +299,9 @@ flowchart TD
    stay in the list with the `unreviewed` warning flag and
    `judge` capped at a neutral 0.5 so they cannot pass the judged leaders on
    similarity alone. The rubric checks category match, tone
-   match, and no risky content. Audience is estimated from text, captions, and
+   match, and no risky content. The judge reads up to 10 captions with hashtags
+   and ad labels per creator. It also reports formats, style, and a style fit that
+   must cite a video. These are shown to the Marketer and move no score. Audience is estimated from text, captions, and
    bio only, never from faces. Risky content becomes a flag.
 8. **Output.** Every candidate is scored again now that judged values exist.
    The top k is selected with MMR over `Final`, using caption similarity, so
@@ -439,7 +447,8 @@ tuning once real labels exist.
 
 `estimate_run_cost` in `backend/app/integrations/apify.py` charges `$0.005`
 per run plus a per-item rate, and caps the result at the run's own
-`maxTotalChargeUsd`. The rates are TikTok search `$0.004`, profile enrichment
+`maxTotalChargeUsd`. The rates are TikTok search `$0.0043` (`$0.003` per result
+plus `$0.0013` for the Thai proxy, on the Free plan), profile enrichment
 `$0.003`, Facebook page `$0.015`, and Facebook posts `$0.005` per item. The
 sync endpoint returns dataset items but not usage, so these are estimates.
 
@@ -448,20 +457,20 @@ sync endpoint returns dataset items but not usage, so these are estimates.
 | Facebook page, 1 item | `0.005 + 0.015` = $0.020 |
 | Facebook posts, 20 items | `0.005 + 20 × 0.005` = $0.105 |
 | Facebook subtotal | $0.125 |
-| TikTok search, 15 videos per query | `0.005 + 15 × 0.004` = $0.065 per run |
-| Search runs | 10 runs = $0.65 |
+| TikTok search, 15 videos per query | `0.005 + 15 × 0.0043` = $0.0695 per run |
+| Search runs | 10 runs = $0.695 |
 | Profile enrichment, 10 videos per profile | `0.005 + 10 × 0.003` = $0.035 per run |
 | Profile runs | 20 runs = $0.70 |
-| **Total at the conservative estimate** | **$1.475 of $1.50** |
+| **Total at the conservative estimate** | **$1.52 of $1.55** |
 
 `MatchingConfig.max_search_queries` caps search at 10 queries per job, so an
 eleventh search run is not allowed. Raising `--max-enrich` above 20 would
-need `$1.475 + $0.035 = $1.51` for a 21st profile, over the `$1.50` budget, so
+need `$1.52 + $0.035 = $1.555` for a 21st profile, over the `$1.55` budget, so
 the budget guard would skip it. `estimate_default_job_usd` reproduces this table.
 
 These are estimates from the code's own per-item rates. The
-[live runs](#live-results) stayed inside this plan, but the code does not read
-Apify's billing, so their real spend is unmeasured.
+[live runs](#live-results) used the previous actors and rates, and the code does
+not read Apify's billing, so their real spend is unmeasured.
 
 The reserve matters for enrichment. The `$0.70` reserve guarantees room for 20
 profile runs, which equals `MatchingConfig.enrich_top_n` (default 20), so every
@@ -478,9 +487,9 @@ log with one line per stage, for example:
 cost log:
   llm: analyze_brand 1 call
   llm: generate_queries round 1 1 call
-  search round 1: est $0.52 (8 queries)
+  search round 1: est $0.56 (8 queries)
   llm: generate_queries round 2 1 call
-  search round 2: est $0.13 (2 queries)
+  search round 2: est $0.14 (2 queries)
   enrich: est $0.70 (20 profiles)
   llm: judge 1 call (20 creators)
 ```
@@ -488,6 +497,8 @@ cost log:
 ## Live results
 
 These are the five most recent successful live jobs, with every service live.
+They ran before the switch to TikTok Data Extractor with a Thai proxy on search,
+so their run times, filter counts, and costs come from the previous actors.
 Each one ran one discovery round and logged 20 profile runs. Apify cost is the logged estimate for search and enrichment, so it leaves
 out Facebook (about $0.125).
 
@@ -517,8 +528,9 @@ The tool is for an agency's influencer team. It turns a client's two URLs into a
 first shortlist they can review, so their time goes to judging and contacting
 creators rather than searching for them.
 
-- **Speed.** A live job takes about 9-11 minutes without anyone watching it.
-- **Known cost per brief.** Apify is budgeted at up to $1.50 per job, with a hard
+- **Speed.** A live job took about 9-11 minutes on the previous actors, without
+  anyone watching it. The current actor has not been timed on a full job.
+- **Known cost per brief.** Apify is budgeted at up to $1.55 per job, with a hard
   check before each run. LLM cost is separate and not tracked.
 - **Reasoning the team can check.** Each creator comes with component scores, a
   reason, flags, and evidence videos, so a shortlist can be challenged and
@@ -559,10 +571,8 @@ they share one request. That keeps the expensive stage small and makes the
 rubric consistent across candidates.
 
 **An estimated Apify budget plus per-run caps.** Every Apify run sets
-`maxItems`, `limit`, and `maxTotalChargeUsd`. The TikTok actors reject a cap
-below $0.50, so the TikTok caps default to that minimum and a lower value is
-rejected with an error before any run starts. On top of that,
-`APIFY_JOB_BUDGET_USD` (default $1.50) covers the whole job. A run starts only
+`maxItems`, `limit`, and `maxTotalChargeUsd`. On top of that,
+`APIFY_JOB_BUDGET_USD` (default $1.55) covers the whole job. A run starts only
 if its worst-case estimate, from the item count it asks for, still fits in the
 budget. Runs that do not fit are skipped and recorded as warnings, and the job
 still finishes with what it has. The cost table is in
@@ -669,8 +679,9 @@ permission for automated data collection.
 - **LLM replies can come back empty.** Two Akha Ama jobs failed at brand analysis
   this way before `LLM_MAX_TOKENS` was raised to 16000. The fix has one successful
   run behind it.
-- **Content style is thin.** The brief captures the brand's tone in words, not its
-  formats or how its content is made.
+- **Content style reads text only.** Formats, style, and style fit come from
+  captions and hashtags, not from what is said or shown in the videos. Style fit
+  has no human-checked eval yet, so it is not part of the score.
 - **`on_topic` is keyword-based.** Terms are expanded from a small built-in
   category lexicon with a bio fallback, but a relevant video described in
   unseen words can still be missed, and a passing mention still counts as a
@@ -787,8 +798,7 @@ docker-compose.yml
 
 Data collection:
 
-- [Apify TikTok Scraper](https://apify.com/clockworks/tiktok-scraper) and
-  [TikTok Profile Scraper](https://apify.com/clockworks/tiktok-profile-scraper)
+- [Apify TikTok Data Extractor](https://apify.com/clockworks/free-tiktok-scraper)
 - [Apify Facebook Pages Scraper](https://apify.com/apify/facebook-pages-scraper)
   and [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper)
 - [Jina Reader](https://jina.ai/reader/) and

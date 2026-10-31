@@ -75,8 +75,8 @@ def test_brand_prompt_includes_recent_posts_and_website():
     assert "categories: Eyewear Store" in user
     assert "intro: Blue-light glasses for gamers and students." in user
     assert (
-        "weak_signals_recent_posts (weak signal only: use for tone and"
-        " current campaigns; never as the sole source of a product):" in user
+        "weak_signals_recent_posts (weak signal only: use for tone, content"
+        " style, and current campaigns; never as the sole source of a product):" in user
     )
     posts_block = user.split("weak_signals_recent_posts", 1)[1]
     assert posts_block.count("\n- ") == MAX_PROMPT_POSTS
@@ -458,7 +458,7 @@ def test_scraped_posts_reach_brand_analysis(tmp_path):
     seen: list[FacebookPage | None] = []
 
     class _SpyAnalyzer(MockBrandAnalyzer):
-        def analyze_brand(self, website_content, facebook_page):
+        def analyze_brand(self, website_content, facebook_page, research=None):
             seen.append(facebook_page)
             return super().analyze_brand(website_content, facebook_page)
 

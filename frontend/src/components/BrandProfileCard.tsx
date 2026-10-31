@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCompact, hostOf, initials } from '@/lib/format'
+import { formatLabel } from '@/lib/kol'
 
 const GENDER_LABELS: Record<TargetAudience['gender'], string> = {
   any: 'ทุกเพศ',
@@ -111,6 +112,16 @@ export function BrandProfileCard({ websiteUrl, logoUrl, profile, unavailable }: 
               )}
             </Item>
             <Item label="โทนการสื่อสาร">{thai(profile.tone_th, profile.tone)}</Item>
+            {profile.content_formats && profile.content_formats.length > 0 && (
+              <Item label="รูปแบบคอนเทนต์ที่เหมาะ" wide>
+                <Keywords words={profile.content_formats.map(formatLabel)} />
+              </Item>
+            )}
+            {profile.content_style && (
+              <Item label="สไตล์คอนเทนต์" wide>
+                {thai(profile.content_style_th, profile.content_style)}
+              </Item>
+            )}
             <Item label="สินค้าหลัก" wide>
               <Keywords words={thai(profile.key_products_th, profile.key_products)} />
             </Item>
